@@ -102,12 +102,19 @@ jobs:
       - name: Test
         working-directory: iosApp
         run: |
+          # The Keychain only works from an app that carries the simulator's app-identifier
+          # entitlement, which an unsigned build does not have (SecItemAdd then fails with
+          # -34018). A simulator destination needs no team or provisioning profile, so the app is
+          # signed ad hoc with the local identity instead.
           xcodebuild test \
             -project OpenStrap.xcodeproj \
             -scheme OpenStrap \
             -destination "id=${{ steps.simulator.outputs.id }}" \
             -resultBundlePath build/OpenStrap.xcresult \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual
 
       - name: Upload the test results
         if: always()
