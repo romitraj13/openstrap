@@ -1,0 +1,79 @@
+# Builds and tests the shared Kotlin code and the Swift app on a macOS runner.
+# Android runs on the draft pull request; this workflow runs on the ios branch only so a
+# commit does not pay for two macOS jobs.
+name: iOS
+
+on:
+  push:
+    branches: [ios]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Kotlin tests and XCFramework
+        run: ./gradlew :protocol:iosSimulatorArm64Test :shared:iosSimulatorArm64Test :shared:assembleOpenStrapSharedDebugXCFramework
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        working-directory: iosApp
+        run: |
+          cp Local.xcconfig.example Local.xcconfig
+          xcodegen generate
+
+      - name: Pick an iPhone simulator
+        id: simulator
+        run: |
+          SIM_ID=$(python3 - <<'PY'
+          import json
+          import subprocess
+
+          devices = json.loads(
+              subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"])
+          )["devices"]
+          for runtime in sorted(devices):
+              for device in devices[runtime]:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("no available iPhone simulator")
+          PY
+          )
+          echo "id=$SIM_ID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator $SIM_ID"
+
+      - name: Test
+        working-directory: iosApp
+        run: |
+          xcodebuild test \
+            -project OpenStrap.xcodeproj \
+            -scheme OpenStrap \
+            -destination "id=${{ steps.simulator.outputs.id }}" \
+            -resultBundlePath build/OpenStrap.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload the test results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: OpenStrap.xcresult
+          path: iosApp/build/OpenStrap.xcresult
+          if-no-files-found: warn
