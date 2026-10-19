@@ -1,0 +1,97 @@
+name: OpenStrap
+
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+configFiles:
+  Debug: Base.xcconfig
+  Release: Base.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  OpenStrap:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: OpenStrap
+        excludes:
+          - Info.plist
+          - OpenStrap.entitlements
+    settings:
+      base:
+        INFOPLIST_FILE: OpenStrap/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: OpenStrap/OpenStrap.entitlements
+        # Kotlin's static framework needs the system libraries it links through platform libs:
+        # zlib (platform.zlib) and Security (SecRandomCopyBytes). A static framework does not
+        # carry those linker flags into the app.
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -lz
+          - -framework
+          - Security
+    dependencies:
+      - framework: ../shared/build/XCFrameworks/debug/OpenStrapShared.xcframework
+        embed: false
+        codeSign: false
+
+  OpenStrapTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: OpenStrapTests
+    dependencies:
+      - target: OpenStrap
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: org.example.openstrap.OpenStrapTests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/OpenStrap.app/OpenStrap
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  OpenStrapUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: OpenStrapUITests
+    dependencies:
+      - target: OpenStrap
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: org.example.openstrap.OpenStrapUITests
+        TEST_TARGET_NAME: OpenStrap
+
+schemes:
+  OpenStrap:
+    build:
+      targets:
+        OpenStrap: all
+        OpenStrapTests: [test]
+        OpenStrapUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: OpenStrapTests
+          parallelizable: false
+        - name: OpenStrapUITests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

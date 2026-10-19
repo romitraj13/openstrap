@@ -1,0 +1,4 @@
+// Copy this file to Local.xcconfig and fill in your Apple developer team id.
+// Local.xcconfig is ignored by git.
+DEVELOPMENT_TEAM =
+PRODUCT_BUNDLE_IDENTIFIER = org.example.openstrap

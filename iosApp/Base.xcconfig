@@ -1,0 +1,5 @@
+// Signing settings. Personal values go in Local.xcconfig, which is not committed.
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM =
+PRODUCT_BUNDLE_IDENTIFIER = org.example.openstrap
+#include? "Local.xcconfig"
