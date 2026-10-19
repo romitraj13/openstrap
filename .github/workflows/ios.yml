@@ -30,6 +30,45 @@ jobs:
       - name: Kotlin tests and XCFramework
         run: ./gradlew :protocol:iosSimulatorArm64Test :shared:iosSimulatorArm64Test :shared:assembleOpenStrapSharedDebugXCFramework
 
+      # Gradle prints nothing per test for native targets, so the counts live only in the JUnit
+      # XML. Print them here: the run log then states how many tests actually executed.
+      - name: Summarize the Kotlin test results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob
+          import sys
+          import xml.etree.ElementTree as ET
+
+          paths = sorted(
+              glob.glob("protocol/build/test-results/iosSimulatorArm64Test/*.xml")
+              + glob.glob("shared/build/test-results/iosSimulatorArm64Test/*.xml")
+          )
+          if not paths:
+              print("no JUnit XML found: the Kotlin tests did not run")
+              sys.exit(1)
+
+          totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+          for path in paths:
+              suite = ET.parse(path).getroot()
+              counts = {k: int(suite.get(k, 0)) for k in totals}
+              for k in totals:
+                  totals[k] += counts[k]
+              print(
+                  f"{suite.get('name')}: {counts['tests']} tests, "
+                  f"{counts['failures']} failures, {counts['errors']} errors, "
+                  f"{counts['skipped']} skipped"
+              )
+              for case in suite.iter("testcase"):
+                  print(f"  - {case.get('name')}")
+
+          print(
+              "TOTAL iosSimulatorArm64Test: {tests} tests, {failures} failures, "
+              "{errors} errors, {skipped} skipped".format(**totals)
+          )
+          sys.exit(1 if totals["failures"] or totals["errors"] else 0)
+          PY
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
