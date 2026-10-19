@@ -8,6 +8,14 @@ plugins {
     // The Zepp code parses JSON with kotlinx-serialization-json; the plugin is the same Kotlin
     // version as the compiler (pinned in libs.versions.toml).
     alias(libs.plugins.kotlin.serialization)
+    // Room's KMP compiler runs through KSP: one schema, one database per target.
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
+}
+
+// Room writes the exported schema here; the JVM test opens the database from these entities.
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 kotlin {
@@ -36,6 +44,9 @@ kotlin {
             implementation(libs.coroutines.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)
+            // Room 2.8 is multiplatform; the bundled SQLite build supplies the native driver.
+            api(libs.room.runtime)
+            implementation(libs.sqlite.bundled)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -43,6 +54,15 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(libs.junit)
+            implementation(libs.coroutines.test)
+            // Room's JVM artifacts come with the multiplatform runtime; JUnit is the runner.
         }
     }
+}
+
+dependencies {
+    // KSP2 supports Kotlin/Native; this exact triple is the one verified on this server.
+    add("kspJvm", libs.room.compiler)
+    add("kspIosArm64", libs.room.compiler)
+    add("kspIosSimulatorArm64", libs.room.compiler)
 }
