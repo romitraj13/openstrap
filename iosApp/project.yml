@@ -39,6 +39,11 @@ targets:
           - -lz
           - -framework
           - Security
+      configs:
+        # The unit tests use `@testable import OpenStrap` to reach the Keychain store and the UUID
+        # mapping, so the Debug build has to be built for testing.
+        Debug:
+          ENABLE_TESTABILITY: YES
     dependencies:
       - framework: ../shared/build/XCFrameworks/debug/OpenStrapShared.xcframework
         embed: false

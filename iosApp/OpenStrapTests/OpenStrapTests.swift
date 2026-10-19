@@ -1,6 +1,7 @@
 import XCTest
 import CoreBluetooth
 import OpenStrapShared
+@testable import OpenStrap
 
 final class OpenStrapTests: XCTestCase {
     func testSharedGreetingComesFromKotlin() {
