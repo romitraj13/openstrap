@@ -37,3 +37,11 @@ kotlin {
         }
     }
 }
+
+// The upstream Android workflow runs `:protocol:test`, which the JVM plugin used to provide.
+// Multiplatform renamed it to `jvmTest`; this alias keeps that workflow command working.
+tasks.register("test") {
+    group = "verification"
+    description = "Alias for jvmTest so the upstream Android workflow command keeps working"
+    dependsOn("jvmTest")
+}
