@@ -122,6 +122,12 @@ final class StrapController: ObservableObject {
         logLines.joined(separator: "\n")
     }
 
+    /// A Diagnostics line from another screen (the Zepp sign-in logs one per sign-in). Never
+    /// called with the auth key, a token or a cookie string.
+    func note(_ line: String) {
+        append(line)
+    }
+
     // MARK: - Called by the sink on the main thread
 
     fileprivate func engineState(state: String, detail: String?) {

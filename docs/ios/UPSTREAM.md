@@ -58,12 +58,11 @@ What changed in each copy, and why:
   `PairingFailure(message, keyRejected)` instead of Android's `ConnectionState.Failed`, which does
   not exist in `shared/`. Android has no `PairingErrorsTest`; the 4 tests are new and cover the four
   branches.
-- `ZeppCloud.kt`. Only `normalizeKey` and the `object` declaration were copied, as C3 says; the
-  sign-in session, parsers and networking stay on Android until S1. 1 of the 2 tests
-  (`badKeysAreIgnored`) is copied from Android's `ZeppCloudTest`, and its three assertions are
-  unchanged; the second test (prefixed, colon-separated, upper-case input) is new for C3. The test
-  count deliberately does not match Android's here: S1 copies the whole file and the whole test
-  class, and C3's card says "plus one test" rather than "same count".
+- `ZeppCloud.kt`. C3 copied only `normalizeKey` and the `object` declaration; the sign-in session,
+  parsers and networking stayed on Android until S1. 1 of the 2 tests (`badKeysAreIgnored`) was
+  copied from Android's `ZeppCloudTest`, and its three assertions are unchanged; the second test
+  (prefixed, colon-separated, upper-case input) was new for C3. **S1 replaced both copies with the
+  whole file and the whole test class** — see the S1 section below.
 - `StrapManager.kt` → `StrapEngine.kt`. Lines 136-270 (`startConnect` + `afterAuth`) and 513-598
   (`startLive` + `pauseLive` + `stopLive`). Kept: notification enabling on 0016/0017, the channel
   session, the handshake, the payload-MTU query, firmware from DIS 2A28, battery (channel 0x0029,
@@ -85,3 +84,45 @@ What changed in each copy, and why:
 
 `:shared:jvmTest` after C3: 20 tests, 0 failures (BridgeStrapLinkTest 3, PairingErrorsTest 4,
 ZeppCloudTest 2, BleBridgeTest 5, StrapEngineTest 6).
+
+## S1 (Zepp sign-in as the pairing fallback)
+
+```
+app/src/main/kotlin/org/openstrap/app/zepp/ZeppCloud.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/zepp/ZeppCloud.kt
+app/src/test/kotlin/org/openstrap/app/zepp/ZeppCloudTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/zepp/ZeppCloudTest.kt
+```
+
+What changed, and why:
+
+- `ZeppCloud.kt` is now the file's whole pure half: `ZeppSession`, `BoundDevice`, `DeviceListing`,
+  `sessionFromCookies`, `parseDeviceList`, `pickHelioStrap`, `normalizeKey`, `ZeppCloudException`
+  and the constants (`SIGN_IN_URL`, `COOKIE_URLS`, `API_HOSTS`, `APP_ID`, `APP_VERSION_NAME`,
+  `APP_VERSION_CODE`). Same package, same logic, same wording. `ZeppCloudException` extends
+  `Exception` instead of `IOException`, which common code does not have, and `parseDeviceList`
+  carries `@Throws(ZeppCloudException::class)` so Swift can catch a malformed reply instead of the
+  process aborting on an unhandled Kotlin exception.
+- `org.json` became kotlinx-serialization-json (1.12.0, with the `kotlin-serialization` plugin at
+  the Kotlin version, 2.4.21). `JSONObject.optString`/`optInt` are reproduced by private
+  `JsonObject.text`/`int`/`intOrNull` helpers, including the object-or-JSON-string
+  `additionalInfo` and the `productId >= 0` rule. `java.net.URLDecoder` became a private
+  `urlDecode` over the UTF-8 bytes, with the same `+`-is-space and `%XX` behaviour and the same
+  three-round retry.
+- `const val` became `val` for `SIGN_IN_URL`, `COOKIE_URLS`, `API_HOSTS`, `APP_ID` and the version
+  strings: Kotlin/Native exposes object properties to Swift as `ZeppCloud.shared.<name>`, which is
+  how the Swift request reads them. `APP_ID`, `APP_VERSION_NAME` and `APP_VERSION_CODE` were
+  private on Android and are public here because the Swift request sends them as headers.
+- `listDevices`/`get` — the HTTP request — were not copied. S1 writes it in Swift at
+  `iosApp/OpenStrap/ZeppSignIn/ZeppDeviceListClient.swift`, with the same hosts in the same
+  fallback order, the same path, headers and query parameters (only the `device` query value is
+  `ios_<major>`, because iOS has no Android SDK level). All parsing and picking stays in the
+  shared Kotlin.
+- `BoundDevice` used `StrapIdentity` (`app/src/main/kotlin/org/openstrap/app/firmware/FirmwareCloud.kt`
+  @ 19f2865, lines 18-30) for `DEVICE_SOURCE_GLOBAL`, `DEVICE_SOURCE_CHINA` and `PRODUCT_ID`.
+  Firmware checks are out of S1's scope and that file also does firmware networking, so the three
+  constants are inlined in `BoundDevice`'s private companion as the same values.
+- Tests: all 10 of Android's `ZeppCloudTest` tests are copied, the same count (C3's 2 are replaced).
+  `org.junit.Assert` became `kotlin.test`, `@Test(expected = …)` became `assertFailsWith`, and
+  `java.net.URLEncoder` became a test-local percent-encoding helper with the same unreserved set.
+
+`:shared:jvmTest` after S1: 28 tests, 0 failures (BridgeStrapLinkTest 3, PairingErrorsTest 4,
+ZeppCloudTest 10, BleBridgeTest 5, StrapEngineTest 6).

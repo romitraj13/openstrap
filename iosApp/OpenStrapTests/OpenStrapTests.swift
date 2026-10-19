@@ -61,4 +61,22 @@ final class OpenStrapTests: XCTestCase {
         XCTAssertEqual(bytes.kotlinByteArray.data, bytes)
         XCTAssertEqual(Data().kotlinByteArray.data, Data())
     }
+
+    // MARK: - Zepp sign-in helpers
+
+    /// The cookie header only carries the Zepp domains, so no unrelated cookie reaches the parser
+    /// (or the device-list request).
+    func testCookieHeaderKeepsOnlyTheZeppDomains() throws {
+        let cookies = [
+            try XCTUnwrap(HTTPCookie(properties: [.domain: "watchface.zepp.com", .path: "/", .name: "hm-user-login-info", .value: "x"])),
+            try XCTUnwrap(HTTPCookie(properties: [.domain: ".zepp.com", .path: "/", .name: "apptoken", .value: "t"])),
+            try XCTUnwrap(HTTPCookie(properties: [.domain: "example.com", .path: "/", .name: "other", .value: "y"])),
+        ]
+        XCTAssertEqual(ZeppSignInModel.cookieHeader(from: cookies), "hm-user-login-info=x; apptoken=t")
+        XCTAssertNil(ZeppSignInModel.cookieHeader(from: []))
+    }
+
+    func testMaskedKeyHidesAllButTheLastFourCharacters() {
+        XCTAssertEqual(ZeppSignInModel.maskedKey("ffeeddccbbaa99887766554433221100"), "••••••••1100")
+    }
 }

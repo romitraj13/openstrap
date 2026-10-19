@@ -5,6 +5,9 @@ plugins {
     // The Kotlin Gradle plugin is already on the build classpath (root build.gradle.kts pins the
     // version), so the multiplatform plugin must be requested without a version here.
     kotlin("multiplatform")
+    // The Zepp code parses JSON with kotlinx-serialization-json; the plugin is the same Kotlin
+    // version as the compiler (pinned in libs.versions.toml).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -32,6 +35,7 @@ kotlin {
             api(project(":protocol"))
             implementation(libs.coroutines.core)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

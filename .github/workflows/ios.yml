@@ -17,6 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # All networking lives in the Zepp sign-in screen (plan section 8: no network access outside
+      # it). This fails the build if URLSession, WKWebView, NWConnection or URLRequest ever appears
+      # in another Swift file, so later cards cannot add it elsewhere.
+      - name: Networking stays in the Zepp sign-in screen
+        run: |
+          allowed='iosApp/OpenStrap/ZeppSignIn/'
+          outside=$(grep -rlE 'URLSession|WKWebView|NWConnection|URLRequest' iosApp --include=*.swift | grep -v "^$allowed" || true)
+          if [ -n "$outside" ]; then
+            echo "networking code outside $allowed:"
+            echo "$outside"
+            exit 1
+          fi
+          echo "networking code is confined to $allowed"
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
