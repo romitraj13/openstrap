@@ -1,16 +1,8 @@
 import SwiftUI
-import OpenStrapShared
 
+/// The app's root, kept as a name so the SwiftUI lifecycle in `OpenStrapApp` stays unchanged.
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 16) {
-            Text("OpenStrap")
-                .font(.largeTitle)
-            Text(SharedInfo.shared.greeting())
-                .font(.body)
-                .multilineTextAlignment(.center)
-                .accessibilityIdentifier("sharedGreeting")
-        }
-        .padding()
+        RootView()
     }
 }
