@@ -16,5 +16,8 @@ class BytesTest {
     fun oneByteRoundTrips() = roundTrip(1)
 
     @Test
+    fun multiByteRoundTrips() = roundTrip(13)
+
+    @Test
     fun fourThousandNinetySixBytesRoundTrip() = roundTrip(4096)
 }
