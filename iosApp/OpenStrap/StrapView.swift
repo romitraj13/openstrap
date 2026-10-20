@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What the strap is doing: state, battery, firmware, and live heart rate.
+/// What the strap is doing: state, the last sync, battery, firmware, and live heart rate.
 struct StrapView: View {
     @ObservedObject var controller: StrapController
 
@@ -12,6 +12,20 @@ struct StrapView: View {
                         .accessibilityIdentifier("strapState")
                     if let detail = controller.stateDetail, !detail.isEmpty {
                         Text(detail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Section("History sync") {
+                    LabeledContent("Last sync", value: controller.lastSyncText)
+                        .accessibilityIdentifier("lastSync")
+                    Button("Sync now") {
+                        controller.syncNow()
+                    }
+                    .disabled(controller.state != "ready")
+                    .accessibilityIdentifier("syncNowButton")
+                    if controller.inBackground {
+                        Text("In the background. A sync that wakes the app runs on the time iOS lends it, and this screen says how it went when it is back.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -40,6 +54,7 @@ struct StrapView: View {
                 }
             }
             .navigationTitle("Strap")
+            .onAppear { controller.refreshSyncLog() }
         }
     }
 }

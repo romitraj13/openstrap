@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import kotlin.concurrent.Volatile
 import org.openstrap.app.ble.BridgeStrapLink
@@ -207,6 +208,23 @@ class StrapEngine(
 
     /** Set by the app; recorded in each `sync_log` row. */
     @Volatile var appVisible = false
+
+    /**
+     * The newest [limit] `sync_log` rows, newest first, handed to [onRows] on the main thread. The
+     * app asks for this when the Strap or Diagnostics screen appears; it is a plain callback rather
+     * than a `suspend` function or a `Flow` because Swift calls it.
+     */
+    fun recentSyncs(limit: Int, onRows: (List<SyncLog>) -> Unit) {
+        scope.launch {
+            val rows = try {
+                syncLog.recent(limit)
+            } catch (e: Exception) {
+                log("could not read the sync log: $e")
+                emptyList()
+            }
+            withContext(Dispatchers.Main) { onRows(rows) }
+        }
+    }
 
     /** Syncs now (the Sync button). Runs even when a sync is already going: the two queue up. */
     fun syncNow() = startSync(full = true, trigger = "manual")

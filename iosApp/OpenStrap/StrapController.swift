@@ -2,6 +2,45 @@ import Combine
 import CoreBluetooth
 import Foundation
 import OpenStrapShared
+import UIKit
+
+/// One `sync_log` row as the Diagnostics screen shows it: when it finished, what asked for it,
+/// whether the app was on screen, how many rows it wrote, and the error if it failed.
+struct SyncLogRow: Identifiable {
+    /// Position in the list the engine returned (newest first), because Kotlin's `id` is not needed
+    /// anywhere else and this keeps the row a plain value.
+    let id: Int
+    let start: Int64
+    let end: Int64
+    let trigger: String
+    let foreground: Bool
+    let rows: Int
+    let error: String?
+
+    init(index: Int, row: SyncLog) {
+        id = index
+        start = row.start
+        end = row.end
+        trigger = row.trigger
+        foreground = row.foreground
+        rows = Int(row.rows)
+        error = row.error
+    }
+
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM HH:mm"
+        return formatter
+    }()
+
+    /// `20 Oct 06:12  background  auto  12 rows  <error>` — the fields H2 reads.
+    var text: String {
+        let when = Self.formatter.string(from: Date(timeIntervalSince1970: TimeInterval(end)))
+        var line = "\(when)  \(foreground ? "foreground" : "background")  \(trigger)  \(rows) rows"
+        if let error, !error.isEmpty { line += "  \(error)" }
+        return line
+    }
+}
 
 /// Owns the strap for the whole app: the Keychain key, the CoreBluetooth driver, the shared
 /// `StrapEngine`, and everything the screens show.
@@ -9,6 +48,8 @@ final class StrapController: ObservableObject {
     static let peripheralIdentifierKey = "openstrap.strapPeripheralIdentifier"
     static let invalidKeyMessage = "That isn't a valid auth key: it should be 32 hex characters"
     private static let logLimit = 2000
+    /// The Diagnostics screen's sync log: the newest rows, enough to cover a night and a day.
+    static let syncLogLimit = 50
 
     @Published private(set) var state = "disconnected"
     @Published private(set) var stateDetail: String?
@@ -19,6 +60,12 @@ final class StrapController: ObservableObject {
     @Published private(set) var liveHeartRateEnabled = false
     @Published private(set) var logLines: [String] = []
     @Published private(set) var hasStoredKey: Bool
+    /// When the last history sync finished, in epoch seconds; 0 before the first one.
+    @Published private(set) var lastSyncEpochSeconds: Int64 = 0
+    /// The newest sync log rows, newest first: the Strap screen's last sync and the Diagnostics list.
+    @Published private(set) var syncLogRows: [SyncLogRow] = []
+    /// True while the app is not on screen. Syncs then run from a Bluetooth wake, on borrowed time.
+    @Published private(set) var inBackground = false
 
     private let secrets: KeychainSecretStore
     private let defaults: UserDefaults
@@ -27,6 +74,8 @@ final class StrapController: ObservableObject {
     private let sink: EngineSink
     private var peripheralIdentifier: UUID?
     private var discoveredCharacteristics: [String] = []
+    private var appStateObservers: [NSObjectProtocol] = []
+    private var syncBackgroundTask: UIBackgroundTaskIdentifier = .invalid
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -34,11 +83,11 @@ final class StrapController: ObservableObject {
         return formatter
     }()
 
-    /// Where the shared Kotlin code keeps the Room database (the strap's history and the settings).
-    static var databasePath: String {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return dir.appendingPathComponent("openstrap.db").path
-    }
+    private static let dateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM HH:mm"
+        return formatter
+    }()
 
     init(secrets: KeychainSecretStore = KeychainSecretStore(), defaults: UserDefaults = .standard) {
         self.secrets = secrets
@@ -48,7 +97,10 @@ final class StrapController: ObservableObject {
         self.sink = sink
         let driver = BleDriverImpl()
         self.driver = driver
-        self.engine = StrapEngine(driver: driver, listener: sink, databasePath: Self.databasePath)
+        // The health database lives in Application Support with the attributes plan section 8 asks
+        // for; `openDatabase` never throws, it reports what went wrong in the log instead.
+        let database = Self.openDatabase()
+        self.engine = StrapEngine(driver: driver, listener: sink, databasePath: database.path)
         // The sink calls back into this object; it holds us weakly, so no cycle through Kotlin.
         sink.owner = self
         driver.bridge = engine.bridge
@@ -63,8 +115,18 @@ final class StrapController: ObservableObject {
                 self?.engine.linkDown(reason: reason)
             }
         }
+        observeAppState()
+        append("database \(database.path): \(database.summary)")
+        // The rows outlive the app: a sync that ran overnight is already in the table at launch.
+        refreshSyncLog()
         if hasStoredKey {
             driver.start(savedIdentifier: Self.storedIdentifier(defaults))
+        }
+    }
+
+    deinit {
+        for observer in appStateObservers {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 
@@ -108,6 +170,7 @@ final class StrapController: ObservableObject {
         defaults.removeObject(forKey: Self.peripheralIdentifierKey)
         driver.stop()
         engine.linkDown(reason: "forgotten")
+        endSyncBackgroundTask()
         hasStoredKey = false
         peripheralIdentifier = nil
         discoveredCharacteristics = []
@@ -124,8 +187,55 @@ final class StrapController: ObservableObject {
         append(enabled ? "live heart rate on" : "live heart rate off")
     }
 
+    /// The Strap screen's button. The engine queues it behind a sync that is already running, and the
+    /// background task that gives it time to finish starts with the `running` state.
+    func syncNow() {
+        guard hasStoredKey else {
+            append("sync now: no strap paired yet")
+            return
+        }
+        guard state == "ready" else {
+            append("sync now: the strap is \(state)")
+            return
+        }
+        append("sync now")
+        engine.syncNow()
+    }
+
+    /// Asks the engine for the newest sync log rows; the answer arrives on the main thread.
+    func refreshSyncLog() {
+        engine.recentSyncs(limit: Int32(Self.syncLogLimit)) { [weak self] rows in
+            guard let self else { return }
+            self.syncLogRows = rows.enumerated().map { SyncLogRow(index: $0.offset, row: $0.element) }
+            if let newest = self.syncLogRows.first, newest.end > self.lastSyncEpochSeconds {
+                self.lastSyncEpochSeconds = newest.end
+            }
+        }
+    }
+
+    /// "Never" before the first sync, otherwise the time the last one finished. A sync from a
+    /// previous day keeps its date, so an overnight run is not mistaken for one this morning.
+    var lastSyncText: String {
+        guard lastSyncEpochSeconds > 0 else { return "Never" }
+        let finished = Date(timeIntervalSince1970: TimeInterval(lastSyncEpochSeconds))
+        return Calendar.current.isDateInToday(finished)
+            ? Self.timeFormatter.string(from: finished)
+            : Self.dateTimeFormatter.string(from: finished)
+    }
+
     var logText: String {
         logLines.joined(separator: "\n")
+    }
+
+    /// What the Copy button puts on the clipboard: the sync log rows first, then the engine's lines.
+    /// No key, token or cookie ever reaches either; the auth key lives in the Keychain only.
+    var diagnosticsText: String {
+        var sections: [String] = []
+        if !syncLogRows.isEmpty {
+            sections.append("sync log (newest first)\n" + syncLogRows.map { $0.text }.joined(separator: "\n"))
+        }
+        sections.append(logText.isEmpty ? "nothing logged yet" : logText)
+        return sections.joined(separator: "\n\n")
     }
 
     /// A Diagnostics line from another screen (the Zepp sign-in logs one per sign-in). Never
@@ -165,15 +275,92 @@ final class StrapController: ObservableObject {
         append(line)
     }
 
-    /// Sync progress from the shared engine. The Sync screen is a later card; for now it is a log
-    /// line, which is where the diagnostics for a sync that went wrong end up.
+    /// Sync progress from the shared engine: the background task that gives the sync its time, the
+    /// last-sync time on the Strap screen, and the log row the two screens read back.
     fileprivate func engineSync(state: String, detail: String?, lastSyncEpochSeconds: Int64) {
+        if state == "running" {
+            beginSyncBackgroundTask()
+        } else if state == "done" || state == "failed" {
+            endSyncBackgroundTask()
+        }
+        if lastSyncEpochSeconds > 0 {
+            self.lastSyncEpochSeconds = lastSyncEpochSeconds
+        }
         let extra = detail.map { " (\($0))" } ?? ""
-        let last = lastSyncEpochSeconds > 0 ? " last sync \(Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(lastSyncEpochSeconds))))" : ""
+        let last = lastSyncEpochSeconds > 0
+            ? " last sync \(Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(lastSyncEpochSeconds))))"
+            : ""
         append("sync \(state)\(extra)\(last)")
+        if state == "done" || state == "failed" {
+            refreshSyncLog()
+        }
+    }
+
+    // MARK: - Background
+
+    private func observeAppState() {
+        let center = NotificationCenter.default
+        appStateObservers.append(
+            center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.setAppVisible(true)
+            }
+        )
+        appStateObservers.append(
+            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.setAppVisible(false)
+            }
+        )
+        // A Bluetooth relaunch starts without an active scene; the notification above says when it
+        // becomes one.
+        let active = UIApplication.shared.applicationState == .active
+        inBackground = !active
+        engine.appVisible = active
+    }
+
+    private func setAppVisible(_ visible: Bool) {
+        let wasVisible = !inBackground
+        inBackground = !visible
+        // Each sync_log row records this: a sync from a Bluetooth wake overnight is "background".
+        engine.appVisible = visible
+        if wasVisible != visible {
+            append(visible ? "app in the foreground" : "app in the background")
+        }
+    }
+
+    /// A history sync gets a background task so iOS does not suspend the app in the middle of one.
+    /// It starts when `onSync` reports `running` and ends on `done` or `failed`.
+    private func beginSyncBackgroundTask() {
+        guard syncBackgroundTask == .invalid else { return }
+        syncBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "strap history sync") { [weak self] in
+            // iOS is about to suspend the app: the task has to end here or the app is terminated.
+            self?.append("sync background time ran out")
+            self?.endSyncBackgroundTask()
+        }
+        append("sync background task started")
+    }
+
+    private func endSyncBackgroundTask() {
+        guard syncBackgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(syncBackgroundTask)
+        syncBackgroundTask = .invalid
+        append("sync background task ended")
     }
 
     // MARK: - Plumbing
+
+    /// Opens the health database in Application Support and applies plan section 8's two attributes.
+    /// Never throws: the app still runs when the file system refuses, and says so in Diagnostics.
+    private static func openDatabase() -> (path: String, summary: String) {
+        do {
+            let url = try StrapDatabase.url()
+            let applied = try StrapDatabase.prepare(url)
+            return (url.path, applied.summary)
+        } catch {
+            let fallback = (try? StrapDatabase.url())
+                ?? FileManager.default.temporaryDirectory.appendingPathComponent(StrapDatabase.fileName)
+            return (fallback.path, "the database attributes could not be applied: \(error.localizedDescription)")
+        }
+    }
 
     private func startEngine(identifier: UUID, characteristics: [String]) {
         guard let key = secrets.read() else { return }

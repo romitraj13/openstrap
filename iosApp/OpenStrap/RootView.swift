@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The three screens C3 ships: Pair, Strap and Diagnostics.
 struct RootView: View {
-    @StateObject private var controller = StrapController()
+    @ObservedObject var controller: StrapController
 
     var body: some View {
         TabView {

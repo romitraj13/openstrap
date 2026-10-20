@@ -36,6 +36,13 @@ interface SyncLogDao {
     @Query("SELECT * FROM sync_log ORDER BY start, id")
     suspend fun all(): List<SyncLog>
 
+    /**
+     * The newest [limit] rows, newest first: what the Diagnostics screen shows, including the rows
+     * from an overnight sync that ran while the app was suspended.
+     */
+    @Query("SELECT * FROM sync_log ORDER BY start DESC, id DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<SyncLog>
+
     @Query("SELECT MAX(`end`) FROM sync_log")
     suspend fun lastEnd(): Long?
 
