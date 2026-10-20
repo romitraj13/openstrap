@@ -277,3 +277,22 @@ Authored for iOS in this card, with no upstream source:
 
 `:shared:jvmTest` after C4: 161 tests, 0 failures (the 28 from S1 + the 129 copied + 4 new
 `HistorySyncTest`).
+
+## Card C5 (background sync on iPhone)
+
+No file was copied from Android in this card, so the table above is unchanged.
+
+- **`StrapEngine.recentSyncs(limit: Int, onRows: (List<SyncLog>) -> Unit)`** is new and iOS-only. The
+  `sync_log` table itself is an iOS addition (C4); Android never reads it back, so there is no
+  upstream reader to copy. It hands the newest rows to Swift on the main thread as a plain callback,
+  because nothing crossing into Swift may be a `suspend` function or a `Flow`. The Diagnostics
+  screen shows the newest 50.
+- **`SyncLogDao.recent(limit)`** is the query behind it (`ORDER BY start DESC, id DESC LIMIT :limit`).
+- **`shared/src/commonTest/.../device/SyncLogReadTest.kt`** is new: an engine that has not synced has
+  no rows, the newest rows come back first with their `foreground` flag, and the limit is honoured.
+- The engine's own wiring is unchanged: `SyncLog.foreground` is still written from `appVisible` at
+  insert time; C5 makes the Swift app keep `appVisible` in step with the app lifecycle.
+
+`:shared:jvmTest` after C5: 164 tests, 0 failures (161 + the 3 `SyncLogReadTest`).
+`iosSimulatorArm64Test` total after C5: 260 (was 257).
+
