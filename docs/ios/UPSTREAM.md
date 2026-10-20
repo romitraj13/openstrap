@@ -126,3 +126,154 @@ What changed, and why:
 
 `:shared:jvmTest` after S1: 28 tests, 0 failures (BridgeStrapLinkTest 3, PairingErrorsTest 4,
 ZeppCloudTest 10, BleBridgeTest 5, StrapEngineTest 6).
+
+## C4 (database and history sync)
+
+Every file C4 copied, as the required `source path @ 19f2865 -> destination path`:
+
+```
+app/src/main/kotlin/org/openstrap/app/data/Activity.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Activity.kt
+app/src/main/kotlin/org/openstrap/app/data/Backtest.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Backtest.kt
+app/src/main/kotlin/org/openstrap/app/data/BodySignals.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/BodySignals.kt
+app/src/main/kotlin/org/openstrap/app/data/BodySignalsCopy.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/BodySignalsCopy.kt
+app/src/main/kotlin/org/openstrap/app/data/CheckIn.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/CheckIn.kt
+app/src/main/kotlin/org/openstrap/app/data/EnergyExpenditure.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/EnergyExpenditure.kt
+app/src/main/kotlin/org/openstrap/app/data/HealthRepository.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/HealthRepository.kt
+app/src/main/kotlin/org/openstrap/app/data/History.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/History.kt
+app/src/main/kotlin/org/openstrap/app/data/LiveSteps.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/LiveSteps.kt
+app/src/main/kotlin/org/openstrap/app/data/NightMetrics.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/NightMetrics.kt
+app/src/main/kotlin/org/openstrap/app/data/Recovery.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Recovery.kt
+app/src/main/kotlin/org/openstrap/app/data/RecoveryEngine.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/RecoveryEngine.kt
+app/src/main/kotlin/org/openstrap/app/data/SleepHistory.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/SleepHistory.kt
+app/src/main/kotlin/org/openstrap/app/data/SleepRegularity.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/SleepRegularity.kt
+app/src/main/kotlin/org/openstrap/app/data/Summaries.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Summaries.kt
+app/src/main/kotlin/org/openstrap/app/data/Vo2max.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Vo2max.kt
+app/src/main/kotlin/org/openstrap/app/data/Workouts.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Workouts.kt
+app/src/main/kotlin/org/openstrap/app/data/db/Entities.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/db/Entities.kt
+app/src/main/kotlin/org/openstrap/app/data/db/Daos.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/db/Daos.kt
+app/src/main/kotlin/org/openstrap/app/data/settings/Goals.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/settings/Goals.kt
+app/src/main/kotlin/org/openstrap/app/data/settings/Units.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/settings/Units.kt
+app/src/main/kotlin/org/openstrap/app/data/settings/SettingsStore.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/settings/SettingsRepository.kt
+app/src/main/kotlin/org/openstrap/app/device/HistorySync.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/device/HistorySync.kt
+app/src/main/kotlin/org/openstrap/app/device/StrapController.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/device/SyncState.kt
+app/src/test/kotlin/org/openstrap/app/data/ActivityTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/ActivityTest.kt
+app/src/test/kotlin/org/openstrap/app/data/BodySignalsTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/BodySignalsTest.kt
+app/src/test/kotlin/org/openstrap/app/data/DayStatTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/DayStatTest.kt
+app/src/test/kotlin/org/openstrap/app/data/EnergyExpenditureTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/EnergyExpenditureTest.kt
+app/src/test/kotlin/org/openstrap/app/data/HistoryTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/HistoryTest.kt
+app/src/test/kotlin/org/openstrap/app/data/LiveStepsTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/LiveStepsTest.kt
+app/src/test/kotlin/org/openstrap/app/data/LoadTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/LoadTest.kt
+app/src/test/kotlin/org/openstrap/app/data/RecoveryTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/RecoveryTest.kt
+app/src/test/kotlin/org/openstrap/app/data/SleepHistoryTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/SleepHistoryTest.kt
+app/src/test/kotlin/org/openstrap/app/data/SleepRegularityTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/SleepRegularityTest.kt
+app/src/test/kotlin/org/openstrap/app/data/SummariesTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/SummariesTest.kt
+app/src/test/kotlin/org/openstrap/app/data/Vo2maxTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/Vo2maxTest.kt
+app/src/test/kotlin/org/openstrap/app/data/WorkoutsTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/WorkoutsTest.kt
+app/src/test/kotlin/org/openstrap/app/data/settings/UnitsTest.kt @ 19f2865 -> shared/src/commonTest/kotlin/org/openstrap/app/data/settings/UnitsTest.kt
+app/src/test/kotlin/org/openstrap/app/data/BacktestTest.kt @ 19f2865 -> shared/src/jvmTest/kotlin/org/openstrap/app/data/BacktestTest.kt
+app/src/test/kotlin/org/openstrap/app/data/RecoveryEngineTest.kt @ 19f2865 -> shared/src/jvmTest/kotlin/org/openstrap/app/data/RecoveryEngineTest.kt
+```
+
+Test counts, Android → shared (every copied file, same count):
+
+| Test class | Android | shared | Where |
+|---|---|---|---|
+| ActivityTest | 7 | 7 | commonTest |
+| BacktestTest | 2 | 2 | jvmTest |
+| BodySignalsTest | 13 | 13 | commonTest |
+| DayStatTest | 2 | 2 | commonTest |
+| EnergyExpenditureTest | 5 | 5 | commonTest |
+| HistoryTest | 6 | 6 | commonTest |
+| LiveStepsTest | 4 | 4 | commonTest |
+| LoadTest | 7 | 7 | commonTest |
+| RecoveryEngineTest | 2 | 2 | jvmTest |
+| RecoveryTest | 49 | 49 | commonTest |
+| SleepHistoryTest | 7 | 7 | commonTest |
+| SleepRegularityTest | 6 | 6 | commonTest |
+| SummariesTest (with BucketTest) | 4 + 1 | 4 + 1 | commonTest |
+| Vo2maxTest | 8 | 8 | commonTest |
+| WorkoutsTest | 4 | 4 | commonTest |
+| UnitsTest | 2 | 2 | commonTest |
+| **total** | **129** | **129** | |
+
+`BacktestTest` and `RecoveryEngineTest` are in `jvmTest` because they use things only the JVM
+has — `java.io.File` and `System.getProperty` for the on-demand replay, and
+`java.lang.reflect.Proxy` for a DAO that answers two reads. Their test bodies are otherwise the
+Android ones: JUnit 4 is still the runner there, so `@Test` and `org.junit.Assert` needed no
+conversion at all.
+
+What changed in each copy, and why:
+
+- **Time.** `java.time` became kotlinx-datetime and `kotlin.time.Instant`. `shared/.../data/Dates.kt`
+  holds small internal extensions with the `java.time` names the copies use
+  (`plusDays`, `minusDays`, `atStartOfDay(zone)`, `atTime(h, m).atZone(zone).toEpochSecond()`,
+  `Instant.fromEpochSeconds(x).atZone(zone).toLocalDate()`, `toEpochDay()`, `mondayOfWeek()`), so the
+  copied lines read as they did on Android. `System.currentTimeMillis() / 1000` became
+  `Clock.System.now().epochSeconds`, `LocalDate.now()` became
+  `Clock.System.todayIn(TimeZone.currentSystemDefault())`, `ZoneId.systemDefault()` became
+  `TimeZone.currentSystemDefault()`, `ZoneOffset.UTC` became `TimeZone.UTC`,
+  `TemporalAdjusters.previousOrSame(MONDAY)` became `mondayOfWeek()`.
+- **`String.format`.** Common Kotlin has none, and `Recovery`, `BodySignals`, `SleepRegularity`,
+  `Goals` and `Backtest` all use `"%.1f".format(...)`, `"%02d"`, `"%,d"` and `"%s"`.
+  `shared/.../data/Format.kt` is a small `fun String.format(vararg args)` that reproduces those
+  specs with `Locale.ROOT` behaviour (ASCII digits, `.` as the separator, half away from zero).
+  `Backtest`'s `"%.1f".format(java.util.Locale.ROOT, x)` simply drops the locale argument.
+- **`Math.round`.** Java's `Math.round(Float)`/`Math.round(Double)` became `roundToInt()` and
+  `round(...).toInt()`, which round ties the same way.
+- **`sortedMapOf` / `toSortedMap` / `toSortedSet` / `MutableMap.merge`** are JVM-only.
+  `Summaries.heartRateSeries` sorts its entries explicitly, `History.weekly` and
+  `Vo2max.estimate` sort the entries of a grouped map, `RecoveryEngine` uses
+  `.distinct().sorted()`, and `HistorySync` writes `maxHr[day] = maxOf(...)`.
+- **`UserProfile.usesImperial`** fell back on `java.util.Locale.getDefault().country`. Common code
+  has no locale, so `settings/PlatformLocale.kt` declares `internal expect fun platformUsesImperial()`
+  with a JVM actual (`Locale.getDefault().country`) and an iOS actual
+  (`NSLocale.currentLocale.countryCode`). `age(today = LocalDate.now())` is now
+  `Clock.System.todayIn(...)`.
+- **`HistorySync`.** `GattClient` became `GattPort`, `SettingsStore` became `SettingsRepository`,
+  and the two history characteristics are now string constants because `GattPort` is string-keyed
+  (`enableNotifications(HISTORY_DATA)`, `write(HISTORY_CONTROL, …)`). `dumpRaw` — the debug aid that
+  wrote chunks to a `java.io.File` — was not copied; nothing else in the file changed. Two
+  additions, both for the engine's `sync_log`: a `rowsWritten` counter incremented where rows are
+  inserted, and `CoroutineStart.UNDISPATCHED` on the notification collectors. The latter is a real
+  fix: `GattPort`'s flows have no replay, so a strap reply that arrived before the collector
+  subscribed was dropped and the whole sync timed out after ten seconds. On Android the collectors
+  start on another thread and lose that race only rarely; here it was reproducible.
+- **`SyncState`** is copied verbatim from `StrapController.kt` lines 20-26: `HistorySync` writes it
+  and the engine turns it into `EngineListener.onSync`.
+- **`SettingsStore.kt` → `SettingsRepository.kt`.** The `UserProfile` and `PairedDevice` data
+  classes are copied unchanged (except the locale fallback above). The repository keeps exactly the
+  six settings functions `HistorySync` and `StrapManager` call — `lastSync`, `setLastSync`, `profile`,
+  `liveHeartRate`, `setLiveHeartRate`, `pairedDevice` — as suspending functions over the
+  `key_value` table, because nothing that crosses into Swift may be a `Flow`. The keys are Android's
+  (`last_sync_<type>`, `profile_*`, `live_hr`, `device_address`, `device_name`). No secret is stored:
+  `pairedDevice().authKeyHex` is empty, the key lives in the iOS Keychain (card C3), and the Zepp
+  account, goals and Today-tile settings were not copied.
+- **The database.** `OpenStrapIosDatabase` has the same 27 entities as `OpenStrapDatabase` at
+  version 1 — Android is at version 7 with six auto-migrations, and a new database on a new platform
+  has no history to migrate — plus `KeyValue` and `SyncLog`. It is opened with
+  `BundledSQLiteDriver` (or in memory with `:memory:`), annotated `@ConstructedBy`, and its schema is
+  exported to `shared/schemas/org.openstrap.app.data.db.OpenStrapIosDatabase/1.json`.
+- **`StrapEngine`.** The constructor now takes `databasePath: String` and opens the database; after
+  `ready` it starts `watchDataAvailable` and `autoSync` and gained `syncNow()`, all ported from
+  `StrapManager.kt` lines 374-474 without the Android notification and foreground-service parts.
+  They only start when the session advertises the history endpoint — otherwise there is nothing to
+  fetch. `synchronized` blocks became plain code because all engine work runs on one
+  limited-parallelism thread. `onSync` is posted on the main thread, and `done` is posted after the
+  `sync_log` row is written.
+
+Authored for iOS in this card, with no upstream source:
+
+| File | Why it is new |
+|---|---|
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/Dates.kt` | The `java.time` names the copies use, over kotlinx-datetime. |
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/Format.kt` | `String.format` for the specs the copies use. |
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/db/KeyValue.kt` | The `key_value` and `sync_log` entities the card adds. |
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/db/SettingsDao.kt` | Their DAOs. |
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/db/OpenStrapIosDatabase.kt` | The multiplatform database and its builder. |
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/settings/SettingsRepository.kt` | Room-backed settings (copied `UserProfile`/`PairedDevice` + the six functions). |
+| `shared/src/commonMain/kotlin/org/openstrap/app/data/settings/PlatformLocale.kt` (+ `.jvm.kt`, `.ios.kt`) | The region fallback for `usesImperial`, which common code cannot read from a locale. |
+| `shared/src/commonTest/kotlin/org/openstrap/shared/device/SimulatedGdspStrap.kt` | The GDSP device side of `protocol/.../GdspClientTest.kt`, serving per-minute activity instead of a recorded workout. |
+| `shared/src/commonTest/kotlin/org/openstrap/shared/device/HistorySyncTest.kt` | The four end-to-end sync tests (rows written, no duplicates, cursor, `sync_log`). |
+
+`:shared:jvmTest` after C4: 161 tests, 0 failures (the 28 from S1 + the 129 copied + 4 new
+`HistorySyncTest`).

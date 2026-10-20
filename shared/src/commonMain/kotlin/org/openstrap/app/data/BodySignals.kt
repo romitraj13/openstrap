@@ -1,6 +1,7 @@
 package org.openstrap.app.data
 
 import kotlin.math.max
+import kotlin.math.round
 
 /**
  * "Body signals off baseline": a night-by-night state machine over overnight resting HR, skin temperature and
@@ -71,7 +72,7 @@ object BodySignals {
     private const val DAY = 86_400L
 
     /** Whole nights between two local midnights, tolerant of a DST hour. */
-    private fun nightsBetween(a: Long, b: Long): Int = Math.round((b - a).toDouble() / DAY).toInt()
+    private fun nightsBetween(a: Long, b: Long): Int = round((b - a).toDouble() / DAY).toInt()
 
     /** The overnight values the alert rule uses: our own on a valid night, else the strap's fallback. */
     private fun rhrOf(n: Recovery.Night) = n.rhrMeanSleep?.takeIf { n.valid } ?: n.strapRestingHr

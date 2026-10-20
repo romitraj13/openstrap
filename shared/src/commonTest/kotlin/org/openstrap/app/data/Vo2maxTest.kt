@@ -1,5 +1,6 @@
 package org.openstrap.app.data
 
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -25,13 +26,13 @@ class Vo2maxTest {
         assertEquals(expected - 2.77f - 0.32f + 3.03f, Vo2max.jurcaMets(false, 45, bmi, 72f, 4), 1e-4f)
     }
 
-    @Test fun `estimate is a band of plus or minus one SEE, never a decimal`() {
+    @Test fun `estimate is a band of plus or minus one SEE and never a decimal`() {
         val (e, why) = Vo2max.estimate(profile, 45, rhr, today)
         assertNull(why)
         val ml = Vo2max.jurcaMets(true, 45, 87.7f / (1.72f * 1.72f), 72f, 1) * 3.5f
-        assertEquals(Math.round(ml), e!!.value)
-        assertEquals(Math.round(ml - 1.45f * 3.5f), e.low)
-        assertEquals(Math.round(ml + 1.45f * 3.5f), e.high)
+        assertEquals(ml.roundToInt(), e!!.value)
+        assertEquals((ml - 1.45f * 3.5f).roundToInt(), e.low)
+        assertEquals((ml + 1.45f * 3.5f).roundToInt(), e.high)
         // ≈ 33 ml/kg/min for a 45-year-old man: between the 40-49 row's 30th (29.7) and 50th (35.3) percentiles.
         assertEquals(Vo2max.Friend.Band.P30to50, e.band)
         assertEquals(Vo2max.Friend.fitnessAge(ml, UserProfile.Sex.Male), e.fitnessAge)
@@ -60,7 +61,7 @@ class Vo2maxTest {
         assertEquals(Vo2max.Withheld.RestingHr, why(n = (20 until 30).associate { today - it * day to 60f }))
     }
 
-    @Test fun `FRIEND tables are Table 3 treadmill rows, ascending and falling with age`() {
+    @Test fun `FRIEND tables are Table 3 treadmill rows and ascending and falling with age`() {
         for (t in listOf(Vo2max.Friend.MEN, Vo2max.Friend.WOMEN)) {
             assertEquals(listOf(20..29, 30..39, 40..49, 50..59, 60..69, 70..79, 80..89), t.keys.toList())
             for (row in t.values) {
@@ -79,7 +80,7 @@ class Vo2maxTest {
         assertEquals(20.8f, Vo2max.Friend.WOMEN.getValue(80..89)[8])
     }
 
-    @Test fun `band edges use the 30th, 50th, 70th and 90th percentiles`() {
+    @Test fun `band edges use the 30th and 50th and 70th and 90th percentiles`() {
         val f = UserProfile.Sex.Female // 40-49: 30th 21.8, 50th 25.7, 70th 30.0, 90th 37.8
         assertEquals(Vo2max.Friend.Band.Below30, Vo2max.Friend.band(21.7f, f, 45))
         assertEquals(Vo2max.Friend.Band.P30to50, Vo2max.Friend.band(21.8f, f, 45))
@@ -90,7 +91,7 @@ class Vo2maxTest {
         assertNull(Vo2max.Friend.band(30f, f, 19))
     }
 
-    @Test fun `fitness age is where the median equals the estimate, plus or minus 10 years, clamped 20-80`() {
+    @Test fun `fitness age is where the median equals the estimate and plus or minus 10 years and clamped 20-80`() {
         val m = UserProfile.Sex.Male
         // The 50-59 median exactly: centre 55.
         assertEquals(45..65, Vo2max.Friend.fitnessAge(29.2f, m))

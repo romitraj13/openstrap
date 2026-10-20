@@ -1,5 +1,7 @@
 package org.openstrap.app.data
 
+import kotlin.math.round
+import kotlin.math.roundToInt
 import org.openstrap.app.data.settings.UserProfile
 
 /**
@@ -91,7 +93,9 @@ object Vo2max {
         val answered = profile.activityAnsweredAt
         if (level == null || answered == null || day - answered > ACTIVITY_MAX_AGE_DAYS * dayS) return null to Withheld.Activity
         if (profile.betaBlocker || profile.pregnant) return null to Withheld.Medication
-        val recent = nightlyRhr.filterKeys { it <= day && day - it < RHR_LOOKBACK_DAYS * dayS }.toSortedMap().values.toList()
+        val recent = nightlyRhr
+            .filterKeys { it <= day && day - it < RHR_LOOKBACK_DAYS * dayS }
+            .toList().sortedBy { it.first }.map { it.second }
         if (recent.size < MIN_RHR_NIGHTS) return null to Withheld.RestingHr
         val rhr = Recovery.percentile(recent.takeLast(RHR_NIGHTS_USED), 0.5f)!!
         val bmi = w / ((h / 100f) * (h / 100f))
@@ -99,7 +103,7 @@ object Vo2max {
         val ml = mets * ML_PER_MET
         val see = SEE_METS * ML_PER_MET
         return Estimate(
-            Math.round(ml), Math.round(ml - see), Math.round(ml + see), rhr,
+            round(ml).toInt(), round(ml - see).toInt(), round(ml + see).toInt(), rhr,
             band = Friend.band(ml, sex, age), fitnessAge = Friend.fitnessAge(ml, sex), sex = sex,
         ) to null
     }
@@ -183,7 +187,7 @@ object Vo2max {
                     a.first + (a.second - vo2) / (a.second - b.second) * (b.first - a.first)
                 }
             }
-            val centre = Math.round(age).coerceIn(FITNESS_AGE_MIN, FITNESS_AGE_MAX)
+            val centre = age.roundToInt().coerceIn(FITNESS_AGE_MIN, FITNESS_AGE_MAX)
             return (centre - FITNESS_AGE_SPREAD).coerceAtLeast(FITNESS_AGE_MIN)..(centre + FITNESS_AGE_SPREAD).coerceAtMost(FITNESS_AGE_MAX)
         }
 

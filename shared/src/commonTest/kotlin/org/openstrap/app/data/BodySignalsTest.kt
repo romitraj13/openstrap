@@ -41,7 +41,7 @@ class BodySignalsTest {
         assertFalse(r.strainAlert)
     }
 
-    @Test fun `resting HR up two nights in a row is an alert, and caps readiness`() {
+    @Test fun `resting HR up two nights in a row is an alert and and caps readiness`() {
         val days = run(night(31, rhr = 66f), night(32, rhr = 66f))
         assertEquals(State.Alert, days.last().state)
         assertEquals(2, days.last().nightsOff)
@@ -51,7 +51,7 @@ class BodySignalsTest {
         assertTrue(r.score!! <= Recovery.ALERT_CAP)
     }
 
-    @Test fun `one missing night is bridged, two reset persistence`() {
+    @Test fun `one missing night is bridged and two reset persistence`() {
         assertEquals(State.Alert, run(night(31, rhr = 66f), night(33, rhr = 66f)).last().state)
         assertEquals(State.Watch, run(night(31, rhr = 66f), night(34, rhr = 66f)).last().state)
     }
@@ -76,7 +76,7 @@ class BodySignalsTest {
         assertEquals(State.Alert, days.at(35).state)
     }
 
-    @Test fun `breathing rate up 3 is an alert on its own, up 2 a watch`() {
+    @Test fun `breathing rate up 3 is an alert on its own and up 2 a watch`() {
         assertEquals(State.Alert, run(night(31, rr = 17.2f)).last().state)
         assertEquals(State.Watch, run(night(31, rr = 16.2f)).last().state)
         assertEquals(State.Normal, run(night(31, rr = 15.5f)).last().state)
@@ -106,7 +106,7 @@ class BodySignalsTest {
         assertTrue(r.contributors.first { it.factor == Recovery.Factor.Temperature }.score < 60)
     }
 
-    @Test fun `likely causes are annotated, not suppressed`() {
+    @Test fun `likely causes are annotated and not suppressed`() {
         val days = BodySignals.evaluate(base + night(31, rhr = 66f) + night(32, rhr = 66f)) { if (it == 32 * day) listOf("alcohol") else emptyList() }
         assertEquals(State.Alert, days.last().state)
         assertEquals(listOf("alcohol"), days.last().causes)

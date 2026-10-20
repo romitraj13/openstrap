@@ -1,8 +1,6 @@
 package org.openstrap.app.data.db
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /** All timestamps are epoch seconds (UTC). */

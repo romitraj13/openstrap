@@ -7,19 +7,28 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.datetime.TimeZone
 import kotlin.concurrent.Volatile
 import org.openstrap.app.ble.BridgeStrapLink
 import org.openstrap.app.ble.StrapUuids
+import org.openstrap.app.data.db.OpenStrapIosDatabase
+import org.openstrap.app.data.db.SyncLog
+import org.openstrap.app.data.settings.SettingsRepository
+import org.openstrap.app.device.HistorySync
 import org.openstrap.app.device.PairingErrors
+import org.openstrap.app.device.SyncState
 import org.openstrap.app.zepp.ZeppCloud
 import org.openstrap.protocol.ChannelSession
 import org.openstrap.protocol.auth.AuthException
 import org.openstrap.protocol.hexToBytes
+import org.openstrap.protocol.history.FetchCodec
+import org.openstrap.protocol.history.GdspMessage
 import org.openstrap.protocol.services.BatteryInfo
 import org.openstrap.protocol.services.ConnectCodec
 import org.openstrap.protocol.services.Endpoints
@@ -42,24 +51,46 @@ interface EngineListener {
     fun onDevice(firmware: String?, batteryPercent: Int, charging: Boolean)
     fun onHeartRate(bpm: Int)
     fun onLog(line: String)
+
+    /**
+     * History sync progress: [state] is `idle`, `running`, `done` or `failed`; [detail] is the step
+     * being synced, or the failure's reason; [lastSyncEpochSeconds] is when the last sync finished
+     * (0 before the first one), so the app can say how old the data is.
+     */
+    fun onSync(state: String, detail: String?, lastSyncEpochSeconds: Long)
 }
 
 /**
- * The strap, as the Swift app sees it: one object that owns the connection, the channel session and
- * live heart rate.
+ * The strap, as the Swift app sees it: one object that owns the connection, the channel session,
+ * live heart rate and the history sync into the database.
  *
  * Port of `StrapManager.startConnect` and `afterAuth`
- * (`app/src/main/kotlin/org/openstrap/app/device/StrapManager.kt` @ 19f2865, lines 136-270) and of
- * `startLive`/`pauseLive` (lines 513-598). What Android does with a foreground service, alarms,
- * settings, the database and history sync is not here: this card only pairs, authenticates and
- * shows battery, firmware and live heart rate.
+ * (`app/src/main/kotlin/org/openstrap/app/device/StrapManager.kt` @ 19f2865, lines 136-270), of
+ * `startLive`/`pauseLive` (lines 513-598) and of `watchDataAvailable`/`autoSync`/`startSync`
+ * (lines 374-474). What Android does with a foreground service, alarms, its notification manager
+ * and its settings DataStore is not here; the database is [OpenStrapIosDatabase] and settings are
+ * [SettingsRepository].
  *
  * All engine work runs on one background thread ([Dispatchers.Default.limitedParallelism]); listener
- * callbacks are posted to [Dispatchers.Main]. Swift calls [linkUp], [linkDown] and
- * [setLiveHeartRate] from any thread, the way [BleBridge] allows.
+ * callbacks are posted to [Dispatchers.Main]. Swift calls [linkUp], [linkDown], [setLiveHeartRate] and
+ * [syncNow] from any thread, the way [BleBridge] allows.
+ *
+ * @param databasePath the SQLite file (`:memory:` in tests) that history and settings live in.
  */
-class StrapEngine(private val driver: BleDriver, private val listener: EngineListener) {
+class StrapEngine(
+    private val driver: BleDriver,
+    private val listener: EngineListener,
+    databasePath: String,
+) {
     val bridge: BleBridge = BleBridge(driver)
+
+    private val database = OpenStrapIosDatabase.open(databasePath)
+
+    /** The database the engine writes history and settings to; the app's screens read it from here. */
+    val db: OpenStrapIosDatabase get() = database
+    private val healthDao = database.healthDao()
+    private val settings = SettingsRepository(database.settingsDao())
+    private val syncLog = database.syncLogDao()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
 
@@ -117,6 +148,13 @@ class StrapEngine(private val driver: BleDriver, private val listener: EngineLis
                 emitState("ready", null)
                 emitDevice()
                 if (liveWanted) startLive()
+                // Android starts these right after the session is connected; they live in the connect
+                // job, so they end with the connection. Without the history endpoint there is nothing
+                // to fetch from this strap.
+                if (s.services.has(Endpoints.HISTORY)) {
+                    watchDataAvailable(s)
+                    autoSync(s)
+                }
             } catch (e: AuthException) {
                 val failure = PairingErrors.authFailure(e)
                 log("auth failed: ${e.message}")
@@ -156,6 +194,117 @@ class StrapEngine(private val driver: BleDriver, private val listener: EngineLis
         session = null
         link = null
         scope.cancel()
+        database.close()
+    }
+
+    // ---- History sync, as StrapManager.watchDataAvailable / autoSync / startSync ----
+
+    /** What the history sync is doing; mirrored to [EngineListener.onSync]. */
+    private val sync = MutableStateFlow<SyncState>(SyncState.Idle)
+
+    /** Epoch seconds of the last auto sync attempt, so a reconnect doesn't sync twice in a quarter hour. */
+    @Volatile private var lastAutoSync = 0L
+
+    /** Set by the app; recorded in each `sync_log` row. */
+    @Volatile var appVisible = false
+
+    /** Syncs now (the Sync button). Runs even when a sync is already going: the two queue up. */
+    fun syncNow() = startSync(full = true, trigger = "manual")
+
+    /**
+     * The strap pushes `11 <type>` when it has new data; like Zepp, sync the related types at once
+     * (a finished workout, recovery HR; 04 §1.7).
+     */
+    private fun CoroutineScope.watchDataAvailable(s: ChannelSession) = launch {
+        s.messagesFor(Endpoints.HISTORY).collect { p ->
+            val m = FetchCodec.parse(p) as? GdspMessage.DataAvailable ?: return@collect
+            val types = m.typesToSync.toSet()
+            if (types.isEmpty()) return@collect
+            log("strap has new data of type ${m.typeCode}, syncing $types")
+            // Everything the engine does runs on one limited-parallelism thread, so this needs no lock.
+            pendingTypes += types
+            startSync(full = false, trigger = "push")
+        }
+    }
+
+    /** Sync right after connecting (unless one ran recently), then every [AUTO_SYNC_SECONDS] while connected. */
+    private fun CoroutineScope.autoSync(s: ChannelSession) = launch {
+        while (isActive && session === s) {
+            val now = Clock.System.now().epochSeconds
+            if (now - lastAutoSync >= MIN_SYNC_GAP_SECONDS && sync.value !is SyncState.Running) {
+                lastAutoSync = now
+                log("auto sync")
+                startSync(full = true, trigger = "auto")
+            }
+            delay(AUTO_SYNC_SECONDS * 1000L)
+        }
+    }
+
+    /** One sync at a time; a full sync or types asked for meanwhile run when it ends. */
+    private val syncLock = Mutex()
+    private val pendingTypes = mutableSetOf<Int>()
+    @Volatile private var pendingFull = false
+
+    private fun takePending(): Set<Int> = pendingTypes.toSet().also { pendingTypes.clear() }
+
+    private fun hasPending(): Boolean = pendingFull || pendingTypes.isNotEmpty()
+
+    /** What to sync next: null for everything (a full sync covers anything pushed so far), or the pushed types. */
+    private fun takeNext(): Set<Int>? = if (pendingFull) { pendingFull = false; takePending(); null } else takePending()
+
+    private fun startSync(full: Boolean, trigger: String) {
+        val s = session ?: return
+        if (full) pendingFull = true
+        scope.launch {
+            // A sync is running: it picks up what was just queued when it finishes.
+            if (!syncLock.tryLock()) return@launch
+            try {
+                while (session === s) {
+                    val only = takeNext()
+                    if (only != null && only.isEmpty()) break
+                    runSync(s, only, if (only == null) trigger else "push")
+                }
+            } finally {
+                syncLock.unlock()
+            }
+            // Something queued between the last check and the unlock would otherwise wait for the next trigger.
+            if (hasPending() && session === s) startSync(full = false, trigger)
+        }
+    }
+
+    /**
+     * One `HistorySync` run, then one `sync_log` row: when it started and ended, what asked for it,
+     * whether the app was on screen, how many rows it wrote and the error if it failed.
+     */
+    private suspend fun runSync(s: ChannelSession, only: Set<Int>?, trigger: String) {
+        val started = Clock.System.now().epochSeconds
+        // `done` is posted after the sync_log row is written, so the app never sees a finished sync
+        // whose row (or data) isn't there yet.
+        val watcher = scope.launch { sync.collect { if (it !is SyncState.Done) emitSync(it) } }
+        var error: String? = null
+        try {
+            val history = HistorySync(s, bridge, healthDao, settings, sync, ::log)
+            history.run(only)
+            error = (sync.value as? SyncState.Failed)?.reason
+            syncLog.insert(
+                SyncLog(
+                    start = started,
+                    end = Clock.System.now().epochSeconds,
+                    trigger = trigger,
+                    foreground = appVisible,
+                    rows = history.rowsWritten,
+                    error = error,
+                ),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log("sync failed: $e")
+            error = e.message ?: "Sync failed"
+        } finally {
+            watcher.cancel()
+        }
+        if (error != null) emitSync(SyncState.Failed(error)) else emitSync(SyncState.Done(syncLog.lastEnd() ?: started))
     }
 
     // ---- Setup, as StrapManager.afterAuth ----
@@ -350,7 +499,27 @@ class StrapEngine(private val driver: BleDriver, private val listener: EngineLis
         scope.launch(Dispatchers.Main) { listener.onHeartRate(bpm) }
     }
 
+    /** Posts one sync state to Swift, with the finish time of the last sync that has a log row. */
+    private fun emitSync(state: SyncState) {
+        val (name, detail) = when (state) {
+            SyncState.Idle -> "idle" to null
+            is SyncState.Running -> "running" to state.step
+            is SyncState.Done -> "done" to null
+            is SyncState.Failed -> "failed" to state.reason
+        }
+        val done = (state as? SyncState.Done)?.atEpochSeconds
+        scope.launch(Dispatchers.Main) {
+            listener.onSync(name, detail, done ?: syncLog.lastEnd() ?: 0L)
+        }
+    }
+
     private companion object {
         val KEEP_ALIVE_REPLY = byteArrayOf(0x05, 0x02)
+
+        /** A reconnect within a quarter hour doesn't sync again (StrapManager.MIN_SYNC_GAP_SECONDS). */
+        const val MIN_SYNC_GAP_SECONDS = 15 * 60L
+
+        /** While connected, sync once an hour (StrapManager.AUTO_SYNC_SECONDS). */
+        const val AUTO_SYNC_SECONDS = 60 * 60L
     }
 }

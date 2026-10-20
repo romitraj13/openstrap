@@ -44,7 +44,8 @@ object History {
      */
     fun weekly(stats: List<DayStat>): List<DayStat> =
         stats.groupBy { mondayOf(it.date) }
-            .toSortedMap()
+            .toList()
+            .sortedBy { it.first }
             .map { (monday, days) ->
                 DayStat(monday, days.map { it.value }.average().toFloat(), days.minOf { it.value }, days.maxOf { it.value }, days.sumOf { it.count })
             }

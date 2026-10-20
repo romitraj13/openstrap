@@ -34,6 +34,12 @@ final class StrapController: ObservableObject {
         return formatter
     }()
 
+    /// Where the shared Kotlin code keeps the Room database (the strap's history and the settings).
+    static var databasePath: String {
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return dir.appendingPathComponent("openstrap.db").path
+    }
+
     init(secrets: KeychainSecretStore = KeychainSecretStore(), defaults: UserDefaults = .standard) {
         self.secrets = secrets
         self.defaults = defaults
@@ -42,7 +48,7 @@ final class StrapController: ObservableObject {
         self.sink = sink
         let driver = BleDriverImpl()
         self.driver = driver
-        self.engine = StrapEngine(driver: driver, listener: sink)
+        self.engine = StrapEngine(driver: driver, listener: sink, databasePath: Self.databasePath)
         // The sink calls back into this object; it holds us weakly, so no cycle through Kotlin.
         sink.owner = self
         driver.bridge = engine.bridge
@@ -159,6 +165,14 @@ final class StrapController: ObservableObject {
         append(line)
     }
 
+    /// Sync progress from the shared engine. The Sync screen is a later card; for now it is a log
+    /// line, which is where the diagnostics for a sync that went wrong end up.
+    fileprivate func engineSync(state: String, detail: String?, lastSyncEpochSeconds: Int64) {
+        let extra = detail.map { " (\($0))" } ?? ""
+        let last = lastSyncEpochSeconds > 0 ? " last sync \(Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(lastSyncEpochSeconds))))" : ""
+        append("sync \(state)\(extra)\(last)")
+    }
+
     // MARK: - Plumbing
 
     private func startEngine(identifier: UUID, characteristics: [String]) {
@@ -209,5 +223,9 @@ final class EngineSink: NSObject, EngineListener {
 
     func onLog(line: String) {
         owner?.engineLog(line: line)
+    }
+
+    func onSync(state: String, detail: String?, lastSyncEpochSeconds: Int64) {
+        owner?.engineSync(state: state, detail: detail, lastSyncEpochSeconds: lastSyncEpochSeconds)
     }
 }

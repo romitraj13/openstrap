@@ -1,13 +1,15 @@
 package org.openstrap.app.data
 
-import org.openstrap.app.data.db.SleepStage
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.round
+import kotlin.math.roundToInt
 import kotlin.math.sign
+import org.openstrap.app.data.db.SleepStage
 
 /**
  * OpenStrap's own recovery model: a morning **Readiness** score and a minute-by-minute **Charge** (body
@@ -126,8 +128,8 @@ object Recovery {
         if (days < MIN_STRESS_DAYS || calm.size < MIN_STRESS_READINGS) return StressThreshold(STRESS_FROM, null, days)
         val sorted = calm.map { it.second }.sorted()
         val median = (sorted[(sorted.size - 1) / 2] + sorted[sorted.size / 2]) / 2f
-        val value = Math.round(median + STRESS_MARGIN).coerceIn(STRESS_FROM_MIN, STRESS_FROM_MAX)
-        return StressThreshold(value, Math.round(median), days)
+        val value = (median + STRESS_MARGIN).roundToInt().coerceIn(STRESS_FROM_MIN, STRESS_FROM_MAX)
+        return StressThreshold(value, median.roundToInt(), days)
     }
 
     const val STRESS_BASELINE_DAYS = 14
@@ -230,7 +232,7 @@ object Recovery {
      * Maps a z-score (deviation from baseline in standard deviations, positive = better) to 0-100.
      * A normal night (z = 0) scores 80, one SD better ~93, one SD worse ~55, two SD worse ~27.
      */
-    fun scoreFromZ(z: Float): Int = Math.round(100.0 / (1.0 + exp(-(Z_SLOPE * z + Z_OFFSET)))).toInt().coerceIn(0, 100)
+    fun scoreFromZ(z: Float): Int = round(100.0 / (1.0 + exp(-(Z_SLOPE * z + Z_OFFSET)))).toInt().coerceIn(0, 100)
     private const val Z_SLOPE = 1.19
     private val Z_OFFSET = ln(4.0)
 
@@ -504,8 +506,8 @@ object Recovery {
      */
     fun sleepScore(n: Night, need: Int = SLEEP_NEED_MINUTES): Int {
         val duration = durationScore(n.asleepMinutes, need)
-        val continuity = n.wasoMinutes?.let { continuityScore(it) } ?: return Math.round(duration)
-        return Math.round(SLEEP_DURATION_WEIGHT * duration + SLEEP_CONTINUITY_WEIGHT * continuity).coerceIn(0, 100)
+        val continuity = n.wasoMinutes?.let { continuityScore(it) } ?: return duration.roundToInt()
+        return (SLEEP_DURATION_WEIGHT * duration + SLEEP_CONTINUITY_WEIGHT * continuity).roundToInt().coerceIn(0, 100)
     }
 
     const val SLEEP_DURATION_WEIGHT = 0.7f
@@ -685,7 +687,7 @@ object Recovery {
 
     /** "vs your usual": the share (0-100) of the last 90 days' loads ([history]) at or below [today]; null under 7 days. */
     fun loadPercentile(today: Float, history: List<Float>): Int? =
-        if (history.size < 7) null else Math.round(100f * history.count { it <= today } / history.size)
+        if (history.size < 7) null else (100f * history.count { it <= today } / history.size).roundToInt()
 
     /** Acute (7-day) and chronic (28-day) exponentially weighted load, λ = 2/(N+1) (Williams et al. 2017). */
     fun ewmaLoads(daily: List<Float>): Pair<Float, Float> {

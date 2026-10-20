@@ -1,6 +1,7 @@
 package org.openstrap.app.data
 
 import kotlin.math.exp
+import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -10,9 +11,9 @@ import kotlin.test.assertTrue
 class LoadTest {
     private val rest = 60f
     private val max = 190f
-    private fun bpmAt(x: Float) = Math.round(rest + x * (max - rest))
+    private fun bpmAt(x: Float) = (rest + x * (max - rest)).roundToInt()
 
-    @Test fun `isolated spikes don't count, sustained effort does`() {
+    @Test fun `isolated spikes don't count and sustained effort does`() {
         // A spike every 10 minutes over an hour: never 3 of 5.
         val spikes = (0 until 60).map { it * 60L to if (it % 10 == 0) bpmAt(0.7f) else 70 }
         assertEquals(0f, Recovery.dailyLoad(spikes, rest, max), 1e-6f)
@@ -43,7 +44,7 @@ class LoadTest {
         assertNull(Recovery.filteredMax(listOf(0L to 240)))
     }
 
-    @Test fun `daytime resting HR prefers the strap's daily values, else nightly plus an offset`() {
+    @Test fun `daytime resting HR prefers the strap's daily values and else nightly plus an offset`() {
         val d = 86_400L
         val daily = (1..20).associate { it * d to 62f }
         val nightly = (1..20).associate { it * d to 56f }

@@ -2,11 +2,13 @@ package org.openstrap.shared.device
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.device.PairingErrors
 import org.openstrap.protocol.auth.AuthException
 import org.openstrap.protocol.hexToBytes
@@ -21,7 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Records what the engine tells the app. The engine delivers on Dispatchers.Main, which the tests replace. */
-private class RecordingListener : EngineListener {
+internal class RecordingListener : EngineListener {
     val states = mutableListOf<Pair<String, String?>>()
     val logs = mutableListOf<String>()
     val heartRates = mutableListOf<Int>()
@@ -33,6 +35,19 @@ private class RecordingListener : EngineListener {
     val device = CompletableDeferred<Unit>()
     val heartRate = CompletableDeferred<Int>()
     val disconnected = CompletableDeferred<String>()
+
+    /** Every `onSync` call, in order. */
+    val syncs = mutableListOf<Triple<String, String?, Long>>()
+    /** Buffered so a sync that finishes before the test asks for it isn't lost. */
+    private val syncEvents = Channel<Triple<String, String?, Long>>(Channel.UNLIMITED)
+
+    /** The next sync state named [state], waiting as long as it takes. */
+    suspend fun nextSync(state: String): Triple<String, String?, Long> {
+        while (true) {
+            val call = syncEvents.receive()
+            if (call.first == state) return call
+        }
+    }
 
     override fun onState(state: String, detail: String?) {
         states += state to detail
@@ -56,6 +71,12 @@ private class RecordingListener : EngineListener {
     }
 
     override fun onLog(line: String) { logs += line }
+
+    override fun onSync(state: String, detail: String?, lastSyncEpochSeconds: Long) {
+        val call = Triple(state, detail, lastSyncEpochSeconds)
+        syncs += call
+        syncEvents.trySend(call)
+    }
 }
 
 class StrapEngineTest {
@@ -73,7 +94,7 @@ class StrapEngineTest {
     private class Harness(listener: RecordingListener, keyHex: String) {
         val strap = SimulatedStrap(keyHex.hexToBytes())
         val driver = FakeStrapDriver(strap)
-        val engine = StrapEngine(driver, listener)
+        val engine = StrapEngine(driver, listener, OpenStrapIosDatabase.IN_MEMORY)
 
         init { driver.bridge = engine.bridge }
 

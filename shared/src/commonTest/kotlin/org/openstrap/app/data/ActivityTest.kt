@@ -25,7 +25,7 @@ class ActivityTest {
         assertEquals(0, m.moderateMinutes)
     }
 
-    @Test fun `heart rate counts effort without steps after ten minutes, never twice`() {
+    @Test fun `heart rate counts effort without steps after ten minutes and never twice`() {
         // 12 minutes of cycling at 50 % of reserve with no steps: moderate, from HR.
         val bike = Activity.mvpa(minutes(*IntArray(12), hrr = 0.5f))
         assertEquals(12, bike.moderateMinutes)

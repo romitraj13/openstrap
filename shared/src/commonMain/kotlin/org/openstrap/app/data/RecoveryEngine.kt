@@ -169,7 +169,7 @@ class RecoveryEngine(private val dao: HealthDao) {
         val activityDays = (6 downTo 0).map { back ->
             val w = DayWindow.of(date.minusDays(back.toLong()), zone)
             // Minutes with any data; no row is missing, never zero.
-            val times = (minuteSteps.keys.filter { it in w.from..w.to } + weekHr.keys.filter { it in w.from..w.to }).toSortedSet()
+            val times = (minuteSteps.keys.filter { it in w.from..w.to } + weekHr.keys.filter { it in w.from..w.to }).distinct().sorted()
             times.map { t ->
                 Activity.Minute(
                     t, minuteSteps[t] ?: 0, weekHr[t]?.let { Recovery.hrr(it, restingHr, maxHr) }, asleep(t),
@@ -196,7 +196,7 @@ class RecoveryEngine(private val dao: HealthDao) {
 
         // Energy: every minute of the day with data (a step record, heart rate, or sleep); no row is missing, never zero.
         val todaySleep = sessions.flatMap { s -> (maxOf(s.start, day.from) / 60 * 60 until minOf(s.end, day.to + 1) step 60).toList() }.toSet()
-        val energyTimes = (minuteSteps.keys.filter { it in day.from..day.to } + weekHr.keys.filter { it in day.from..day.to } + todaySleep).toSortedSet()
+        val energyTimes = (minuteSteps.keys.filter { it in day.from..day.to } + weekHr.keys.filter { it in day.from..day.to } + todaySleep).distinct().sorted()
         val energy = EnergyExpenditure.day(
             energyTimes.map { t ->
                 val w = workouts.firstOrNull { t in it.start until it.end }

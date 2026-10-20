@@ -33,7 +33,7 @@ class SleepRegularityTest {
         assertEquals(Band.Regular, SleepRegularity.band(sri))
     }
 
-    @Test fun `only pairs with both minutes valid count, and under 120 h it is withheld`() {
+    @Test fun `only pairs with both minutes valid count and and under 120 h it is withheld`() {
         // Off the wrist outside sleep: only the 8 h of sleep per day are valid, 7 pairs × 480 = 3360 < 7200.
         val grids = (0..7).map { day(it, 660, 1140, worn = false) }
         val (sri, valid) = SleepRegularity.sri(grids)
@@ -54,7 +54,7 @@ class SleepRegularityTest {
         assertEquals(Band.VeryRegular, SleepRegularity.band(87f))
     }
 
-    @Test fun `sleep wins over awake when stages touch, naps count as sleep`() {
+    @Test fun `sleep wins over awake when stages touch and naps count as sleep`() {
         val g = SleepRegularity.grid(0, listOf(Triple(0L, 600L, SleepStage.AWAKE), Triple(300L, 900L, SleepStage.REM))) { false }
         assertEquals(SleepRegularity.WAKE, g[0])
         assertEquals(SleepRegularity.SLEEP, g[5])

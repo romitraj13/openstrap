@@ -1,5 +1,6 @@
 package org.openstrap.app.device
 
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,16 +106,31 @@ class HistorySync(
     private val data = Channel<ByteArray>(Channel.UNLIMITED)
     private val client = GdspClient(::send, control, data, log)
 
+    /** Rows this sync wrote to the health tables; the engine puts it in its `sync_log` row. */
+    var rowsWritten = 0
+        private set
+
     /** Syncs every type, or only the codes in [only] (an on-demand sync after a data-available push). */
     suspend fun run(only: Set<Int>? = null) = coroutineScope {
+        rowsWritten = 0
         state.value = SyncState.Running("Preparing…")
         repairEarlierSyncs()
-        val listeners = launch {
-            launch { gatt.notifications.filter { it.characteristic == HISTORY_DATA }.collect { data.send(it.value) } }
+        // The notification flows carry no replay: a reply that arrives before these collectors have
+        // subscribed is dropped and the whole sync times out. Android's listeners start on another
+        // thread and lose that race rarely; UNDISPATCHED starts each collector up to its first
+        // suspension right here, which is the subscription, so nothing can be missed.
+        val listeners = launch(start = CoroutineStart.UNDISPATCHED) {
+            launch(start = CoroutineStart.UNDISPATCHED) {
+                gatt.notifications.filter { it.characteristic == HISTORY_DATA }.collect { data.send(it.value) }
+            }
             if (useChannel) {
-                launch { session.messagesFor(Endpoints.HISTORY).collect { log("gdsp < ${it.toHex()}"); control.send(FetchCodec.parse(it)) } }
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    session.messagesFor(Endpoints.HISTORY).collect { log("gdsp < ${it.toHex()}"); control.send(FetchCodec.parse(it)) }
+                }
             } else {
-                launch { gatt.notifications.filter { it.characteristic == HISTORY_CONTROL }.collect { control.send(FetchCodec.parse(it.value)) } }
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    gatt.notifications.filter { it.characteristic == HISTORY_CONTROL }.collect { control.send(FetchCodec.parse(it.value)) }
+                }
             }
         }
         try {
@@ -347,6 +363,7 @@ class HistorySync(
                     .map { (t, bpm) -> WorkoutHeartRate(r.timestamp, t, bpm) }
                 dao.deleteWorkoutHeartRate(r.timestamp)
                 if (samples.isNotEmpty()) dao.insertWorkoutHeartRate(samples)
+                rowsWritten += samples.size
             }
             is SportEffect -> effects += SportEffectRow(
                 r.timestamp, r.recoveryTimeMinutes, r.vo2max, r.epoc, r.trainingLoadWeekly, r.trainingLoadMonthly,
@@ -371,7 +388,7 @@ class HistorySync(
             is OsaResult -> osaResults += OsaResultRow(r.timestamp, r.odiValidTime, r.odiRefined, r.odiScore, r.odiDispCode, r.odNumRefined, r.version)
             // The strap updates the day's value as it rises; keep the highest seen.
             is DailyMaxHeartRate -> HeartRateSentinel.valid(r.maxHeartRate)?.let { bpm ->
-                maxHr.merge(dayStart(r.timestamp), bpm, ::maxOf)
+                val day = dayStart(r.timestamp); maxHr[day] = maxOf(maxHr[day] ?: bpm, bpm)
             }
             is RecoveryHeartRate -> if (r.samples.isNotEmpty()) recoveryHr += RecoveryHeartRateRow(r.trackId, r.samples.map { it.toByte() }.toByteArray())
             // A record of 0xFF bytes is buffer padding, not a minute.
@@ -383,6 +400,9 @@ class HistorySync(
             else -> Unit
         }
         perSecond.forEach { (minute, values) -> hr += HeartRateSample(minute, values.average().toInt()) }
+        rowsWritten += activity.size + hr.size + spo2.size + stress.size + hrv.size + resting.size + restingIfMissing.size +
+            skin.size + breath.size + pai.size + sdnn.size + workouts.size + effects.size + sleepSpo2.size +
+            osaEvents.size + osaResults.size + maxHr.size + recoveryHr.size + extended.size + raw.size
         if (activity.isNotEmpty()) dao.insertActivity(activity)
         if (hr.isNotEmpty()) dao.insertHeartRate(hr)
         if (spo2.isNotEmpty()) dao.insertSpo2(spo2)
@@ -434,6 +454,7 @@ class HistorySync(
                     wakeCount = r.wakeCount,
                 )))
                 dao.insertSleepStages(main.map { stage(it, start, r) })
+                rowsWritten += 1 + main.size
             }
         }
         // The newest copy of a day replaces its naps, including when it has none: the strap can report a stretch
@@ -447,6 +468,7 @@ class HistorySync(
             if (mainWindow != null && start < mainWindow.second && end > mainWindow.first) continue
             dao.insertSleepSessions(listOf(SleepSession(start, end, day, nap = true)))
             dao.insertSleepStages(stages.filter { it.start >= start && it.end <= end }.map { it.copy(sessionStart = start) })
+            rowsWritten += 1 + stages.count { it.start >= start && it.end <= end }
         }
     }
 

@@ -1,5 +1,6 @@
 package org.openstrap.app.data
 
+import kotlin.math.round
 import org.openstrap.app.data.db.ActivityMinute
 import org.openstrap.app.data.db.HeartRateSample
 import org.openstrap.app.data.db.SleepStage
@@ -23,16 +24,16 @@ object Summaries {
 
     /** Merges heart rate from dedicated HR samples and per-minute activity, preferring HR samples. */
     fun heartRateSeries(hr: List<HeartRateSample>, minutes: List<ActivityMinute>): List<Pair<Long, Int>> {
-        val byTime = sortedMapOf<Long, Int>()
+        val byTime = mutableMapOf<Long, Int>()
         for (m in minutes) if (m.heartRate != null && m.heartRate in 30..230) byTime[m.timestamp] = m.heartRate
         for (s in hr) if (s.bpm in 30..230) byTime[s.timestamp] = s.bpm
-        return byTime.map { it.key to it.value }
+        return byTime.entries.sortedBy { it.key }.map { it.key to it.value }
     }
 
     /** Averages a series into fixed buckets (e.g. 5 minutes) for a calmer chart line. */
     fun bucketAverage(series: List<Pair<Long, Int>>, bucketSeconds: Long = 300): List<Pair<Long, Int>> =
         series.groupBy { it.first / bucketSeconds * bucketSeconds }
-            .map { (t, v) -> t to Math.round(v.map { it.second }.average()).toInt() }
+            .map { (t, v) -> t to round(v.map { it.second }.average()).toInt() }
             .sortedBy { it.first }
 
     /**
@@ -57,7 +58,7 @@ object Summaries {
                 if (best == null || avg < best) best = avg
             }
         }
-        return best?.let { Math.round(it).toInt() }
+        return best?.let { round(it).toInt() }
     }
 
     data class SleepBreakdown(

@@ -3,6 +3,7 @@ package org.openstrap.app.data
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import org.openstrap.app.data.db.SportEffectRow
 import org.openstrap.app.data.db.Workout
 import org.openstrap.app.data.db.WorkoutHeartRate
@@ -22,7 +23,7 @@ class WorkoutsTest {
         assertEquals(30, a.recovery60)
         assertEquals(60, a.recovery120)
         assertEquals(140, a.endHeartRate)
-        org.junit.Assert.assertTrue(a.recoveryIsMeaningful)
+        assertTrue(a.recoveryIsMeaningful)
         // 140/190 = 73 %: all workout time in zone 3 (index 2).
         assertEquals(1200, a.zoneSeconds[2])
     }

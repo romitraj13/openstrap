@@ -51,6 +51,12 @@ internal class SimulatedStrap(private val authKey: ByteArray) : StrapLink {
     /** What the strap reports on 0016 in answer to the MTU query (payload MTU, not the ATT MTU). */
     var reportedPayloadMtu = 20
 
+    /** The GDSP device behind this strap: it serves per-minute activity, and answers on 0x004B. */
+    var gdsp: SimulatedGdspStrap? = null
+
+    /** GDSP data packets, on the strap's history-data characteristic (HUAMI 0005), as on hardware. */
+    val historyNotifications = MutableSharedFlow<ByteArray>(extraBufferCapacity = 64)
+
     private val reassembler = Reassembler({ true }, { sid, data, len ->
         // The device decrypts with its own rx counter, which starts at the phone's tx counter.
         cipher!!.decrypt(sid, data, len)
@@ -120,8 +126,17 @@ internal class SimulatedStrap(private val authKey: ByteArray) : StrapLink {
                     outbox += endpoint to byteArrayOf(0x05, 0x48, 0x00)
                 }
             }
+            // GDSP: the history module answers on 0x004B, its data packets go out on 0005.
+            Endpoints.HISTORY -> gdsp?.let { sim ->
+                sim.handle(payload).forEach { outbox += endpoint to it }
+                dataOutbox += sim.packets.toList()
+                sim.packets.clear()
+            }
         }
     }
+
+    /** Packets waiting for the data characteristic, sent by [flushOutbox] after the control replies. */
+    private val dataOutbox = mutableListOf<ByteArray>()
 
     /** A later push on 0x0048 (`05 hr u16`). */
     suspend fun pushHeartRate(bpm: Int) {
@@ -140,7 +155,7 @@ internal class SimulatedStrap(private val authKey: ByteArray) : StrapLink {
             Endpoints.TIME to false,
             Endpoints.HEART_RATE to false,
             Endpoints.OPEN_APP to false,
-        )
+        ) + if (gdsp != null) listOf(Endpoints.HISTORY to false) else emptyList()
         return ByteWriter().u8(0x04).u16(entries.size).apply {
             for ((endpoint, encrypted) in entries) {
                 u16(endpoint); u8(if (encrypted) 1 else 0)
@@ -169,6 +184,10 @@ internal class SimulatedStrap(private val authKey: ByteArray) : StrapLink {
     }
 
     private suspend fun flushOutbox() {
+        // Data packets go out on 0005 before the control reply that ends the transfer, as the strap sends them.
+        while (dataOutbox.isNotEmpty()) {
+            historyNotifications.emit(dataOutbox.removeAt(0))
+        }
         while (outbox.isNotEmpty()) {
             val (endpoint, payload) = outbox.removeAt(0)
             val sid = deviceSession++ and 0xFF
@@ -186,6 +205,10 @@ internal class SimulatedStrap(private val authKey: ByteArray) : StrapLink {
  * time, like CoreBluetooth's serial queue.
  */
 internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
+    /** The strap's history-data and history-control characteristics, as `HistorySync` names them. */
+    private val HISTORY_DATA = "00000005-0000-3512-2118-0009af100700"
+    private val HISTORY_CONTROL = "00000004-0000-3512-2118-0009af100700"
+
     lateinit var bridge: BleBridge
     val calls = mutableListOf<String>()
 
@@ -203,6 +226,8 @@ internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
         StrapUuids.HEART_RATE_SERVICE,
         StrapUuids.HR_MEASUREMENT,
         StrapUuids.HR_CONTROL,
+        HISTORY_DATA,
+        HISTORY_CONTROL,
     )
 
     private val reads = mapOf(
@@ -216,12 +241,14 @@ internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
     private val forwarders = listOf(
         scope.launch { strap.controlNotifications.collect { bridge.onNotification(StrapUuids.CHANNEL_CONTROL, it) } },
         scope.launch { strap.dataNotifications.collect { bridge.onNotification(StrapUuids.CHANNEL_DATA, it) } },
+        scope.launch { strap.historyNotifications.collect { bridge.onNotification(HISTORY_DATA, it) } },
     )
 
-    /** Wait until both notification forwarders are subscribed, so no early chunk is dropped. */
+    /** Wait until every notification forwarder is subscribed, so no early chunk is dropped. */
     suspend fun ready() {
         strap.controlNotifications.subscriptionCount.first { it > 0 }
         strap.dataNotifications.subscriptionCount.first { it > 0 }
+        strap.historyNotifications.subscriptionCount.first { it > 0 }
     }
 
     override fun write(requestId: Long, characteristic: String, data: ByteArray, withResponse: Boolean) {
