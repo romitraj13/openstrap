@@ -27,6 +27,7 @@ import org.openstrap.app.data.db.SleepStage
 import org.openstrap.app.data.db.SyncLog
 import org.openstrap.app.data.settings.UserProfile
 import org.openstrap.app.data.DayWindow
+import org.openstrap.app.data.minusDays
 import kotlin.time.Clock
 
 /**
@@ -140,7 +141,9 @@ class HealthQueriesTest {
             // Steps are the day's per-minute total, as the Android day view sums them.
             val day = DayWindow.of(today, zone)
             assertEquals(Summaries.totalSteps(dao.activityOnce(day.from, day.to)), snapshot.steps)
-            assertTrue("the sample day has steps", snapshot.steps > 0)
+            // A day that is already over always has its steps, whatever time the test runs at.
+            val yesterday = DayWindow.of(today.minusDays(1), zone)
+            assertTrue("the sample data has steps on a past day", Summaries.totalSteps(dao.activityOnce(yesterday.from, yesterday.to)) > 0)
 
             // Resting HR is the strap's own daily value for the day; the sample data writes one.
             assertEquals(dao.restingHrOnce(day.from, day.to).single().bpm, snapshot.restingHr)
@@ -204,7 +207,6 @@ class HealthQueriesTest {
         val demo = HealthQueries(newPath()).also { queries = it }
         ask<String> { demo.seedDemoData(it) }
         val once = demo.todayNow().steps
-        assertTrue("the sample day has steps", once > 0)
         ask<String> { demo.seedDemoData(it) }
         assertEquals(once, demo.todayNow().steps)
     }
@@ -265,17 +267,19 @@ class HealthQueriesTest {
     fun heartIsTheDayAsFiveMinuteAverages() = runTest {
         val path = seed(HealthQueries.DEMO_DAYS)
         val queries = open(path)
-        val heart = queries.heartNow()
+        // A day that is already over, so the sample data's own minute records cover all of it.
+        val day = today.minusDays(1)
+        val heart = queries.heartNow(day.toString())
 
         withDatabase(path) { database ->
             val dao = database.healthDao()
-            val day = DayWindow.of(today, zone)
-            val series = Summaries.bucketAverage(Summaries.heartRateSeries(dao.heartRateOnce(day.from, day.to), dao.activityOnce(day.from, day.to)))
+            val window = DayWindow.of(day, zone)
+            val series = Summaries.bucketAverage(Summaries.heartRateSeries(dao.heartRateOnce(window.from, window.to), dao.activityOnce(window.from, window.to)))
             assertEquals(series.map { it.first }, heart.samples.map { it.timestamp })
             assertEquals(series.map { it.second }, heart.samples.map { it.bpm })
             assertTrue("the sample day has heart rate", heart.samples.size > 100)
             assertTrue(heart.samples.all { it.bpm in 30..230 })
-            assertEquals(dao.restingHrOnce(day.from, day.to).single().bpm, heart.restingHr)
+            assertEquals(dao.restingHrOnce(window.from, window.to).single().bpm, heart.restingHr)
             assertEquals(series.last().second, heart.latestHr)
         }
         // The strap's own daily value wins, so nothing is marked as our estimate.

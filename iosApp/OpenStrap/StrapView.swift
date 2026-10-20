@@ -52,6 +52,12 @@ struct StrapView: View {
                             .font(.footnote)
                     }
                 }
+                Section("Diagnostics") {
+                    NavigationLink("Sync log and app log") {
+                        DiagnosticsView(controller: controller)
+                    }
+                    .accessibilityIdentifier("diagnosticsLink")
+                }
             }
             .navigationTitle("Strap")
             .onAppear { controller.refreshSyncLog() }

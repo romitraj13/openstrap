@@ -67,6 +67,10 @@ final class StrapController: ObservableObject {
     /// True while the app is not on screen. Syncs then run from a Bluetooth wake, on borrowed time.
     @Published private(set) var inBackground = false
 
+    /// The database file the engine writes and the screens read (card C6's `HealthQueries` opens the
+    /// same path). Set once, in `init`.
+    let databasePath: String
+
     private let secrets: KeychainSecretStore
     private let defaults: UserDefaults
     private let driver: BleDriverImpl
@@ -100,6 +104,7 @@ final class StrapController: ObservableObject {
         // The health database lives in Application Support with the attributes plan section 8 asks
         // for; `openDatabase` never throws, it reports what went wrong in the log instead.
         let database = Self.openDatabase()
+        self.databasePath = database.path
         self.engine = StrapEngine(driver: driver, listener: sink, databasePath: database.path)
         // The sink calls back into this object; it holds us weakly, so no cycle through Kotlin.
         sink.owner = self

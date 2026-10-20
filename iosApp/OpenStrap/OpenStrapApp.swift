@@ -8,11 +8,20 @@ struct OpenStrapApp: App {
     /// CoreBluetooth central manager that receives the restored connection — exists before any view
     /// is on screen. A controller owned by `RootView` would be created too late, or not at all, for
     /// an overnight sync to happen without the user opening the app.
-    private let controller = StrapController()
+    private let controller: StrapController
+
+    /// The screens' reads, over the same database file the engine writes (card C6).
+    private let health: HealthModel
+
+    init() {
+        let controller = StrapController()
+        self.controller = controller
+        health = HealthModel(databasePath: controller.databasePath)
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView(controller: controller)
+            ContentView(controller: controller, health: health)
         }
     }
 }
