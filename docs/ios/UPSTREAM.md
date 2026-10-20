@@ -296,3 +296,35 @@ No file was copied from Android in this card, so the table above is unchanged.
 `:shared:jvmTest` after C5: 164 tests, 0 failures (161 + the 3 `SyncLogReadTest`).
 `iosSimulatorArm64Test` total after C5: 260 (was 257).
 
+
+## Card C6 (Today, Sleep, Heart, Recovery screens)
+
+```
+app/src/main/kotlin/org/openstrap/app/ui/dashboard/Narrative.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Narrative.kt
+app/src/main/kotlin/org/openstrap/app/ui/components/Cards.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/Narrative.kt
+app/src/debug/kotlin/org/openstrap/app/data/SampleData.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/SampleData.kt
+app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/RecoveryCopy.kt
+```
+
+What changed in each copy, and why:
+
+- **`Narrative.kt`** carries the headlines, rating words, advice sentences and `stressThreshold`
+  text unchanged. What changed: `Rating` held a Compose `Color` on Android, which `shared/` has no
+  type for, so it now carries the label only and the Swift view picks the colour from the rating.
+  `formatDuration` came with it, copied from `Cards.kt` line 185 (the sentences are built with it),
+  and `Math.round(x)` became `kotlin.math.round(x).toInt()` — `java.lang.Math` does not exist in
+  common Kotlin. `org.openstrap.app.data.X` prefixes inside the file became plain names because the
+  copy lives in that package.
+- **`SampleData.kt`**: same numbers and the same `Random(42)`, so the sample week is the week the
+  Android debug build writes. What changed: `java.time` to kotlinx-datetime (`ZoneId.systemDefault`
+  → `TimeZone.currentSystemDefault`, `LocalDate.now` → `Clock.System.todayIn`) and
+  `System.currentTimeMillis()` to `Clock.System.now().epochSeconds`. `load` takes the number of days
+  to seed: it defaults to the 7 Android writes (`SampleData.DAYS`), and the iOS `-demoData` argument
+  asks for a month (`DEMO_DAYS = 30`) so Readiness is past its seven-night learning phase on screen.
+  Android has no test for this file; the JVM tests exercise it through a real database instead.
+- **`RecoveryCopy.kt`** is the Recovery screen's copy, character for character: the two empty
+  states in `RecoveryCard`, `ChargeCard`'s two hints, the "capped" note, and `HowItWorksPanel`'s two
+  explanation paragraphs. They sit in `shared/` rather than in Swift because the card's rule is the
+  Android app's wording with no new copy.
+
+`:shared:jvmTest` after C6: 173 tests, 0 failures (164 + the 9 `HealthQueriesTest`).
