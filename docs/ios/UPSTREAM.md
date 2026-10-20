@@ -340,3 +340,56 @@ Authored for iOS in this card, with no upstream source:
 | `shared/src/jvmTest/kotlin/org/openstrap/shared/health/HealthQueriesTest.kt` | The 9 tests that seed a real database from the copied sample week and check each snapshot against the score functions. |
 | `iosApp/OpenStrap/HealthModel.swift` | The Swift object over `HealthQueries`, the `-demoData` flag (debug builds only) and the screens' formatters. |
 | `iosApp/OpenStrap/TodayView.swift`, `SleepView.swift`, `HeartView.swift` | The three screens and their Swift Charts. |
+
+## Card C7 (Apple Health export)
+
+C7 copied nothing from `app/`. `HealthExportQueue` is new Kotlin and `HealthKitWriter.swift` is new
+Swift; the only upstream text this card leans on is the export's own grouping rules, which were
+**mirrored, not copied**, because the destination is HealthKit's sample model rather than Health
+Connect's record model:
+
+```
+app/src/main/kotlin/org/openstrap/app/health/HealthConnectExporter.kt @ 19f2865 -> (not copied; the rules below were mirrored in shared/src/commonMain/kotlin/org/openstrap/shared/health/HealthExportQueue.kt and iosApp/OpenStrap/HealthKitWriter.swift)
+```
+
+What was taken from that file, and what could not be:
+
+- **Heart rate** takes the heart-rate table plus the activity minutes that carry a reading, keeps
+  30..230 bpm and one sample per timestamp (`distinctBy { it.timestamp }`). Health Connect groups an
+  hour of samples into one record; HealthKit has one sample per reading, so the hour grouping has no
+  destination and each reading is its own row. The `openstrap.hr.<epochSeconds>` sync identifier
+  keeps a re-export one sample.
+- **Steps** are one minute per activity minute with `steps > 0`, from the minute to the minute + 60,
+  exactly the Android bucket.
+- **Oxygen saturation** keeps the 70..100 filter and carries the percentage; Swift divides by 100
+  because `HKUnit.percent()` is a fraction. Android's `Percentage(...)` is the same unit.
+- **Resting heart rate** is one row per local day, as Android writes `time = r.day`.
+- **Sleep** keeps the two hardening rules in `HealthConnectExporter.export`: a stage is clipped into
+  its session (`start.coerceAtLeast(session.start)`, `maxOf(end, start + 60).coerceAtMost(session.end)`)
+  and dropped when it is zero length. Android maps a fifth, `else` case to `STAGE_TYPE_UNKNOWN`;
+  Apple Health has no unknown sleep stage, so C7 skips it (card step 2, "others skipped").
+- **Not carried over**: Android's `deleteRecords` before re-inserting sleep (HealthKit's sync
+  identifier replaces instead), Health Connect's 500-record batch cap (C7 saves 500 samples per call
+  by choice), and the whole import direction.
+- **Not exported at all** (plan section 6): HRV. Android writes `HeartRateVariabilityRmssdRecord`;
+  the strap's value is RMSSD and HealthKit only has SDNN, so C7 writes neither. Skin temperature and
+  stress have no honest Apple Health type and stay in `openstrap.db`. A JVM test seeds all three
+  tables and asserts no type hands out a row.
+- Android has no test for `HealthConnectExporter` (`app/src/test/kotlin/org/openstrap/app/health/`
+  does not exist), so there was no test to copy. The 15 `HealthExportQueueTest` cases are new.
+
+`:shared:jvmTest` after C7: 188 tests, 0 failures (173 + the 15 `HealthExportQueueTest`).
+`iosSimulatorArm64Test` after C7: 260, unchanged (the new Kotlin tests are JVM-only; nothing
+commonTest was added). XCTest: `OpenStrapTests` 11 -> 22, the 11 new `HealthExportTests`; the iOS
+job's log reads "Executed 22 tests, with 0 failures" and "Executed 2 tests" for `OpenStrapUITests`,
+then "** TEST SUCCEEDED **". Android: `:app:testDebugUnitTest` 151 tests and `:app:assembleDebug`
+green, `git diff --stat 19f2865 -- app docs/protocol` empty.
+
+Authored for iOS in this card, with no upstream source:
+
+| File | Why it is new |
+|---|---|
+| `shared/src/commonMain/kotlin/org/openstrap/shared/health/HealthExportQueue.kt` | `HealthExportTypes`, `ExportRow`/`ExportBatch` as plain data, and the per-type cursor in `key_value` (`health_export_<type>`, never Android's `last_sync_<type>`), with one worker and main-thread callbacks. |
+| `shared/src/jvmTest/kotlin/org/openstrap/shared/health/HealthExportQueueTest.kt` | The 15 tests: the five type names, an empty database, the heart-rate merge and 30..230 filter, the cursor (newer-only, survives a new queue, never backwards, per type, batch limit), the step minute buckets and their boundary, the oxygen range, the resting-HR day, the clipped sleep stages, a night found by its session end, and that HRV, stress and skin temperature never appear. |
+| `iosApp/OpenStrap/HealthKitWriter.swift` | `HealthExportType`, `HealthSampleMapper` (pure builders), `HealthKitWriter` (write-only authorisation and `save`), `HealthExportSettings` (the switch, off when absent), and `HealthExportCoordinator` (pending, save, mark, next type, 500 samples a call). |
+| `iosApp/OpenStrapTests/HealthExportTests.swift` | The 11 XCTests that build each type through the mapper without saving and check type, unit, value, dates, the sync identifier and version, the device, and that the switch starts off. |
