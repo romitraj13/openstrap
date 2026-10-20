@@ -328,3 +328,15 @@ What changed in each copy, and why:
   Android app's wording with no new copy.
 
 `:shared:jvmTest` after C6: 173 tests, 0 failures (164 + the 9 `HealthQueriesTest`).
+`iosSimulatorArm64Test` after C6: 260, unchanged (the new tests are JVM-only; nothing commonTest
+was added). XCTest: `OpenStrapTests` 11, unchanged; `OpenStrapUITests` 1 -> 2, the new test
+launching with `-demoData`, visiting the four tabs and attaching a screenshot of each.
+
+Authored for iOS in this card, with no upstream source:
+
+| File | Why it is new |
+|---|---|
+| `shared/src/commonMain/kotlin/org/openstrap/shared/health/HealthQueries.kt` | The screens' reads: `today`, `sleep`, `heart`, `recovery` as plain callbacks on the main thread, and `seedDemoData` for `-demoData`. The values come from `RecoveryEngine` and `Narrative`; nothing new is computed here. |
+| `shared/src/jvmTest/kotlin/org/openstrap/shared/health/HealthQueriesTest.kt` | The 9 tests that seed a real database from the copied sample week and check each snapshot against the score functions. |
+| `iosApp/OpenStrap/HealthModel.swift` | The Swift object over `HealthQueries`, the `-demoData` flag (debug builds only) and the screens' formatters. |
+| `iosApp/OpenStrap/TodayView.swift`, `SleepView.swift`, `HeartView.swift` | The three screens and their Swift Charts. |
