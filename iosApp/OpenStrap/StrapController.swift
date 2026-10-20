@@ -66,6 +66,10 @@ final class StrapController: ObservableObject {
     @Published private(set) var syncLogRows: [SyncLogRow] = []
     /// True while the app is not on screen. Syncs then run from a Bluetooth wake, on borrowed time.
     @Published private(set) var inBackground = false
+    /// Card C7: "Write to Apple Health". Off until the user turns it on, and remembered after that.
+    @Published private(set) var appleHealthEnabled: Bool
+    /// What the Strap screen says under the toggle: the permission answer, or why it is unavailable.
+    @Published private(set) var appleHealthNote: String?
 
     /// The database file the engine writes and the screens read (card C6's `HealthQueries` opens the
     /// same path). Set once, in `init`.
@@ -76,6 +80,7 @@ final class StrapController: ObservableObject {
     private let driver: BleDriverImpl
     private let engine: StrapEngine
     private let sink: EngineSink
+    private let healthExport: HealthExportCoordinator
     private var peripheralIdentifier: UUID?
     private var discoveredCharacteristics: [String] = []
     private var appStateObservers: [NSObjectProtocol] = []
@@ -106,8 +111,14 @@ final class StrapController: ObservableObject {
         let database = Self.openDatabase()
         self.databasePath = database.path
         self.engine = StrapEngine(driver: driver, listener: sink, databasePath: database.path)
+        // Card C7: the Apple Health export reads the same file through its own connection, and moves
+        // its per-type cursors in the `key_value` table there.
+        self.healthExport = HealthExportCoordinator(databasePath: database.path, defaults: defaults)
+        self.appleHealthEnabled = HealthExportSettings.isEnabled(defaults)
+        self.appleHealthNote = nil
         // The sink calls back into this object; it holds us weakly, so no cycle through Kotlin.
         sink.owner = self
+        healthExport.onLog = { [weak self] line in self?.append(line) }
         driver.bridge = engine.bridge
         driver.onLog = { [weak self] line in self?.append(line) }
         driver.onDiscovered = { [weak self] identifier, characteristics in
@@ -190,6 +201,16 @@ final class StrapController: ObservableObject {
         liveHeartRateEnabled = enabled
         engine.setLiveHeartRate(enabled: enabled)
         append(enabled ? "live heart rate on" : "live heart rate off")
+    }
+
+    /// Card C7's switch: stores it, and on turning it on asks Apple Health for write permission. The
+    /// first export is the next successful sync's.
+    func setAppleHealth(_ enabled: Bool) {
+        appleHealthEnabled = enabled
+        append(enabled ? "write to Apple Health on" : "write to Apple Health off")
+        healthExport.setEnabled(enabled) { [weak self] line in
+            self?.appleHealthNote = line
+        }
     }
 
     /// The Strap screen's button. The engine queues it behind a sync that is already running, and the
@@ -285,8 +306,6 @@ final class StrapController: ObservableObject {
     fileprivate func engineSync(state: String, detail: String?, lastSyncEpochSeconds: Int64) {
         if state == "running" {
             beginSyncBackgroundTask()
-        } else if state == "done" || state == "failed" {
-            endSyncBackgroundTask()
         }
         if lastSyncEpochSeconds > 0 {
             self.lastSyncEpochSeconds = lastSyncEpochSeconds
@@ -296,8 +315,29 @@ final class StrapController: ObservableObject {
             ? " last sync \(Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(lastSyncEpochSeconds))))"
             : ""
         append("sync \(state)\(extra)\(last)")
-        if state == "done" || state == "failed" {
+        if state == "done" {
             refreshSyncLog()
+            exportAfterSync()
+        } else if state == "failed" {
+            endSyncBackgroundTask()
+            refreshSyncLog()
+        }
+    }
+
+    /// Card C7: after a successful sync, write what Apple Health does not have yet while the switch
+    /// is on. The sync's background task stays open until the export finishes, so a sync that ran
+    /// overnight gets its HealthKit writes done before iOS suspends the app.
+    private func exportAfterSync() {
+        guard healthExport.isEnabled else {
+            endSyncBackgroundTask()
+            return
+        }
+        // If an export is already running (`-demoData` plus a fast sync, or two syncs back to back),
+        // that run ends the background task itself; this one is not called.
+        healthExport.run { [weak self] line in
+            guard let self else { return }
+            self.append(line)
+            self.endSyncBackgroundTask()
         }
     }
 

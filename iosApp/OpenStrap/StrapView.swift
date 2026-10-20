@@ -30,6 +30,18 @@ struct StrapView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                Section("Apple Health") {
+                    Toggle("Write to Apple Health", isOn: Binding(
+                        get: { controller.appleHealthEnabled },
+                        set: { controller.setAppleHealth($0) }
+                    ))
+                    .accessibilityIdentifier("appleHealthToggle")
+                    Text(controller.appleHealthNote
+                        ?? "Heart rate, resting heart rate, blood oxygen, steps and sleep stages, after each successful sync. HRV, skin temperature and stress stay in OpenStrap.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("appleHealthNote")
+                }
                 Section("Device") {
                     LabeledContent("Firmware", value: controller.firmware ?? "-")
                         .accessibilityIdentifier("firmware")
