@@ -134,12 +134,19 @@ final class BleDriverImpl: NSObject, BleDriver, CBCentralManagerDelegate, CBPeri
     }
 
     private func adopt(_ strap: CBPeripheral) {
+        takeOver(strap)
+        log("connecting")
+        central?.connect(strap, options: nil)
+    }
+
+    /// This object becomes the strap's delegate with no cached characteristic map, so services are
+    /// discovered again on this link rather than trusted from an earlier one.
+    private func takeOver(_ strap: CBPeripheral) {
         peripheral = strap
         characteristics = [:]
         discovered = []
+        servicesRemaining = 0
         strap.delegate = self
-        log("connecting")
-        central?.connect(strap, options: nil)
     }
 
     // MARK: - BleDriver, called from Kotlin on any thread
@@ -209,6 +216,34 @@ final class BleDriverImpl: NSObject, BleDriver, CBCentralManagerDelegate, CBPeri
             log("This device does not support Bluetooth")
         default:
             break
+        }
+    }
+
+    /// Called by iOS when it launches the app for a strap that is still connected (H1: without this
+    /// method CoreBluetooth throws `NSInternalInconsistencyException` at the first Connect, because
+    /// the central manager was created with a restore identifier).
+    ///
+    /// The restored peripherals are put back under this driver — delegate, empty characteristic map —
+    /// and a link that is already up is rediscovered, so `onDiscovered` reaches the engine and it
+    /// authenticates and syncs again without the user opening anything.
+    ///
+    /// Delivered on the queue the central manager was created with, so this runs on the driver's own
+    /// queue; `start(savedIdentifier:)` has already set the reconnect intent by then.
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        let restored = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
+        guard let strap = restored.first(where: { BleDriverImpl.matches($0.name) }) ?? restored.first else {
+            log("Bluetooth state restored with no strap")
+            return
+        }
+        log("Bluetooth state restored: \(strap.name ?? "the strap")")
+        shouldReconnect = true
+        takeOver(strap)
+        if strap.state == .connected {
+            log("the strap came back connected, discovering services")
+            strap.discoverServices(nil)
+        } else {
+            log("the strap came back disconnected, connecting")
+            central.connect(strap, options: nil)
         }
     }
 

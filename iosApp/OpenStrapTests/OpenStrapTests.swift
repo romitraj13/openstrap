@@ -79,4 +79,89 @@ final class OpenStrapTests: XCTestCase {
     func testMaskedKeyHidesAllButTheLastFourCharacters() {
         XCTAssertEqual(ZeppSignInModel.maskedKey("ffeeddccbbaa99887766554433221100"), "••••••••1100")
     }
+
+    // MARK: - CoreBluetooth state restoration
+
+    /// H1 crashed at the first Connect on a real iPhone: the central manager is created with a
+    /// restore identifier (BleDriverImpl.swift), so CoreBluetooth calls this delegate method and
+    /// throws NSInternalInconsistencyException when the delegate does not implement it. The crash
+    /// costs a card, not a phone: a missing handler fails here instead.
+    func testBleDriverImplementsTheRestoreStateDelegateMethod() {
+        let driver = BleDriverImpl()
+        XCTAssertTrue(driver is CBCentralManagerDelegate)
+        XCTAssertTrue(
+            driver.responds(to: NSSelectorFromString("centralManager:willRestoreState:")),
+            "BleDriverImpl must implement centralManager(_:willRestoreState:)"
+        )
+    }
+
+    // MARK: - The health database's file attributes (plan section 8)
+
+    /// A temporary `openstrap.db`, in its own folder so the folder's backup flag can be read back.
+    private func temporaryDatabase() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("openstrap-db-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { [folder] in
+            try? FileManager.default.removeItem(at: folder)
+        }
+        return folder.appendingPathComponent(StrapDatabase.fileName)
+    }
+
+    /// Step 6 of the card: the helper the app uses applies protection and backup exclusion. The backup
+    /// flag is a real file-system property on the simulator as well, so it is read back; the protection
+    /// class is only reported by a device (the Simulator has no Data Protection), and the app puts the
+    /// same read-back in the Diagnostics log for the phone run.
+    func testPrepareAppliesProtectionAndBackupExclusionToATemporaryFile() throws {
+        let url = try temporaryDatabase()
+        let applied = try StrapDatabase.prepare(url)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertEqual(applied.requestedProtection, .completeUntilFirstUserAuthentication)
+
+        let excluded = try StrapDatabase.isExcludedFromBackup(url)
+        XCTAssertTrue(excluded)
+        XCTAssertTrue(applied.excludedFromBackup)
+        XCTAssertTrue(applied.directoryExcludedFromBackup)
+
+        #if targetEnvironment(simulator)
+        // Data Protection does not exist in the Simulator: if it reports a class after all, it has to
+        // be the one asked for. H2 step 6 reads the device's own answer from the log.
+        if let recorded = applied.recordedProtection {
+            XCTAssertEqual(recorded, .completeUntilFirstUserAuthentication)
+        }
+        #else
+        XCTAssertNil(applied.protectionError)
+        XCTAssertEqual(applied.recordedProtection, .completeUntilFirstUserAuthentication)
+        #endif
+    }
+
+    /// SQLite writes `-wal` and `-shm` beside the database; the helper has to cover the ones already
+    /// there, and the folder's flag the ones written later.
+    func testPrepareAlsoCoversTheSidecarsBesideTheDatabase() throws {
+        let url = try temporaryDatabase()
+        let wal = URL(fileURLWithPath: url.path + "-wal")
+        let shm = URL(fileURLWithPath: url.path + "-shm")
+        try Data("wal".utf8).write(to: wal)
+        try Data("shm".utf8).write(to: shm)
+
+        let applied = try StrapDatabase.prepare(url)
+
+        XCTAssertEqual(applied.sidecars, 2)
+        let walExcluded = try StrapDatabase.isExcludedFromBackup(wal)
+        let shmExcluded = try StrapDatabase.isExcludedFromBackup(shm)
+        XCTAssertTrue(walExcluded)
+        XCTAssertTrue(shmExcluded)
+    }
+
+    /// Step 2 of the card: Application Support, not Documents.
+    func testTheDatabaseLivesInApplicationSupport() throws {
+        let url = try StrapDatabase.url()
+        XCTAssertEqual(url.lastPathComponent, "openstrap.db")
+        XCTAssertTrue(url.path.contains("/Library/Application Support/"), url.path)
+        let support = url.deletingLastPathComponent()
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: support.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+    }
 }
