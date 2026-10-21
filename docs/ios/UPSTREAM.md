@@ -452,3 +452,42 @@ so the exception comes from another engine's background work surfacing while it 
 commit ran the same iOS tests green with no Kotlin change in between. Worth a card of its own if it
 recurs.
 
+## Card U2 (the glow charts, parts, quiet panels, tab bar and calendar)
+
+No file was copied into the bundle. One file of Kotlin was **written**, because the Compose charts
+compute their geometry inline inside `DrawScope` and standing instruction 5 forbids re-deriving it in
+Swift:
+
+```
+app/src/main/kotlin/org/openstrap/app/ui/glow/GlowCharts.kt:126-460      (GlowLineChart … GlowHorizon)
+app/src/main/kotlin/org/openstrap/app/ui/glow/GlowLayout.kt:33-64        (the layout constants)
+app/src/main/kotlin/org/openstrap/app/ui/components/Charts.kt:288-319    (smoothPath)
+app/src/main/kotlin/org/openstrap/app/ui/dashboard/DayCalendar.kt:138-153 (the month grid)
+        -> shared/src/commonMain/kotlin/org/openstrap/app/ui/glow/GlowGeometry.kt (object GlowGeometry)
+        -> shared/src/commonTest/kotlin/org/openstrap/app/ui/glow/GlowGeometryTest.kt (30 tests)
+```
+
+Each function is one expression of the Compose source, with the canvas size and the dp values passed
+in as pixels, so both builds compute the same number: the line chart's domain (`yRange`, then band,
+then the data, with the 1e-3 flat guard) and its value axis, the dot-bar pitch and lit rows, the
+trend's 85%-of-the-lowest domain, the arc gauge's radius/centre/sweep/leading point, the hypnogram's
+lanes, pill rectangle and row brightness, the horizon's radius, sag and point along the arc, the
+Fritsch–Carlson control points behind `smoothPath`, and the calendar's lead/weeks/day numbers.
+
+`:shared:jvmTest` 188 -> **218 tests, 0 failures, 1 skipped** (+30 `GlowGeometryTest`).
+`iosSimulatorArm64Test` 260 -> **290**: the same 30 tests run on the iOS target too.
+`./gradlew :shared:compileKotlinIosArm64` is clean, which is what the Swift side calls through.
+
+XCTest after U2: `OpenStrapTests` stays at 28 (no new unit tests: the numbers they would check live
+in `GlowGeometryTest`), `OpenStrapUITests` stays at 3, but `testDesignLab` now scrolls to
+`lab.calendar.title` and attaches `U2-designlab-1` … `U2-designlab-14`.
+
+Two things were decided for iOS and are recorded here rather than hidden:
+
+- `DayCalendar.kt:148`'s enabled test stays in Swift. It is one comparison (`day <= today &&
+  (day in available || day == today)`) against the day's own set, and a Kotlin `Set<Int>` reaches
+  Swift as a boxed collection; the grid arithmetic around it is in `GlowGeometry`.
+- `GlowHorizon`'s sweep-in (Compose redraws the arc each frame over 700 ms) becomes a fade of the
+  finished arc, because standing instruction 7 allows only offset, scale and opacity to animate. The
+  same rule leaves `DotHeader`'s caret turn instant and `GlowSwitch`'s track colour un-animated.
+

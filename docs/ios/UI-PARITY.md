@@ -259,18 +259,217 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `drawCircle(color, d / 2, …)` (86) | `context.fill(Path(ellipseIn:), with: .color(color))` (DotMatrixText.swift:69) | ported |
 | glyph advance `(rows[0].length + 1) * step` (89) | `x0 += CGFloat(rows[0].count + 1) * pitch` (DotMatrixText.swift:79) | ported |
 
-## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowParts.kt` — the rest of the file
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowParts.kt` — the rest of the file (card U2)
 
 | Compose element or string (file:line) | Swift (file:line) | Status |
 |---|---|---|
-| `ArcMark`, `ArcTimeline` (105-137) | — | not ported: card U2 ports the chart parts |
-| `GlowSwitch` (145-164) | — | not ported: card U2 ports the quiet parts |
+| `ArcMark(at, color)` (105) | `ArcMark` (GlowParts.swift:13) | ported |
+| `ArcTimeline(marks, arcs, modifier, color)` (112-137) | `ArcTimeline` (GlowParts.swift:26) | ported |
+| dotted baseline: white 65%, 2 wide, 9 gap, 6 above the bottom (120-124) | `glowDottedLine` (GlowParts.swift:34) | ported |
+| an arc bridging each pair, last one solid, others 65% (125-134) | `Path.addArc` 180°→360° (GlowParts.swift:44-58) | ported |
+| marks as 4pt dots on the line (135) | `Path(ellipseIn:)` 8pt (GlowParts.swift:59-65) | ported |
+| `GlowSwitch(checked, onCheckedChange, modifier, accent)` (145) | `GlowSwitch` (GlowParts.swift:75) | ported |
+| track: accent 55% on, white 8% off (146) | `Capsule().fill` (GlowParts.swift:95-96) | ported (the colour changes without an animation: instruction 7 allows only offset, scale and opacity to move) |
+| `size(60.dp, 34.dp)`, clipped to a circle, 3dp padding (148-155) | `frame(width: 60, height: 34)` + 3pt knob padding (GlowParts.swift:103, 99) | ported |
+| knob 28, offset 26 when on, spring(damping 0.6, stiffness 500) (147, 159, 162) | `frame(28)` / `offset(x:)` / `.spring(response: 0.25, dampingFraction: 0.6)` (GlowParts.swift:99-101) | ported |
+| knob fill: radial white → `#DCDCEA`, 6dp shadow (162) | `RadialGradient` + `.shadow` (GlowParts.swift:89-97) | ported |
+| `Role.Switch` (154) | `.accessibilityAddTraits(.isButton)` + on/off label (GlowParts.swift:107-109) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowCharts.kt` (card U2)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Ink` / `Faint` 16% / `Muted` 55% (50-52) | `glowInk` / `glowFaint` / `glowMuted` (GlowCharts.swift:15-17) | ported |
+| `axisText` FunnelSans 10 (54) | `axisTextStyle` (GlowCharts.swift:20) | ported |
+| `valueText` FunnelSans 11 (55) | `valueTextStyle` (GlowCharts.swift:23) | ported |
+| `readoutText` FunnelSans 12 (56) | `readoutTextStyle` (GlowCharts.swift:25) | ported |
+| `dottedLine`: 1.6 wide, round cap, dash (0, gap 6) (59-63) | `glowDottedLine` (GlowCharts.swift:42) | ported: one 1.6pt dot per 6pt instead of a zero-length dash, same pixels |
+| `text(m, s, style, x, y, align)` with the canvas clamp (65-68) | `glowDrawText` (GlowCharts.swift:83) | ported |
+| `readout`, the glass pill: 18/10 padding, 12 gap, black 72%, white 18% hairline (71-80) | `glowReadout` (GlowCharts.swift:121) | ported |
+| `guide`, 1.6 wide white 60% dash (0, 4) (83-86) | `glowGuide` (GlowCharts.swift:151) | ported |
+| `axis`, labels spread 0…1 (89-95) | `glowAxis` (GlowCharts.swift:103) | ported |
+| `GlowLineChart` (103-190) | `GlowLineChart` (GlowCharts.swift:185) | ported |
+| `height = 120.dp` (107) | `height: CGFloat = 120` (GlowCharts.swift:188) | ported |
+| `axisH` 18 / `top` 10 / `inset` 7 (126-127, 132) | the same three constants (GlowCharts.swift:238-239, 254) | ported |
+| domain: yRange, else band and data, flat gains 1 (129-130) | `GlowGeometry.lineChartDomain` (GlowGeometry.kt:44) | ported |
+| `xOf` / `yOf` (133-134) | `GlowGeometry.lineChartX` / `lineChartY` (GlowGeometry.kt:70, 76) | ported |
+| guides at 0, 0.5, 1 (136) | `for fraction in [0, 0.5, 1]` (GlowCharts.swift:266) | ported |
+| band fill 10%, two dotted edges 45% gap 4 (137-143) | the same (GlowCharts.swift:271-282) | ported |
+| runs of consecutive readings; a null starts a new run (146-149) | the same (GlowCharts.swift:285-295) | ported |
+| a lone reading is a 2.6 dot (151) | 5.2pt circle (GlowCharts.swift:298-305) | ported |
+| smooth line: `smoothPath`, fill gradient 14%, halo 4 at 8%, line 1.8 (153-158) | `glowSmoothPath` / `glowGeometry.smoothCubics` / the same three strokes (GlowCharts.swift:306-331) | ported |
+| average: dotted line 50% gap 4 and `"avg ${format(avg)}"` right-aligned 16 above (161-166) | `"avg \(format(average))"` (GlowCharts.swift:334-343) | ported: the only string is `avg `, copied verbatim |
+| latest reading: 6.5 halo at 20%, 3.5 dot (168-171) | the same (GlowCharts.swift:345-355) | ported |
+| axis labels at `h + 4` (173) | `glowAxis` (GlowCharts.swift:357) | ported |
+| scrub readout: nearest non-null reading within count/48 + 1 (176-188) | `nearestIndex` + the guide, black 60% dot and 4pt dot (GlowCharts.swift:360-373, 377-391) | ported |
+| `GlowDotBars` (198-239) | `GlowDotBars` (GlowCharts.swift:400) | ported |
+| `height = 96.dp`, `rows = 10` (201-202) | the same defaults (GlowCharts.swift:402-403) | ported |
+| `highlight = values.indexOfLast { it > 0f }` (205) | the same default (GlowCharts.swift:425) | ported |
+| pitchX / pitchY / radius 32% / max ≥ 1 / lit rows (216-222) | `GlowGeometry.dotBarPitchX` … `dotBarLit` (GlowGeometry.kt:100-125) | ported |
+| other columns dim to 35% while scrubbing (224) | `dim` (GlowCharts.swift:454) | ported |
+| unlit 10%, highlight accent, lit `0.55 + 0.45 * (row+1)/rows` (228-232) | the same (GlowCharts.swift:458-465) | ported |
+| column centre and row y from the bottom (225, 233) | `GlowGeometry.dotBarCenterX` / `dotBarDotY` (GlowGeometry.kt:117, 123) | ported |
+| touch readout at the column, anchored to the top (237) | `glowReadout` (GlowCharts.swift:476-481) | ported |
+| `GlowDay(label, value)` (244) | `GlowDay` (GlowCharts.swift:488) | ported |
+| `GlowTrend` (250-294) | `GlowTrend` (GlowCharts.swift:497) | ported |
+| `height = 130.dp` (254) | `height: CGFloat = 130` (GlowCharts.swift:499) | ported |
+| axisH 18, top 22, bottom inset 6 (260-261, 267) | the same (GlowCharts.swift:519-521, 527) | ported |
+| domain: 85% of the lowest, 1 of room at the top (265-266) | `GlowGeometry.trendDomain` (GlowGeometry.kt:137) | ported |
+| `yOf` with the label room (267) | `GlowGeometry.trendY` (GlowGeometry.kt:146) | ported |
+| average line white 45% gap 4 (269) | the same (GlowCharts.swift:534-538) | ported |
+| day label, today in white, others muted (273) | the same (GlowCharts.swift:544-547) | ported |
+| null day: a 2.5 faint dot 3 above the axis (276) | the same (GlowCharts.swift:548-554) | ported |
+| stem: 2 wide, dash (0, 5), 90% today / 45% (280-284) | `glowDottedLine` width 2 gap 5 (GlowCharts.swift:556-559) | ported |
+| today: 11 halo at 18% + 6 dot; others a 4 dot (286-289) | the same (GlowCharts.swift:560-574) | ported |
+| value printed 20 above, rounded (291) | `String(Int(value.rounded()))` 20 above (GlowCharts.swift:575-579) | ported |
+| `GlowArcGauge` (303-340) | `GlowArcGauge` (GlowCharts.swift:591) | ported |
+| `aspectRatio(1.9f)`, `widthIn(max = 440.dp)`, content at the bottom middle (312-315) | `aspectRatio(1.9)` + `frame(maxWidth: gaugeMaxWidth)` + `ZStack(alignment: .bottom)` (GlowCharts.swift:602-613) | ported |
+| `r = width/2 - 10`, centre 3 above the bottom edge (317-318) | `GlowGeometry.arcGaugeRadius` / `arcGaugeCentre` (GlowGeometry.kt:165, 170) | ported |
+| sweep `180 * progress.coerceIn(0, 1)` (321) | `GlowGeometry.arcGaugeSweep` (GlowGeometry.kt:173) | ported |
+| remaining track: dotted 2, gap 7, 22% (322-325) | `glowDottedStroke` (GlowCharts.swift:623-626) | ported |
+| fill: 8 wide white 10% under a 3 wide line (327-332) | the same two strokes (GlowCharts.swift:629-643) | ported |
+| sweep gradient 55% at 0.5 → white at the end, starting at 3 o'clock (329-332) | `conicGradient` with stops 0.5 and (180+sweep)/360 (GlowCharts.swift:635-643) | ported |
+| end dot: 9 at 30% behind 5 at 100% (333-336) | the same (GlowCharts.swift:645-655) | ported |
+| `GlowStage(from, to, row)` (345) | `GlowStage` (GlowCharts.swift:667) | ported |
+| `GlowHypnogram` (351-409) | `GlowHypnogram` (GlowCharts.swift:677) | ported |
+| `height = 130.dp` (356) | `height: CGFloat = 130` (GlowCharts.swift:681) | ported |
+| axisH 18, name column 46 wide (365-366) | the same (GlowCharts.swift:714-715) | ported |
+| `rowH = h / rows`, `pillH = rowH * 0.46`, lane centres (369-371) | `GlowGeometry.hypnogramRowH` / `hypnogramPillH` / `hypnogramRowY` (GlowGeometry.kt:197-203) | ported |
+| `xOf(f) = nameW + f * w` (372) | `GlowGeometry.hypnogramX` (GlowGeometry.kt:206) | ported |
+| a dotted lane per stage name, the name 7 above it (374-377) | the same (GlowCharts.swift:728-734) | ported |
+| connectors where consecutive stages change lane, 30% (378-383) | the same (GlowCharts.swift:736-749) | ported |
+| pill alpha `0.55 + 0.45 * row / (rows - 1)` (385) | `GlowGeometry.hypnogramPillAlpha` (GlowGeometry.kt:209) | ported |
+| pill: rounded by its half height, never thinner than its height (386-391) | `GlowGeometry.hypnogramPill` (GlowGeometry.kt:212) | ported |
+| axis labels under the plot (393-398) | the same (GlowCharts.swift:766-772) | ported |
+| scrub: the stage under the finger, else the nearest, with the guide and readout (399-407) | the same (GlowCharts.swift:774-789) | ported |
+| `GlowHorizon(progress, color, modifier, height = 72.dp)` (419) | `GlowHorizon` (GlowCharts.swift:799) | ported |
+| sweep 84°, `start = 270 - 42`, chord `w - 28`, `r`, `sag`, top 14 (427-431) | `GlowGeometry.horizonRadius` / `horizonSag` / `horizonPoint` (GlowGeometry.kt:241-266) | ported |
+| `at(f)` on the arc (436-439) | `GlowGeometry.horizonPoint` (GlowGeometry.kt:258) | ported |
+| dotted track 1.6, gap 6 (440-443) | `glowDottedStroke` (GlowCharts.swift:836-839) | ported |
+| five ticks at `r + 9` (444) | the same (GlowCharts.swift:841-849) | ported |
+| fill: 9 wide at 10% under 2.4 wide white (448-449) | the same (GlowCharts.swift:851-861) | ported |
+| knob: 11 at 30%, 6.5 in colour, 2.6 white (452-454) | the same (GlowCharts.swift:862-876) | ported |
+| `"0"` and `"100"` under the arc's ends (457-458) | the same strings (GlowCharts.swift:884-887) | ported |
+| the fill sweeps in over 700 ms (422-425) | the finished arc fades in over 700 ms, and is simply there under Reduce Motion (GlowCharts.swift:813-825) | ported with a recorded deviation: standing instruction 7 allows only offset, scale and opacity to move, so the arc is not redrawn per frame |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowLayout.kt` (card U2)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Gutter` 20 (35) | `GlowLayout.gutter` (GlowLayout.swift:9) | ported |
+| `CardPadding` 30/30/32/26 (37) | `GlowLayout.cardPadding` (GlowLayout.swift:12) | ported |
+| `TitleGap` 14 (39) | `GlowLayout.titleGap` (GlowLayout.swift:14) | ported |
+| `ChartGap` 20 (41) | `GlowLayout.chartGap` (GlowLayout.swift:16) | ported |
+| `ChartHeight` 116 (43) | `GlowLayout.chartHeight` (GlowLayout.swift:18) | ported |
+| `HeroDot` 4.5, `HeroGap` 1.8 (45-46) | `GlowLayout.heroDot` / `heroGap` (GlowLayout.swift:20-21) | ported |
+| `TwoColumnWidth` 600 (48) | `GlowLayout.twoColumnWidth` (GlowLayout.swift:23) | ported |
+| `MaxContentWidth` 1040 (50) | `GlowLayout.maxContentWidth` (GlowLayout.swift:25) | ported |
+| `ColumnGap` 12 (52) | `GlowLayout.columnGap` (GlowLayout.swift:27) | ported |
+| `GaugeMaxWidth` 440 (54) | `GlowLayout.gaugeMaxWidth` (GlowLayout.swift:29) | ported |
+| `WideGutter` 16 (60) | `GlowLayout.wideGutter` (GlowLayout.swift:31) | ported |
+| `NarrowWidth` 400 (62) | `GlowLayout.narrowWidth` (GlowLayout.swift:33) | ported |
+| `WideCardPadding` 20/20/32/26 (63) | `GlowLayout.wideCardPadding` (GlowLayout.swift:34) | ported |
+| `LocalCardPadding` (67) | `EnvironmentValues.glowCardPadding` (GlowLayout.swift:42) | ported: dot panels read it the same way cards do |
+| `Pane { Full, Left, Right }` (70) | `Pane` (GlowLayout.swift:54) | ported |
+| `GlowBlocks.full/left/right(key)` (76-86) | `GlowBlock.full/left/right(key:)` (GlowLayout.swift:62) | ported |
+| `GlowScreenList(contentPadding, state, scrollTo, onScrolled)` (96-132) | `GlowScreenList` (GlowLayout.swift:85) | ported |
+| gutter `max((w - 1040)/2, tight ? 16 : 20)` and tight = wide or < 400 (104-106) | the same (GlowLayout.swift:91-97) | ported |
+| runs of left/right blocks in two columns, full blocks spanning; a lopsided run stacks (117-127) | `sections` + `sectionView` (GlowLayout.swift:135-168) | ported |
+| `scrollTo` animates to the block's key (110-113) | `ScrollViewReader` + `onAppear` / `onChange` (GlowLayout.swift:113-124) | ported |
+| `GlowHeader(title, trailing, chevron, trailingContent)` (162-177) | `GlowHeader` (GlowLayout.swift:171) | ported |
+| `GlowHeroNumber(value, unit, facts, side)` (184-193) | `GlowHeroNumber` (GlowLayout.swift:225) | ported |
+| `GlowChartGap()` (197) | `GlowChartGap` (GlowLayout.swift:271) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowQuiet.kt` (card U2)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `PanelShape` 28 (48) | `paneShape` (GlowQuiet.swift:11) | ported |
+| `DotPanel(modifier, onClick, content)`, spacing 14, card padding (52-79) | `DotPanel` (GlowQuiet.swift:34) | ported |
+| the dotted outline: inset 1, 1.6 wide, round cap, dash (0, 7), white 30% (61-74) | `strokeBorder` with dash (0.1, 7) (GlowQuiet.swift:48-54) | ported: a 0.1pt dash under a round cap draws the same dot as a zero-length one |
+| `DotHeader(title, trailing, chevron, warning, expanded)` (88-109) | `DotHeader` (GlowQuiet.swift:88) | ported |
+| warning icon 20 in `MetricColors.warn`, 10 before the title (90-93) | the same (GlowQuiet.swift:105-110) | ported |
+| trailing text 70%, 4 + a 16 caret at 70% (95-99) | the same (GlowQuiet.swift:116-125) | ported |
+| expanded caret: 32 glass circle, 16 icon, turned 180° (100-107) | the same, turned without animating (GlowQuiet.swift:126-142) | ported: standing instruction 7 leaves rotation out of the moving properties, so the turn is instant |
+| `"Hide"` / `"Show"` (105) | `.accessibilityLabel(expanded ? "Hide" : "Show")` (GlowQuiet.swift:141) | ported |
+| `Modifier.glass(shape, onClick, scale)` (116-119) | `View.glass(_:)` + `GlassSurface` (GlowQuiet.swift:65-79) | ported |
+| `GlassRowShape` 16 (122) | `glassRowShape` (GlowQuiet.swift:82) | ported |
+| `DotDivider`, 1.5 wide, gap 6, white 16% (126-134) | `DotDivider` (GlowQuiet.swift:158) | ported |
+| `DotArrow(up, color)`: five 1.3 dots in an 11×9 box (138-149) | `DotArrow` (GlowQuiet.swift:177) | ported |
+| `DotLevel(color)`: three 1.3 dots, same footprint (153-161) | `DotLevel` (GlowQuiet.swift:211) | ported |
+| `TileShape` 18 (163) | the tile's `RoundedRectangle(cornerRadius: 18)` (GlowQuiet.swift:240) | ported |
+| `GlowTile(label, accent, onClick, modifier, content)`: white 5% fill, 8% hairline, 14/12 padding, 6pt dot (170-191) | `GlowTile` (GlowQuiet.swift:234) | ported |
+| `StatusPill(text, color)`: labelSmall, 14% fill, capsule, 8/3 (195-200) | `StatusPill` (GlowQuiet.swift:322) | ported |
+| `TileGrid(items, tile)`: two a row, 10 apart, equal heights (204-213) | `TileGrid` (GlowQuiet.swift:288) | ported with `Grid`, which gives a row equal cell heights |
+| `DotStatTile(...)` (219-247) | `DotStatTile` (GlowQuiet.swift:343) | ported |
+| `"—"` for a missing value (234) | `Text(value ?? "—")` (GlowQuiet.swift:362) | ported |
+| `"usually $baseline"` (245) | `Text("usually \(baseline)")` (GlowQuiet.swift:379) | ported |
+| trend arrow tints: `TrendGood` / `TrendBad` / white 60% (240) | `trendGood` / `trendBad` / white 60% (GlowQuiet.swift:350-353, 388-389) | ported |
+| `TrendGood` `#3DDC97`, `TrendBad` `#FFB547` (249-250) | `MetricColors.good` / `MetricColors.warn` (Theme.swift:122-123) | ported: the same two values |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/components/Insights.kt` (card U2)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `NavItem(label, icon, selectedIcon = icon)` (52) | `NavItem` (FloatingNavBar.swift:13) | ported |
+| `FloatingNavBar(items, selected, onSelect, modifier, glass)` (59-97) | `FloatingNavBar` (FloatingNavBar.swift:59) | ported |
+| outer padding 20 horizontal, 10 vertical, capped at 440 (60-66) | the same (FloatingNavBar.swift:100-104) | ported |
+| `hazeBlur` black glass: 24 radius, black, `#0B0B0D` at 70% (163-169) | `GlowGlassBackground`: `.ultraThinMaterial` over `#0B0B0D` at 70% (FloatingNavBar.swift:45-52) | ported: the haze library is Android-only; the material blur is the same effect |
+| `GlassEdge` border, white 20% → 5% → black 40% (Glass.kt:39) | `glassEdge` (FloatingNavBar.swift:29) | ported |
+| inner padding 6, `IntrinsicSize.Min` (73) | `padding(6)` and the cells' own height (FloatingNavBar.swift:82) | ported |
+| one pill sliding to the selected tab: `(cell + gap) * selected`, `tween(240)` (77-85) | a capsule offset by the same amount (FloatingNavBar.swift:85-95) | ported |
+| gap 2 between cells, each cell an equal share (77, 90) | the same (FloatingNavBar.swift:63, 66-72) | ported |
+| `NavCell`: 24 icon, 1.08 scale when selected, labelSmall, white / 55% (147-160) | `NavCell` (FloatingNavBar.swift:171) | ported |
+| `FloatingNavRail`: the same bar standing up, 40 corner, 92 wide with margins, 440 tall (104-143) | `FloatingNavRail` (FloatingNavBar.swift:111) | ported |
+| `NavRailWidth` 92 (143) | `NavRailWidth` (FloatingNavBar.swift:168) | ported |
+
+The card body also names "the insight bar" in this file; `Insights.kt` holds no such composable —
+`FloatingNavBar`, `FloatingNavRail` and the private `NavCell` are the whole file, so there was
+nothing else to port.
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/DayCalendar.kt` (card U2)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `DayPicker(available, onPick)` (54) | `DayPicker` (DayCalendarSheet.swift:18) | ported |
+| `TodayDot` `#FF4D5E` (57) | `todayDot` (DayCalendarSheet.swift:14) | ported |
+| `DayCalendarSheet(selected, available, onPick, onDismiss)` (64-127) | `DayCalendarSheet` (DayCalendarSheet.swift:26) | ported |
+| the glass sheet: 28 top corners, `GlassTint` 72%, `GlassEdge`, 36×4 grab handle (71, 186-196 in Glass.kt) | the same, inline rather than in an overlay (DayCalendarSheet.swift:66-119) | ported |
+| `"MMMM yyyy"` month title (77) | `monthTitle` (DayCalendarSheet.swift:263) | ported: a `DateFormatter` with the same pattern, so the locale names match |
+| `"Previous month"` / `"Next month"` with the month bounds (79-84) | the same content descriptions, disabled at the first and last month (DayCalendarSheet.swift:149-167) | ported |
+| weekday initials from the locale's first day of the week (88-95) | `weekdayInitials` (DayCalendarSheet.swift:246) | ported |
+| `AnimatedContent` month change: slide a quarter width + fade, 220 ms (99-109) | `.move` + `.opacity` transition, 220 ms, nothing under Reduce Motion (DayCalendarSheet.swift:170-181, 271-278) | ported |
+| `"Has data"` legend swatch, 12pt (111-117) | the same (DayCalendarSheet.swift:186-192) | ported |
+| `"Today"` legend dot, 6pt (118-121) | the same (DayCalendarSheet.swift:193-198) | ported |
+| `"Go to today"` when another day is selected (123) | the same (DayCalendarSheet.swift:200-213) | ported |
+| `MonthGrid`: `lead = (dow - first + 7) % 7`, `(cells + 6) / 7` weeks, 4 apart (130-155) | `GlowGeometry.calendarLead` / `calendarWeekCount` / `calendarDayNumber` (GlowGeometry.kt:326-338) | ported |
+| `DayCell`: 42 circle, selected fills white with black text, a day with data gets the container fill and a hairline, the rest are dimmed to 35% (158-192) | `DayCell` (DayCalendarSheet.swift:275) | ported |
+| today's 5pt red dot 5 above the cell's bottom (185-190) | the same (DayCalendarSheet.swift:303-308) | ported |
+| pickable when `date <= today && (date in available || date == today)` (148) | the same expression (DayCalendarSheet.swift:225-226) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/components/Charts.kt` — the helpers the glow charts call (card U2)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Modifier.scrub(key, onScrub)`: horizontal drag or press-and-hold (66-81) | `GlowScrub`, a simultaneous drag so the list still scrolls (GlowCharts.swift:161) | ported: long-press is dropped, the sideways drag does the same job in SwiftUI |
+| `smoothPath(pts)`, monotone cubic (Fritsch–Carlson) (288-319) | `GlowGeometry.smoothCubics` + `glowSmoothPath` / `glowAddCubics` (GlowGeometry.kt:274, GlowCharts.swift:895) | ported |
+| `niceStep(raw)` (321-324) | — | not ported: only `LineChart` calls it, and the glow charts draw three fixed guides |
+| `ChartPoint`, `ChartSegment`, `LineChart` (44-286) | — | not ported: the older screens' chart; card U2 is the glow language's own charts |
+| `withUnit(value, unit)` (84-88) | — | not ported: the glow charts print their own readouts and no glow card calls it |
+| `hourLabel(epoch)` (47) | — | not ported: the glow charts take their axis labels as strings from the screen |
+| `TrendPoint`, `StageSpan` (327-330) | — | not ported: `GlowDay` and `GlowStage` replace them in the glow language |
+| `ProgressRing(progress, color, size, stroke)` (334-345) | — | not ported: the glow screens draw `GlowArcGauge` instead; nothing in the listed files calls it |
 
 ## Not in this card
 
 The debug Design lab (`DesignLabView.swift`, `-designLab`) has no Compose counterpart: Android has
 no design lab screen, and U1 needs one to put every token, card and motion in front of a screenshot.
-Its labels are debug-only.
+Card U2 adds the chart, gauge, hypnogram, parts, quiet, tab bar and calendar sections to it with
+fixed sample data. Its section titles and sample values are debug-only and never appear in a release
+build; the panel titles and metric names inside those samples (`Heart rate`, `Resting heart rate`,
+`Steps`, `Skin temperature`, `Recovery`, `Blood oxygen`, `HRV`, `Resting`, `Normal`, `Higher`,
+`Lower`, `Awake`, `REM`, `Light`, `Deep`) are copied from `Routes.kt`, `GlowRecoveryScreen.kt` and
+`ScreenParts.kt` rather than written for the lab.
 
 The three font files and the three licence files are copies, not ports; they are logged in
 `docs/ios/UPSTREAM.md`.
