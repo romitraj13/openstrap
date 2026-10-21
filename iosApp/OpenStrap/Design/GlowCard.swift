@@ -491,7 +491,9 @@ enum GlowRenderer {
         cg.saveGState()
         cg.addPath(cardPath(size, radius: radius))
         cg.clip()
-        cg.draw(blurred, in: CGRect(x: -pad, y: -pad, width: padded.width, height: padded.height))
+        if let blurredImage = blurred.cgImage {
+            cg.draw(blurredImage, in: CGRect(x: -pad, y: -pad, width: padded.width, height: padded.height))
+        }
         cg.restoreGState()
     }
 
