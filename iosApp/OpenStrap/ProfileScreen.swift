@@ -216,16 +216,16 @@ struct ProfileScreen: View {
         if dirty { confirmDiscard = true } else { dismiss() }
     }
 
-    private func switchUnits(toImperial: Boolean) {
+    private func switchUnits(toImperial: Bool) {
         guard toImperial != imperial else { return }
         // Carry valid entries across so switching never loses what was typed (ProfileScreen.kt:104-113).
         if let kg = fields.weightKg {
-            weight = ProfileRules.shared.weightText(kg: kg, imperial: toImperial)
+            weight = ProfileRules.shared.weightText(kg: kg.floatValue, imperial: toImperial)
         }
         if let cm = fields.heightCm {
-            heightCm = ProfileRules.shared.heightText(cm: cm)
-            feet = ProfileRules.shared.feetText(cm: cm)
-            inches = ProfileRules.shared.inchesText(cm: cm)
+            heightCm = ProfileRules.shared.heightText(cm: cm.int32Value)
+            feet = ProfileRules.shared.feetText(cm: cm.int32Value)
+            inches = ProfileRules.shared.inchesText(cm: cm.int32Value)
         }
         imperial = toImperial
     }

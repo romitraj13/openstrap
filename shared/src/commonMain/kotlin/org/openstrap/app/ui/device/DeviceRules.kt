@@ -242,10 +242,10 @@ object GoalsRules {
 
 /**
  * `ProfileScreen`'s per-field state: which field is filled but out of range, and the weight and
- * height a save (or the unit switch) would use. The constructor is internal because the screen
- * only ever reads it.
+ * height a save (or the unit switch) would use. The constructor is public only because
+ * Kotlin/Native does not export a class that has none, and Swift reads this type.
  */
-class ProfileFields internal constructor(
+class ProfileFields(
     val valid: Boolean,
     val ageError: Boolean,
     val weightError: Boolean,

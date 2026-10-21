@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenStrapShared
 
 /// The five destinations, in `MainActivity.kt`'s `Tab` order (`MainActivity.kt:125`).
 enum AppTab: Int, CaseIterable, Identifiable {
