@@ -776,6 +776,191 @@ thing exists yet or why not.
 | `DiagnosticsPanel(lines, asRow = false)` (441-482) | `morePanel` (StrapView.swift:190-215) | ported as a row that opens the existing `DiagnosticsView` |
 | `clock(epochSeconds)` `"d MMM HH:mm"` (484-485) | `StrapController.lastSyncText` | ported (pre-existing) |
 
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt` (card U5)
+
+Today's list is `TodayList` (:136). Every block is drawn in the same order; the layout hints
+(`left`/`right`) only matter at 600 pt and wider, which the app's portrait-only window never
+reaches, so iOS stacks them (`TodayScreen.swift:110`) exactly as Compose's phone path does.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GlowTodayScreen(state, liveHeartRate, battery, …, checkIn, onCheckIn)` (64-103) | `TodayScreen(controller:health:onOpenTab:)` (TodayScreen.swift:58), its data from `HealthModel.reloadToday` (HealthModel.swift:119) | ported |
+| `LocalGlowPaused provides { list.isScrollInProgress }` (100) | not applied: the scroll view belongs to `DayTab` (card U4), and `glowScrollPhasePause()` needs the `ScrollView` itself | not ported: the glow keeps moving while Today scrolls; every card still stops under Reduce Motion (`GlowCard.swift:215`) |
+| `full { DateHeader(…) }` (138) | `DateHeader` in `DayTab` (RootView.swift:157) | ported in U4 |
+| `OverviewCard` (143, 205-269) | `OverviewCard` (TodayScreen.swift:257) | ported |
+| `Score("Charge", …, "since waking")` (215) | `TodayGlow.overview` labels (TodayGlow.kt:151), drawn by `ScoreBar` (TodayScreen.swift:371) | ported |
+| `Score("Recovery", …, "vs yesterday")` (218-223) | the same | ported |
+| `Score("Sleep", …, "vs night before")` (224) | the same | ported |
+| `chargeLeads(state, rec)` (143) | `TodayGlow.chargeLeads` (TodayGlow.kt:290) | ported |
+| `readinessState(r, estimate, short)` (287-301) | `TodayGlow.readinessState` (TodayGlow.kt:217) | ported |
+| `"Learning N/14 nights"` (289), `"No sleep yet"` (290), `"Learning N/7 nights"` (291), `"Needs HRV data"` (292) | `TodayGlow.readinessState` (TodayGlow.kt:217-231) | ported |
+| `"Strap's estimate"`, `"Strap's estimate, N/7 nights"`, `"Strap's estimate, no HRV yet"` (296-299) | the same | ported |
+| `Change(score, withNote)` — arrow, level dots, amount (304-317) | `Change` (TodayScreen.swift:333) | ported |
+| `ScoreBar` — label, caret, value, change, `GlowBar`, note (323-350) | `ScoreBar` (TodayScreen.swift:371) | ported |
+| `overviewColor(score, strain)` (357-363) | `MetricColors.overview(_:)` (Theme.swift:166); the thresholds are `TodayGlow.overviewTone` (TodayGlow.kt:236) | ported |
+| `GlowStyle.Bloom.copy(… coreShape Radial, breath 5/min, depth 6.dp)` (236-241) | `OverviewCard.style` (TodayScreen.swift:264) | ported |
+| `"Heart rate"` (374) | `HeartCard` (TodayScreen.swift:657) | ported |
+| `"Latest"` (375) | the same (`trailing:`) | ported |
+| `"Live"` + `GlowSwitch` (377-384) | `HeartCard` + `GlowSwitch` (TodayScreen.swift:661-672), from `StrapController.setLiveHeartRate` | ported |
+| `"bpm"` (387) | `GlowHeroNumber(unit: "bpm")` (TodayScreen.swift:675) | ported |
+| `"Resting N"` (387) | `TodayGlow.heartFacts` (TodayGlow.kt:411) | ported |
+| `"No heart-rate data yet. Sync your strap."` (390) | `HeartCard` (TodayScreen.swift:679) | ported |
+| `bucket(points, range, 5 * 60)` (189-198) | `TodayGlow.bucket` (TodayGlow.kt:134), via `heartBuckets` (:399) | ported |
+| `GlowLineChart(values, ChartHeight, HOURS)` + readout `"N bpm · HH:mm"` (392-393) | `GlowLineChart` (TodayScreen.swift:683) + `heartReadout` (TodayGlow.kt:403) | ported |
+| `HOURS = 00/06/12/18/24` (184) | `HeartCard.hours` (TodayScreen.swift:638), `ActivityCard.hours` (:713) | ported |
+| `WhatChanged` (413-448) | `WhatChangedPanel` (TodayScreen.swift:542) | ported |
+| `"What changed"` (434) | the same (:554) | ported |
+| `"vs. your last 7 days"` (437) | the same (:560) | ported |
+| `advice` = `Narrative.readinessBody` (160, 439) | `advice()` (TodayScreen.swift:216) with `Narrative.shared` | ported |
+| `EditPill` — sliders icon, `"Edit"` (450-463) | `EditPill` (TodayScreen.swift:604) | ported |
+| `TileGrid` of `DotStatTile` (441-443) | `TileGrid` + `DotStatTile` (TodayScreen.swift:571) | ported |
+| `Signal("Resting HR", …, "bpm", 0, 1.5f, false)` (416) | `TodayGlow.signalTiles` (TodayGlow.kt:324) | ported |
+| `Signal("HRV", …, "ms", 0, 3f, true)` (417) | the same | ported |
+| `Signal("Blood oxygen", …, "%", 0, 1f, true)` (418) | the same | ported |
+| `Signal("Skin temp", …, "°C", 1, 0.3f, null)` (419-422) | the same | ported |
+| `Signal("Stress", …, "", 0, 4f, false)` (423) | the same | ported |
+| `Signal("Breathing", …, "/min", 0, 1f, null)` (424) | the same | ported |
+| `"Your normal builds over the first week of wear."` (444-446) | `WhatChangedPanel` (TodayScreen.swift:584) | ported |
+| `avg()` over the charts' points (ScreenParts.kt:191) | `TodayGlow.signalTiles`' private `avg` (TodayGlow.kt:341) | ported |
+| `ActivityGlow` (466-485) | `ActivityCard` (TodayScreen.swift:708) | ported |
+| `"Activity"` + chevron (472) | the same (:728) | ported |
+| `"Goal reached"` / `"%d%% of %,d"` (474) | `TodayGlow.activityFacts` (TodayGlow.kt:389) | ported |
+| `"steps"` (476) | `GlowHeroNumber(unit: "steps")` (TodayScreen.swift:731) | ported |
+| `"Active N of M h"` (477) | `TodayGlow.activityFacts` (TodayGlow.kt:389) | ported |
+| `"PAI N"` (477) | the same | ported |
+| `GlowDotBars(hourlySteps, …)` + `"HH:00–HH:00 · N steps"` (480-482) | `GlowDotBars` (TodayScreen.swift:735) + `hourStepReadout` (TodayGlow.kt:395) | ported |
+| `SleepPanel` (488-516) | `SleepCard` (TodayScreen.swift:755) | ported |
+| `"Sleep"` + `"HH:mm – HH:mm"` + chevron (492) | `SleepCard` (:764) + `sleepRange` (TodayGlow.kt:435) | ported |
+| `"%d:%02d"` asleep + `"asleep"` (494-495) | `asleepClock` (TodayGlow.kt:417) + `GlowHeroNumber` (TodayScreen.swift:770) | ported |
+| `"Score N"` + `Narrative.sleepHeadline` (496) | `TodayGlow.sleepFacts` (TodayGlow.kt:420) | ported |
+| `GlowSleepStages(state.sleepStages, ChartHeight)` (499-502) | `GlowSleepStages` (GlowSleepStages.swift:39) | ported |
+| naps line `"N naps · duration · HH:mm, …"` (503-513) | `TodayGlow.napsLine` (TodayGlow.kt:424) | ported |
+| `TodayWorkouts` — `"Workouts"` + `WorkoutLine` (174-180) | `TodayWorkouts` (TodayScreen.swift:799) + `WorkoutLine` (GlowWorkoutRow.swift:14) | ported |
+| `state.alerts.isNotEmpty()` → `AlertsPanel` (150) | `TodayScreen.content` (TodayScreen.swift:126) | ported |
+| `history != null && isRecapDay(state)` → `WeeklyRecapPanel` (153) | `recap(_:)` (TodayScreen.swift:223) + `isRecapDay` (TodayGlow.kt:603) | ported |
+| `morning = date == LocalDate.now() && hour < 12` (146) | `TodayGlow.isMorning` (TodayGlow.kt:269); the clock is `TodayFlags.now` (TodayScreen.swift:33) so the UI test can pin both orders | ported |
+| `hasSleep = asleepSeconds != null \|\| naps.isNotEmpty()` (156) | `TodayScreen.content` (TodayScreen.swift:103) | ported |
+| `chargeNow.minus(atWake)`, `readinessNow.minus(before)` (215-224, 271) | `TodayGlow.overview` (TodayGlow.kt:151); `readinessBefore` (:296) | ported |
+| `onOpenRecovery(RecoverySection)` from the card and the bar (242, 264) | `onOpenTab(.recovery)` (TodayScreen.swift:112-115) | ported as the tab tap; card U6 adds the section it lands on |
+| `onOpenSleep` from the Sleep bar and card (265, 490) | `onOpenTab(.sleep)` (TodayScreen.swift:115, 177) | ported |
+| `onOpenActivity` from the Activity card (466) | `onOpenTab(.activity)` (TodayScreen.swift:160) | ported |
+| `onOpenMetric(metric)` from the heart card, tiles and alerts (74, 163, 367) | `TodayRoute.metric(name)` → `TodayDetailPlaceholder` (TodayScreen.swift:928) | ported as the route: card U9 replaces the screen the route pushes |
+| `onOpenWorkout(start)` from the workouts rows (79, 178) | `TodayRoute.workout(start)` → `TodayDetailPlaceholder` (TodayScreen.swift:246) | ported as the route: card U9 replaces the screen |
+| `left`/`right` layout hints, two columns at 600 pt (141-170) | stacked in the same order (TodayScreen.swift:110) | not ported: the two-column branch; the app declares portrait only, so it never reaches 600 pt |
+| `contentPadding` from the shell | `DayTab`'s `.glowClearsNavBar()` (RootView.swift:176, card F4) | ported in U4/F4 |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayExtras.kt` (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `alertText` codes 1-5 and the fallback (40-47) | `TodayGlow.alertLines` (TodayGlow.kt:502) | ported |
+| `"High heart rate: N bpm"`, `"Low heart rate: N bpm"`, `"High stress: N"`, `"Low blood oxygen: N%"`, `"Irregular heart rhythm"`, `"Alert from the strap"` (41-46) | the same (:506) | ported |
+| `AlertsPanel` — `"Strap alerts"`, `"1 today"`/`"N today"`, warning dot (51-63) | `AlertsPanel` (TodayScreen.swift:483) | ported |
+| alert rows sorted newest first, opening `Metric` 3 → Stress, 4 → Spo2, else HeartRate (54-57) | `TodayGlow.alertLines` (TodayGlow.kt:506-515), `onTapGesture` (TodayScreen.swift:503) | ported |
+| `"If you feel unwell, checking in with a healthcare professional may be helpful. " + DISCLAIMER` (61) | `TodayGlow.alertsDisclaimer` (TodayGlow.kt:521) | ported |
+| `clockOf` for an alert's time (65) | `TodayGlow.clock` (TodayGlow.kt:624) | ported |
+| `WeeklyRecapPanel` (74-123) | `WeeklyRecapPanel` (TodayScreen.swift:514) | ported |
+| `"Your week"` + `"d MMM – d MMM"` (97) | `DotHeader` (TodayScreen.swift:519) + `TodayGlow.shortDate` (TodayGlow.kt:616) | ported |
+| `Fact("Steps a day", …)` (100) | `TodayGlow.weeklyRecap` (TodayGlow.kt:531) + `Fact` (GlowRecoveryParts.swift:76) | ported |
+| `Fact("Recovery", …)` (101) | the same | ported |
+| `Fact("Asleep a night", …)` (104) | the same | ported |
+| `Fact("Workouts", n)` (105) | the same | ported |
+| `"Steps held steady"`, `"Steps up N%"`, `"Steps down N%"` (111) | `weeklyRecap` (TodayGlow.kt:531-596) | ported |
+| `"sleep about the same"`, `"N more sleep a night"`, `"N less sleep a night"` (115) | the same | ported |
+| `"Comparisons with the week before start once there are two weeks of data."` (119) | the same | ported |
+| `"… than the week before."` (120) | the same | ported |
+| `isRecapDay(state)` — Monday (126) | `TodayGlow.isRecapDay` (TodayGlow.kt:600) | ported |
+| `TODAY_TILES` order (131) | `TodayGlow.TODAY_TILES` (TodayGlow.kt:121), `allTodayTiles()` (:303) | ported |
+| `TilesDialog` — `"What changed shows"` (135-158) | `TilesSheet` (TodayScreen.swift:819) | ported as a sheet, the way U4 ports `GoalsDialog`; the same strings and the same "at least one stays on" rule |
+| `Checkbox` per tile with `Metric.title` (142-152) | `CheckBox` (TodayScreen.swift:901) + `Text(metric.title)` (:837) | ported: the tick is drawn with shapes, since the icon set has no checkbox |
+| `"Save"` (155) | `Button("Save")` (TodayScreen.swift:861) | ported |
+| `"Cancel"` (157) | `Button("Cancel")` (TodayScreen.swift:850) | ported |
+| stored tile names, unknown ones dropped, empty means all (MainActivity.kt:176-182) | `TodayGlow.todayTiles` (TodayGlow.kt:313), kept in the app's defaults by `HealthModel.saveTodayTiles` (HealthModel.swift:163) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowCheckIn.kt` (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `CheckInPanel(feeling, onCheckIn)` (24-35) | `CheckInPanel` (TodayScreen.swift:432) | ported |
+| `"Morning check-in"` + `CheckIn.label` (26) | the same (:438) | ported |
+| `"How do you feel this morning?"` (27) | the same (:439) | ported |
+| `(CheckIn.MIN..MAX)` pills, tapping the chosen one clears it (29-31) | `ForEach(1...5)` (TodayScreen.swift:443) + `HealthModel.saveCheckIn` (HealthModel.swift:147) | ported |
+| `ChoicePill` — white when selected, black text (39-49) | `ChoicePill` (TodayScreen.swift:457) | ported |
+| `"1 is poor, 5 is great."` (33) | `TodayGlow.checkInNote` (TodayGlow.kt:614) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/NapsPanel.kt` (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `NapsPanel(naps, onClick)` (21-27) | — | not ported: this composable is not called by any live screen (GlowSleepScreen.kt:300 has its own naps panel for the Sleep tab); the naps Today shows are its sleep card's line (`GlowTodayScreen.kt:503-513`), ported as `TodayGlow.napsLine` (TodayGlow.kt:424) |
+| `PanelHeader("Naps", Moon, sleepLight, chevron)` (23) | — | not ported, same reason: Today has no separate naps panel, as its Compose source has none |
+| `"HH:mm – HH:mm · duration"` per nap (25) | `TodayGlow.napsLine` (TodayGlow.kt:424) carries the same figures into Today's sleep card | ported where Today shows naps |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/ScreenParts.kt` (card U5's part)
+
+`DateHeader`, `ScreenList` and `avg` were ported by U4; card U5 adds the rule that decides which
+score leads and the average behind What changed's statistics.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `chargeLeads(state, rec)` — today, with a value, three hours after waking or from noon (183-189) | `TodayGlow.chargeLeads` (TodayGlow.kt:250, ISO and state forms at :276 and :290) | ported |
+| `READINESS_HOURS_AFTER_WAKING = 3` (176) | `TodayGlow`'s private constant (TodayGlow.kt:125) | ported |
+| `List<ChartPoint>.avg()` (191) | `TodayGlow.signalTiles`' private `avg` (TodayGlow.kt:341) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/components/Insights.kt` (card U5's reading of it)
+
+The card names this file as Today's "insight bar". The file is `FloatingNavBar`/`FloatingNavRail`/
+`NavItem` — already ported by U2 (`Design/FloatingNavBar.swift`), and its rows are in the U2 section
+above. There is no insight component in the Compose source: the only insight text on Today is the
+advice line inside What changed (`Narrative.readinessBody`, `GlowTodayScreen.kt:160`), which card U5
+ports there.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `FloatingNavBar`, `FloatingNavRail`, `NavItem`, `NavCell`, glass constants (52-173) | `FloatingNavBar.swift` | ported in U2 |
+| no insight component exists in this file (or in Today's other sources) | the insight is `Narrative.readinessBody` (TodayScreen.swift:216) | not ported: there is no such element to port |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowSleepScreen.kt` — what Today shares (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `SleepGlow = GlowStyle.Midnight.copy(color = sleepDeep, core 0.5/0.6 1.1×0.9, Breath(5))` (108-113) | `GlowStyle.sleep` (GlowSleepStages.swift:17) | ported |
+| `GlowSleepStages(spans, height)` (175-192) | `GlowSleepStages` (GlowSleepStages.swift:39) | ported |
+| `DayViewModel.SLEEP_STAGE_ROWS` — Awake 0, REM 1, Light 2, Deep 3 (178) | `TodayGlow.sleepStageChart` (TodayGlow.kt:475) | ported |
+| `SLEEP_NAMES` — `"Awake"`, `"REM"`, `"Light"`, `"Deep"` (ScreenParts.kt:60-65) | `TodayGlow.sleepStageChart` names (TodayGlow.kt:481) | ported |
+| stage fractions of the night, `start`/`end` clocks (179-186) | the same (:482-492) | ported |
+| readout `"<stage> · HH:mm–HH:mm · N min"` (187-190) | the same (:486) | ported |
+| `GlowHypnogram` drawing | `GlowHypnogram` (GlowCharts.swift:677, U2) | ported in U2 |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt` — what Today shares (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GlowBar(fraction, color)` — track, fill, knob (272-290) | `GlowBar` (GlowRecoveryParts.swift:14) | ported |
+| `Note(text)` (295) | `QuietNote` (GlowRecoveryParts.swift:74) | ported |
+| `Fact(label, value)` (457-462) | `Fact` (GlowRecoveryParts.swift:76) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowActivityScreen.kt` — what Today shares (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `WorkoutLine(a, showDate, onClick)` — glass row, sport name, caret (403-422) | `WorkoutLine` (GlowWorkoutRow.swift:14) | ported |
+| `"HH:mm"` / `"EEE d MMM · HH:mm"` + duration + `"avg N bpm"` + `"N kcal"` (410-418) | `TodayGlow.workoutDetail` (TodayGlow.kt:445) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowCard.kt` — the card's own inset (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `contentPadding: PaddingValues = LocalCardPadding.current` (96) | `GlowCard`'s `contentPadding ?? cardPadding` (GlowCard.swift:244); the inset comes from `glowCardPadding`, which `GlowScreenList` sets and Today sets to `wideCardPadding` (TodayScreen.swift:79) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/theme/Theme.kt` — the colours Today names (card U5)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `overviewColor`'s four literals `0xFF6E7280`, `0xFFF2A33A`, `MetricColors.hrv`, `0xFFF0605A` (GlowTodayScreen.kt:357-363) | `MetricColors.overview(_:)` (Theme.swift:166) | ported |
+| What changed's accents — heart, hrv, spo2, temperature, stress, sleepLight (GlowTodayScreen.kt:416-424) | `MetricColors.signal(_:)` (Theme.swift:177) | ported |
+| the three score accents — chargeDeep, readinessDeep, SleepGlow's sleepDeep (GlowTodayScreen.kt:215-224) | `MetricColors.today(_:)` (Theme.swift:191) | ported |
+
 ## Not in this card
 
 The debug Design lab (`DesignLabView.swift`, `-designLab`) has no Compose counterpart: Android has

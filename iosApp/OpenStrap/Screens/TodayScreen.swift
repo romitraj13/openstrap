@@ -153,7 +153,7 @@ struct TodayScreen: View {
                 live: controller.heartRate,
                 liveEnabled: controller.state == "ready" ? controller.liveHeartRateEnabled : nil,
                 onLiveToggle: { on in controller.setLiveHeartRate(on) },
-                onClick: { open(metric: .heartRate) }
+                onClick: { open(metric: Metric.heartrate) } // Kotlin exports the entry all-lowercase.
             )
 
             ActivityCard(day: day, goals: health.goals) {
@@ -649,7 +649,7 @@ private struct HeartCard: View {
     }
 
     private var buckets: [Float?] {
-        TodayGlow.shared.heartBuckets(state: day).map { $0?.floatValue }
+        TodayGlow.shared.heartBuckets(state: day).map { ($0 as? NSNumber)?.floatValue } // [Any] gaps
     }
 
     var body: some View {

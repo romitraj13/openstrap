@@ -746,3 +746,77 @@ reachable, the rest are recorded here because each is a trap the next card shoul
   matching snapshots: Timed out while evaluating UI query" on `lab.title`, the same flake F2
   recorded; `testEveryTabAndYouScreen` passed in 66.9 s and `testPairScreenAppears` in 10.9 s in
   both runs.
+
+## Card U5 (Today)
+
+### Kotlin copied out of the Compose screens (standing instruction 5)
+
+Today works out more than formatting: which of the three scores leads and by how much, the seven-day
+baselines behind What changed, the weekly recap's averages and its sentence, the hypnogram's rows and
+readouts, the hourly and five-minute buckets. All of it is now in one shared file, in the package of
+the Compose file it came from, with JVM tests, and Swift draws only what it returns.
+
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:189-198   -> shared/src/commonMain/kotlin/org/openstrap/app/ui/glow/TodayGlow.kt  bucket
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:205-269  -> TodayGlow.kt  overview, TodayScore, TodayOverview, TodayAccent
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:271      -> TodayGlow.kt  Int?.minus
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:277-301  -> TodayGlow.kt  readinessState
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:304-317  -> TodayGlow.kt  (Change's text; drawn in Swift)
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:357-363  -> TodayGlow.kt  overviewTone, OverviewTone
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:211      -> TodayGlow.kt  readinessBefore
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:400-446  -> TodayGlow.kt  signalTiles, SignalTile, SignalAccent, avg
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:474-482  -> TodayGlow.kt  activityFacts, hourStepReadout
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:387-393  -> TodayGlow.kt  heartFacts, heartBuckets, heartReadout
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:494-513  -> TodayGlow.kt  asleepClock, sleepFacts, napsLine, sleepRange
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:167-180  -> TodayGlow.kt  dayWorkouts
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayScreen.kt:146,156   -> TodayGlow.kt  isMorning
+    app/src/main/kotlin/org/openstrap/app/ui/dashboard/ScreenParts.kt:176-189 -> TodayGlow.kt  chargeLeads, READINESS_HOURS_AFTER_WAKING
+    app/src/main/kotlin/org/openstrap/app/ui/dashboard/ScreenParts.kt:191     -> TodayGlow.kt  avg
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowSleepScreen.kt:175-192  -> TodayGlow.kt  sleepStageChart, SleepStageChart, SleepStageBlock
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayExtras.kt:40-65    -> TodayGlow.kt  alertLines, AlertLine, alertsDisclaimer
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayExtras.kt:74-126   -> TodayGlow.kt  weeklyRecap, WeeklyRecap, RecapFact, isRecapDay
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayExtras.kt:131      -> TodayGlow.kt  TODAY_TILES, todayTiles, allTodayTiles, metric(name)
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowCheckIn.kt:33           -> TodayGlow.kt  checkInNote
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowActivityScreen.kt:410-418 -> TodayGlow.kt  workoutDetail
+
+Reads added to the screen layer, not copied from Compose:
+
+    app/src/main/kotlin/org/openstrap/app/MainActivity.kt:176-182  -> shared/src/commonMain/kotlin/org/openstrap/shared/screens/ScreenQueries.kt  monthHistory (the 30 days the recap compares), and the strap's own score as `strapReadiness` (MainActivity.kt:186 reads `healthDao.strapReadiness`)
+
+What changed in the move, and why:
+
+- `java.time` is `kotlinx.datetime`, as in cards U3 and U4: `Instant.ofEpochSecond(…).atZone(zone)`
+  is `Instant.fromEpochSeconds(…).toLocalDateTime(zone)`, and `LocalDate.now()` is a parameter.
+- `clock(epoch)` and every function that formats one take a `zone` parameter, because Kotlin/Native
+  does not export default arguments: each has a two-argument overload (`clock(epochSeconds, zone)`)
+  for the tests and a one-argument form that fills in the phone's zone for Swift.
+- `String.format` comes from `shared/`'s own `format` (`app/data/Format.kt`), so `"%,d"`,
+  `"%02d:%02d"` and `"%.1f"` print exactly what `java.util.Formatter` printed.
+- `dayLabel`'s `getDisplayName(TextStyle.SHORT, locale)` and `DateTimeFormatter.ofPattern("d MMM")`
+  became the `WEEKDAYS`/`MONTHS` tables, the same English abbreviations the app's own tests use.
+- `Readiness.phase` is read through `Recovery.phase`, and `showStrapEstimate` through the property
+  `Recovery.Readiness.showStrapEstimate`, so `readinessState` asks the model rather than copying its
+  rule.
+- `TODAY_TILES` and `Metric.entries` stay Kotlin; Swift receives the six metrics as a list and the
+  stored names through `todayTiles(names)`, so an unknown name is dropped where Compose drops it.
+- The strap's Readiness row is a read on `ScreenQueries` (`strapReadiness`) because Today shows
+  "Strap's estimate" while our own score is withheld, exactly as `MainActivity:186` reads it.
+
+Tests: `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/TodayGlowTest.kt`, 40 tests (the
+bucket slots, the overview's three scores and its verdict, the four readiness-state sentences and
+their estimate forms, the tone's three bands, chargeLeads' three conditions, the morning test, the
+tile choice's fallback and stored order, the six signals with their baselines and arrows, activity's
+facts and hourly readout, the heart buckets and readout, the sleep hero and naps line, the hypnogram's
+rows/fractions/readouts, the alert lines and their metrics, the weekly recap's facts and both
+comparison sentences, the workout line, the check-in note, yesterday's Readiness, and the metric
+lookup) and `TodayQueriesTest.kt`, 2 tests (a real database: the strap's row comes back and is null
+without one; a month of steps covers both weeks the recap compares). `SampleDataTest.kt`, 2 tests,
+records that seeding the demo month twice replaces its rows rather than doubling them, which is what
+makes the UI test's several launches safe. `:shared:jvmTest` 270 -> 313 tests, 0 failures, 1 opt-in
+skip.
+
+### Not copied
+
+- The `left`/`right` two-column layout: the app declares portrait only, so the 600 pt branch is
+  never reached; Today stacks its blocks in Compose's phone order.
+- The Design lab and `TODAY_TILES`' picker storage: Android keeps the chosen names in DataStore, iOS
+  in the app's own defaults (`HealthModel.saveTodayTiles`), because it is this phone's preference.
