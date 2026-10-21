@@ -45,6 +45,11 @@ final class OpenStrapUITests: XCTestCase {
     /// the calendar sheet at the end. Scrolls the whole lab and attaches a screenshot per screenful,
     /// named `U2-designlab-1` … `U2-designlab-N`.
     ///
+    /// Card F2: every section is also asserted to sit inside the window. One child with an ideal
+    /// width larger than the column (DotMatrixText("0123456789")) widened the whole VStack, and the
+    /// scroll view centred it, so both edges were cut. A section frame outside the window is that
+    /// bug, whether or not a screenshot happens to show it.
+    ///
     /// The scroll is a fixed number of swipes rather than "swipe until the last section is hittable":
     /// with 5 tab bars, 46 icons and two calendar sheets in one tree, a hit-test snapshot taken
     /// mid-scroll can outlast XCUITest's query timeout (it did, in run 39569063780). One existence
@@ -58,10 +63,36 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["lab.title"].waitForExistence(timeout: 120),
             "The design lab did not open for -designLab"
         )
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 60), "The app never drew a window")
+        for identifier in Self.labSections {
+            let element = app.descendants(matching: .any)[identifier]
+            XCTAssertTrue(element.waitForExistence(timeout: 30), "The lab has no section \(identifier)")
+            let frame = element.frame
+            XCTAssertGreaterThanOrEqual(
+                frame.minX, 0,
+                "\(identifier) starts at x=\(frame.minX), off the left of the window \(window.frame) "
+                    + "(section frame \(frame))"
+            )
+            XCTAssertLessThanOrEqual(
+                frame.maxX, window.frame.maxX,
+                "\(identifier) ends at x=\(frame.maxX), off the right of the window \(window.frame) "
+                    + "(section frame \(frame))"
+            )
+        }
+
         var shots = 0
         func capture() {
             shots += 1
-            attach(app, "U2-designlab-\(shots)")
+            let screenshot = app.screenshot()
+            attach(screenshot, "U2-designlab-\(shots)")
+            // U1's eight screenfuls are the same lab at the same scroll offsets, so the committed
+            // U1 set is refreshed from the same captures instead of keeping the clipped layout F2
+            // removed.
+            if shots <= Self.u1Screenfuls {
+                attach(screenshot, "U1-designlab-\(shots)")
+            }
         }
         capture()
 
@@ -79,8 +110,33 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertGreaterThan(shots, 1, "The lab fits on one screen, so nothing scrolled")
     }
 
+    /// Every identifier the lab puts on a section (`DesignLabView.section`), in layout order, plus
+    /// the title. `testDesignLab` asserts each one sits inside the window.
+    private static let labSections = [
+        "lab.title",
+        "lab.type",
+        "lab.colours",
+        "lab.cards",
+        "lab.motions",
+        "lab.dotmatrix",
+        "lab.icons",
+        "lab.charts",
+        "lab.gauges",
+        "lab.hypnogram",
+        "lab.parts",
+        "lab.quiet",
+        "lab.navbar",
+        "lab.calendar",
+    ]
+
+    /// How many screenfuls card U1 shipped (`U1-designlab-1` … `U1-designlab-8`).
+    private static let u1Screenfuls = 8
+
     private func attach(_ app: XCUIApplication, _ name: String) {
-        let screenshot = app.screenshot()
+        attach(app.screenshot(), name)
+    }
+
+    private func attach(_ screenshot: XCUIScreenshot, _ name: String) {
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
