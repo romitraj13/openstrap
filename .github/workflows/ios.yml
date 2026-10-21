@@ -115,11 +115,16 @@ jobs:
 
       - name: Test
         working-directory: iosApp
+        env:
+          # Card U1: where the UI tests drop their screenshots, in case the runner's xcresulttool
+          # has no `export attachments` subcommand.
+          SCREENSHOT_DIR: ${{ github.workspace }}/iosApp/build/screens
         run: |
           # The Keychain only works from an app that carries the simulator's app-identifier
           # entitlement, which an unsigned build does not have (SecItemAdd then fails with
           # -34018). A simulator destination needs no team or provisioning profile, so the app is
           # signed ad hoc with the local identity instead.
+          mkdir -p build/screens
           xcodebuild test \
             -project OpenStrap.xcodeproj \
             -scheme OpenStrap \
@@ -129,6 +134,31 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual
+
+      # The UI tests attach a screenshot per screen state. Export them from the .xcresult so
+      # `iosApp/scripts/screens.py` can put them in docs/ios/screenshots/ (card U1, standing
+      # instruction 8). Older Xcode has no `export attachments`; the tests then wrote the same
+      # PNGs to SCREENSHOT_DIR, so the artifact is filled either way.
+      - name: Export the UI test screenshots
+        if: always()
+        working-directory: iosApp
+        run: |
+          mkdir -p build/screens
+          if xcrun xcresulttool export attachments --path build/OpenStrap.xcresult --output-path build/screens; then
+            echo "exported the attachments from build/OpenStrap.xcresult"
+          else
+            echo "xcresulttool export attachments is unavailable; using the PNGs the UI tests wrote to SCREENSHOT_DIR"
+          fi
+          find build/screens -name '*.png' -print | sort | head -60
+          echo "png count: $(find build/screens -name '*.png' | wc -l)"
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: screens
+          path: iosApp/build/screens
+          if-no-files-found: warn
 
       - name: Upload the test results
         if: always()

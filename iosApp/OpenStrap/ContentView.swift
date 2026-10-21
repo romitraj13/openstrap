@@ -8,6 +8,23 @@ struct ContentView: View {
     @ObservedObject var health: HealthModel
 
     var body: some View {
+        screen
+            // Always dark: the glow design is built for OLED black and does not follow the
+            // system light mode.
+            .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private var screen: some View {
+        #if DEBUG
+        // Card U1: the design lab, debug builds only, opened with `-designLab`.
+        if DesignLabView.isEnabled {
+            DesignLabView()
+        } else {
+            RootView(controller: controller, health: health)
+        }
+        #else
         RootView(controller: controller, health: health)
+        #endif
     }
 }

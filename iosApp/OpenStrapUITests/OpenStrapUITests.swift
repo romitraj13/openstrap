@@ -41,10 +41,55 @@ final class OpenStrapUITests: XCTestCase {
         attach(app, "strap")
     }
 
+    /// Card U1: the design lab, opened with `-designLab`. Scrolls to the icon grid at the end and
+    /// attaches a screenshot per screenful, named `U1-designlab-1` … `U1-designlab-N`.
+    func testDesignLab() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-designLab"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["lab.title"].waitForExistence(timeout: 120),
+            "The design lab did not open for -designLab"
+        )
+        var shots = 0
+        func capture() {
+            shots += 1
+            attach(app, "U1-designlab-\(shots)")
+        }
+        capture()
+
+        let end = app.staticTexts["lab.icons.title"]
+        var swipes = 0
+        while !(end.exists && end.isHittable) && swipes < 12 {
+            app.swipeUp()
+            swipes += 1
+            // The glow layers are rendered off the main thread on first appearance.
+            Thread.sleep(forTimeInterval: 0.6)
+            capture()
+        }
+
+        XCTAssertTrue(end.exists, "The design lab never reached the icon grid")
+        XCTAssertGreaterThan(shots, 1, "The lab fits on one screen, so nothing scrolled")
+    }
+
     private func attach(_ app: XCUIApplication, _ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+        // The workflow cannot always export attachments from the .xcresult (that subcommand is
+        // recent), so the same PNG is written straight to SCREENSHOT_DIR when it is set.
+        write(screenshot, as: name)
+    }
+
+    private func write(_ screenshot: XCUIScreenshot, as name: String) {
+        guard let directory = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"], !directory.isEmpty else {
+            return
+        }
+        let folder = URL(fileURLWithPath: directory, isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? screenshot.pngRepresentation.write(to: folder.appendingPathComponent("\(name).png"))
     }
 }
