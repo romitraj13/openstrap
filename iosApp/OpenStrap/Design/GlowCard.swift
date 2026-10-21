@@ -216,10 +216,17 @@ struct GlowCard<Content: View>: View {
             let key = GlowLayerCache.Key(style: style, width: size.width, height: size.height, scale: displayScale)
             ZStack(alignment: .topLeading) {
                 if let layers {
+                    // The pre-rendered layers are decoration and an `Image` is an accessibility
+                    // element by default: left visible, the core's padded frame (the card plus its
+                    // 8% margin, scaled by the drift) becomes part of the card's accessibility
+                    // frame and pushes every ancestor's frame wider than the card's own (card F2:
+                    // a 362 pt card section reported 437 pt). Only `content` is readable.
                     Image(uiImage: layers.base)
                         .resizable()
                         .frame(width: size.width, height: size.height)
+                        .accessibilityHidden(true)
                     core(layers, size: size)
+                        .accessibilityHidden(true)
                     content()
                         .padding(contentPadding)
                         .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -227,6 +234,7 @@ struct GlowCard<Content: View>: View {
                         .resizable()
                         .frame(width: size.width, height: size.height)
                         .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 } else {
                     // Until the layers are ready, the plain mid colour.
                     GlowPalette(style).mid.color
