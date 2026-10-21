@@ -69,6 +69,11 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["lab.title"].waitForExistence(timeout: 120),
             "The design lab did not open for -designLab"
         )
+        // The glow layers are rendered once on first appearance, one card at a time (the renderer
+        // holds a lock), and a dozen Core Image blurs keep the accessibility server busy enough to
+        // blow XCUITest's 30 s query timeout (run 39587579214). Let the lab settle before asking it
+        // anything.
+        Thread.sleep(forTimeInterval: 5)
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 60), "The app never drew a window")
         let windowFrame = window.frame
