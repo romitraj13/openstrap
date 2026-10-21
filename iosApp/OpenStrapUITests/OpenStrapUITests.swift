@@ -73,16 +73,20 @@ final class OpenStrapUITests: XCTestCase {
         // hub's own rows carry the same words.
         app.buttons["You"].tap()
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
+        // Card F4: every screen that scrolls under the floating bar must let its last row come clear
+        // of it. Each screen's numbers are measured as the walk goes, and asserted together at the end
+        // so one run names every screen whose last row is still under the bar.
+        var navBarFailures: [String] = []
         // Card F4: the hub's last row is the Licences row; scrolled to the end it must sit above
         // the floating bar, and the screenshot is taken there.
-        assertClearsNavBar(app, lastRow: "you.licences", screen: "You")
+        if let problem = clearsNavBar(app, lastRow: "you.licences", screen: "You") { navBarFailures.append(problem) }
         attach(app, "U4-you-1")
         scrollToTop(app, until: app.buttons["you.profile"])
 
         tap(app, "you.profile")
         XCTAssertTrue(app.buttons["profile.back"].waitForExistence(timeout: 30), "Your profile never opened")
         // The panel's last field is the one to reach at the end; Save is in the header above it.
-        assertClearsNavBar(app, lastRow: "profile.sleepNeed", screen: "Your profile")
+        if let problem = clearsNavBar(app, lastRow: "profile.sleepNeed", screen: "Your profile") { navBarFailures.append(problem) }
         attach(app, "U4-profile-1")
         scrollToTop(app, until: app.buttons["profile.back"])
         app.buttons["profile.back"].tap()
@@ -103,7 +107,7 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(app.buttons["strap.back"].waitForExistence(timeout: 30), "Your strap never opened")
         // The Diagnostics row is the last thing on the screen, and the row U4's screenshot showed
         // under the bar.
-        assertClearsNavBar(app, lastRow: "diagnosticsLink", screen: "Your strap")
+        if let problem = clearsNavBar(app, lastRow: "diagnosticsLink", screen: "Your strap") { navBarFailures.append(problem) }
         attach(app, "U4-strap-1")
         scrollToTop(app, until: app.buttons["strap.back"])
         app.buttons["strap.back"].tap()
@@ -112,7 +116,7 @@ final class OpenStrapUITests: XCTestCase {
         tap(app, "you.diagnostics")
         XCTAssertTrue(app.navigationBars["Diagnostics"].waitForExistence(timeout: 30), "Diagnostics never opened")
         // The log is the last thing here, and it can be thousands of points long.
-        assertClearsNavBar(app, lastRow: "logText", screen: "Diagnostics")
+        if let problem = clearsNavBar(app, lastRow: "logText", screen: "Diagnostics") { navBarFailures.append(problem) }
         attach(app, "U4-diagnostics-1")
         app.navigationBars["Diagnostics"].buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["you.diagnostics"].waitForExistence(timeout: 30), "Back from Diagnostics never returned to You")
@@ -120,35 +124,44 @@ final class OpenStrapUITests: XCTestCase {
         tap(app, "you.licences")
         XCTAssertTrue(app.buttons["licences.back"].waitForExistence(timeout: 30), "The licence texts never opened")
         // The last licence text is the last row of the screen.
-        assertClearsNavBar(app, lastRow: "licence.OFL-MuseoModerno", screen: "Licences")
+        if let problem = clearsNavBar(app, lastRow: "licence.OFL-MuseoModerno", screen: "Licences") { navBarFailures.append(problem) }
         attach(app, "U4-licences-1")
         scrollToTop(app, until: app.buttons["licences.back"])
         app.buttons["licences.back"].tap()
 
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "Back from Licences never returned to You")
+
+        XCTAssertTrue(
+            navBarFailures.isEmpty,
+            "the floating tab bar still covers the last row of:\n" + navBarFailures.joined(separator: "\n")
+        )
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
     /// of it. `navBar.top` is the bar's own top edge (`FloatingNavBar`), so the bound is the bar's
-    /// real frame and not a number copied into the test.
-    private func assertClearsNavBar(_ app: XCUIApplication, lastRow identifier: String, screen: String) {
+    /// real frame and not a number copied into the test. Each screen's numbers are printed as they
+    /// are measured and returned as a sentence when the row is still under the bar, so one run
+    /// names every screen that is wrong instead of stopping at the first (the walk asserts them
+    /// together at the end).
+    private func clearsNavBar(_ app: XCUIApplication, lastRow identifier: String, screen: String) -> String? {
         let bar = app.descendants(matching: .any)["navBar.top"]
         guard bar.waitForExistence(timeout: 30) else {
             print("F4 \(screen): there is no navBar.top. Tree:\n\(app.debugDescription)")
-            XCTFail("\(screen): the floating bar never reported its top edge")
-            return
+            return "\(screen): the floating bar never reported its top edge"
         }
         let row = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(screen): \(identifier) never appeared")
+        guard row.waitForExistence(timeout: 30) else {
+            return "\(screen): \(identifier) never appeared"
+        }
         scrollToEnd(app, until: row)
         let barTop = bar.frame.minY
         let rowBottom = row.frame.maxY
         print("F4 \(screen): \(identifier) maxY=\(rowBottom) barTop=\(barTop) window=\(app.windows.firstMatch.frame)")
-        XCTAssertLessThanOrEqual(
-            rowBottom, barTop,
-            "\(screen): \(identifier) ends at \(rowBottom), under the floating bar whose top is "
+        guard rowBottom <= barTop else {
+            return "\(screen): \(identifier) ends at \(rowBottom), under the floating bar whose top is "
                 + "\(barTop), so the last row cannot be scrolled clear of it"
-        )
+        }
+        return nil
     }
 
     /// Drags to the end of a scrolling screen: a held drag moves about half a screen, so the walk
