@@ -5,6 +5,7 @@ import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -264,6 +265,45 @@ object TodayGlow {
     /** Mornings only: today, before noon. */
     fun isMorning(date: LocalDate, today: LocalDate, hour: Int): Boolean = date == today && hour < 12
 
+    /** [isMorning] with the ISO dates Swift holds; a malformed date is not a morning. */
+    fun isMorning(iso: String, todayIso: String, hour: Int): Boolean {
+        val date = parseDate(iso) ?: return false
+        val today = parseDate(todayIso) ?: return false
+        return isMorning(date, today, hour)
+    }
+
+    /** [chargeLeads] with the ISO dates Swift holds; a malformed date never leads with Charge. */
+    fun chargeLeads(
+        iso: String,
+        todayIso: String,
+        chargeLatest: Float?,
+        sleepEnd: Long?,
+        nowEpoch: Long,
+        hour: Int,
+    ): Boolean {
+        val date = parseDate(iso) ?: return false
+        val today = parseDate(todayIso) ?: return false
+        return chargeLeads(date, today, chargeLatest, sleepEnd, nowEpoch, hour)
+    }
+
+    /** [chargeLeads] over the day the screen holds, so Swift never names the nullable sleep end. */
+    fun chargeLeads(state: DayUiState, todayIso: String, chargeLatest: Float?, nowEpoch: Long, hour: Int): Boolean {
+        val today = parseDate(todayIso) ?: return false
+        return chargeLeads(state.date, today, chargeLatest, state.sleep?.end, nowEpoch, hour)
+    }
+
+    /** Yesterday's Readiness: `readinessTrend.dropLast(1).lastOrNull()?.second` (GlowTodayScreen.kt:211). */
+    fun readinessBefore(rec: RecoveryResult?): Int? =
+        rec?.readinessTrend?.dropLast(1)?.lastOrNull()?.second
+
+    /** The metric a stored tile name names, or null when it has since been renamed. */
+    fun metric(name: String): Metric? = Metric.entries.firstOrNull { it.name == name }
+
+    /** Every statistic the picker offers, in `TODAY_TILES`' order. */
+    fun allTodayTiles(): List<Metric> = TODAY_TILES
+
+    private fun parseDate(iso: String): LocalDate? = runCatching { LocalDate.parse(iso) }.getOrNull()
+
     // ---- MainActivity.kt:178 ---------------------------------------------------------------------
 
     /**
@@ -360,7 +400,11 @@ object TodayGlow {
         bucket(state.heartRate, state.dayStart..state.dayEnd, 5 * 60)
 
     /** The touch readout on a heart-rate point: "62 bpm · 07:35". */
-    fun heartReadout(dayStart: Long, index: Int, value: Float, zone: TimeZone = TimeZone.currentSystemDefault()): String =
+    fun heartReadout(dayStart: Long, index: Int, value: Float): String =
+        heartReadout(dayStart, index, value, TimeZone.currentSystemDefault())
+
+    /** [heartReadout] in [zone], for the tests. */
+    fun heartReadout(dayStart: Long, index: Int, value: Float, zone: TimeZone): String =
         "${value.toInt()} bpm · ${clock(dayStart + index * 5 * 60L, zone)}"
 
     /** The heart card's only fact: the day's resting rate. */
@@ -377,11 +421,45 @@ object TodayGlow {
         score?.let { listOf("Score $it", Narrative.sleepHeadline(it)) } ?: emptyList()
 
     /** "2 naps · 1h 0m · 13:00, 16:10", or empty without naps. */
-    fun napsLine(naps: List<SleepSession>, zone: TimeZone = TimeZone.currentSystemDefault()): String {
+    fun napsLine(naps: List<SleepSession>): String = napsLine(naps, TimeZone.currentSystemDefault())
+
+    /** [napsLine] in [zone], for the tests. */
+    fun napsLine(naps: List<SleepSession>, zone: TimeZone): String {
         if (naps.isEmpty()) return ""
         val total = naps.sumOf { it.end - it.start }
         val count = if (naps.size == 1) "1 nap" else "${naps.size} naps"
         return "$count · ${formatDuration(total)} · " + naps.joinToString(", ") { clock(it.start, zone) }
+    }
+
+    /** The sleep card's header note: "23:00 – 07:00" (GlowTodayScreen.kt:492). */
+    fun sleepRange(session: SleepSession): String = sleepRange(session, TimeZone.currentSystemDefault())
+
+    /** [sleepRange] in [zone], for the tests. */
+    fun sleepRange(session: SleepSession, zone: TimeZone): String =
+        "${clock(session.start, zone)} – ${clock(session.end, zone)}"
+
+    /**
+     * A workout row's second line (`WorkoutLine`, GlowActivityScreen.kt:411): the time it started
+     * (with the day when [showDate]), how long it ran, its average rate and its calories.
+     */
+    fun workoutDetail(analysis: WorkoutAnalysis, showDate: Boolean): String =
+        workoutDetail(analysis, showDate, TimeZone.currentSystemDefault())
+
+    /** [workoutDetail] in [zone], for the tests. */
+    fun workoutDetail(analysis: WorkoutAnalysis, showDate: Boolean, zone: TimeZone): String {
+        val start = Instant.fromEpochSeconds(analysis.workout.start).toLocalDateTime(zone)
+        val time = "%02d:%02d".format(start.hour, start.minute)
+        val whenText = if (showDate) {
+            "${WEEKDAYS[start.date.dayOfWeek.isoDayNumber - 1]} ${start.dayOfMonth} ${MONTHS[start.monthNumber - 1]} · $time"
+        } else {
+            time
+        }
+        return listOfNotNull(
+            whenText,
+            formatDuration(analysis.durationSeconds),
+            analysis.workout.averageHeartRate?.let { "avg $it bpm" },
+            analysis.workout.calories?.let { "$it kcal" },
+        ).joinToString(" · ")
     }
 
     // ---- GlowSleepScreen.kt:175-192 (shared with Today) ------------------------------------------
@@ -390,7 +468,11 @@ object TodayGlow {
      * The night's stages on the glow hypnogram's four rows, with the clock times under it and each
      * block's touch readout: "REM · 01:20–01:34 · 14 min".
      */
-    fun sleepStageChart(spans: List<StageSpan>, zone: TimeZone = TimeZone.currentSystemDefault()): SleepStageChart {
+    fun sleepStageChart(spans: List<StageSpan>): SleepStageChart =
+        sleepStageChart(spans, TimeZone.currentSystemDefault())
+
+    /** [sleepStageChart] in [zone], for the tests. */
+    fun sleepStageChart(spans: List<StageSpan>, zone: TimeZone): SleepStageChart {
         val start = spans.minOfOrNull { it.start } ?: 0L
         val end = (spans.maxOfOrNull { it.end } ?: start).coerceAtLeast(start + 1)
         // AWAKE 0, REM 1, LIGHT 2, DEEP 3: DayViewModel.SLEEP_STAGE_ROWS.
@@ -417,7 +499,11 @@ object TodayGlow {
     // ---- GlowTodayExtras.kt:40-65 ----------------------------------------------------------------
 
     /** The strap's alerts this day, newest first, in the same words as its notification. */
-    fun alertLines(alerts: List<HealthAlertRow>, zone: TimeZone = TimeZone.currentSystemDefault()): List<AlertLine> =
+    fun alertLines(alerts: List<HealthAlertRow>): List<AlertLine> =
+        alertLines(alerts, TimeZone.currentSystemDefault())
+
+    /** [alertLines] in [zone], for the tests. */
+    fun alertLines(alerts: List<HealthAlertRow>, zone: TimeZone): List<AlertLine> =
         alerts.sortedByDescending { it.timestamp }.map { alert ->
             val text = when (alert.type) {
                 1 -> "High heart rate: ${alert.value} bpm"
@@ -431,6 +517,10 @@ object TodayGlow {
             AlertLine(text, clock(alert.timestamp, zone), metric, alert.timestamp)
         }
 
+    /** The line under the alerts: the wellness advice plus the disclaimer (GlowTodayExtras.kt:61). */
+    fun alertsDisclaimer(): String =
+        "If you feel unwell, checking in with a healthcare professional may be helpful. ${BodySignalsCopy.DISCLAIMER}"
+
     // ---- GlowTodayExtras.kt:74-126 ---------------------------------------------------------------
 
     /**
@@ -443,7 +533,15 @@ object TodayGlow {
         recovery: RecoveryResult?,
         workouts: List<WorkoutAnalysis>,
         steps: List<DayStat>,
-        zone: TimeZone = TimeZone.currentSystemDefault(),
+    ): WeeklyRecap = weeklyRecap(state, recovery, workouts, steps, TimeZone.currentSystemDefault())
+
+    /** [weeklyRecap] in [zone], for the tests. */
+    fun weeklyRecap(
+        state: DayUiState,
+        recovery: RecoveryResult?,
+        workouts: List<WorkoutAnalysis>,
+        steps: List<DayStat>,
+        zone: TimeZone,
     ): WeeklyRecap {
         val end = state.date.minusDays(1)
         val start = end.minusDays(6)
@@ -501,6 +599,9 @@ object TodayGlow {
     /** Whether today is the recap's day: a Monday. */
     fun isRecapDay(date: LocalDate): Boolean = date.dayOfWeek == DayOfWeek.MONDAY
 
+    /** [isRecapDay] with the ISO date Swift holds; a malformed date is not a recap day. */
+    fun isRecapDay(iso: String): Boolean = parseDate(iso)?.let { isRecapDay(it) } ?: false
+
     // ---- GlowTodayScreen.kt:167-180 --------------------------------------------------------------
 
     /** The selected day's workouts, in start order (hidden when there are none). */
@@ -520,8 +621,14 @@ object TodayGlow {
 
     private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
+    /** `getDisplayName(TextStyle.SHORT, locale)`: "Mon" … "Sun". */
+    private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+    /** "HH:mm" of [epochSeconds] in the phone's zone. */
+    fun clock(epochSeconds: Long): String = clock(epochSeconds, TimeZone.currentSystemDefault())
+
     /** "HH:mm" of [epochSeconds] in [zone]. */
-    fun clock(epochSeconds: Long, zone: TimeZone = TimeZone.currentSystemDefault()): String {
+    fun clock(epochSeconds: Long, zone: TimeZone): String {
         val time = Instant.fromEpochSeconds(epochSeconds).toLocalDateTime(zone)
         return "%02d:%02d".format(time.hour, time.minute)
     }

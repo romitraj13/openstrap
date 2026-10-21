@@ -79,7 +79,7 @@ struct RootView: View {
                 switch tab {
                 case .today:
                     DayTab(tab: .today, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        TodayView(controller: controller, health: health)
+                        TodayScreen(controller: controller, health: health, onOpenTab: openTab)
                     }
                 case .recovery:
                     DayTab(tab: .recovery, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
@@ -125,6 +125,13 @@ struct RootView: View {
     private func openStrap() {
         youPath = [.strap]
         tab = .you
+    }
+
+    /// A Today card that opens another tab (`onOpenRecovery` / `onOpenActivity`,
+    /// GlowTodayScreen.kt:73-83). Android also clears that tab's detail stack when the bar is used.
+    private func openTab(_ next: AppTab) {
+        youPath = []
+        tab = next
     }
 }
 

@@ -3,6 +3,75 @@ import Foundation
 import OpenStrapShared
 import SwiftUI
 
+/// The night's four stages as one bar. Card U5 deleted `TodayView.swift`, which owned this and
+/// `Stat`; they stay here because the Sleep screen (until card U7 ports `GlowSleepScreen.kt`) and
+/// the unused Heart screen still draw them.
+struct StageBar: View {
+    let stages: StageTotals
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geometry in
+                HStack(spacing: 1) {
+                    ForEach(slices) { slice in
+                        Rectangle()
+                            .fill(ScreenFormat.stageColor(slice.name))
+                            .frame(width: geometry.size.width * slice.fraction)
+                    }
+                }
+            }
+            .frame(height: 12)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            HStack(spacing: 12) {
+                ForEach(slices) { slice in
+                    HStack(spacing: 3) {
+                        Circle().fill(ScreenFormat.stageColor(slice.name)).frame(width: 6, height: 6)
+                        Text("\(ScreenFormat.stageLabel(slice.name)) \(slice.minutes)m").font(.caption2)
+                    }
+                }
+            }
+        }
+    }
+
+    private var slices: [StageSlice] {
+        let values = [
+            StageSlice(name: "deep", minutes: Int(stages.deepMinutes)),
+            StageSlice(name: "light", minutes: Int(stages.lightMinutes)),
+            StageSlice(name: "rem", minutes: Int(stages.remMinutes)),
+            StageSlice(name: "awake", minutes: Int(stages.awakeMinutes)),
+        ]
+        let total = max(values.reduce(0) { $0 + $1.minutes }, 1)
+        return values.map { slice in
+            StageSlice(name: slice.name, minutes: slice.minutes, fraction: Double(slice.minutes) / Double(total))
+        }
+    }
+}
+
+private struct StageSlice: Identifiable {
+    var id: String { name }
+    let name: String
+    let minutes: Int
+    var fraction: Double = 0
+}
+
+/// A label, a value and a unit, in a row of three (the old cards' statistic).
+struct Stat: View {
+    let label: String
+    let value: String
+    let unit: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased()).font(.caption2).foregroundStyle(.secondary)
+            Text(value).font(.title3).monospacedDigit()
+            if !unit.isEmpty {
+                Text(unit).font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// Last night: the score, the sentence, the night as a hypnogram, and the stage totals.
 ///
 /// Card U4 puts this under the app shell's shared header and pull to sync, so the view is the

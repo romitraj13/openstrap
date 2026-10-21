@@ -25,8 +25,8 @@ final class OpenStrapUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["todayScore"].waitForExistence(timeout: 120),
-            "Today never drew a Recovery score from the seeded sample data"
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded sample data"
         )
         // The header the four date tabs share.
         XCTAssertTrue(app.staticTexts["app.wordmark"].exists, "The header never drew its wordmark")
@@ -239,6 +239,154 @@ final class OpenStrapUITests: XCTestCase {
                 withVelocity: .fast,
                 thenHoldForDuration: 0.1
             )
+    }
+
+    /// Card U5: Today, in the two orders a day has, the tile chooser, the pushed detail, Monday's
+    /// recap and a day with no data at all. Screenshots: `U5-today-1..n` (later in the day),
+    /// `U5-tilesheet-1`, `U5-detail-1`, `U5-todaymorning-1..n`, `U5-todayempty-1..n`,
+    /// `U5-todayrecap-1..n`.
+    ///
+    /// The app is launched several times, which is safe: the demo seed writes the same rows for the
+    /// same day (`SampleDataTest` in shared pins that), so the screenshots all show one month of wear.
+    func testToday() {
+        // Later in the day: Charge leads the top card, and last night sits at the bottom.
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData", "-todayEvening"]
+        app.launch()
+        XCTAssertTrue(
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded month"
+        )
+        walk(app, prefix: "U5-today", milestones: ["What changed", "Heart rate", "steps", "asleep"])
+
+        // The tile chooser, from the top of the screen.
+        scrollToTop(app)
+        app.staticTexts["Edit"].tap()
+        if !app.buttons["tiles.cancel"].waitForExistence(timeout: 30) {
+            attach(app, "U5-tilesheet-missing")
+            print("U5 after Edit:\n\(app.debugDescription)")
+            XCTFail("The tile chooser never opened")
+        }
+        XCTAssertTrue(app.staticTexts["What changed shows"].exists, "The tile chooser has no title")
+        attach(app, "U5-tilesheet-1")
+        app.buttons["tiles.cancel"].tap()
+        XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 30), "Cancel never closed the tile chooser")
+
+        // A metric tap pushes the detail route card U9 fills in.
+        app.staticTexts["Heart rate"].tap()
+        if !app.staticTexts["today.detail"].waitForExistence(timeout: 30) {
+            attach(app, "U5-detail-missing")
+            print("U5 after tapping Heart rate:\n\(app.debugDescription)")
+            XCTFail("Tapping the heart card pushed no detail")
+        }
+        attach(app, "U5-detail-1")
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 30), "Back never returned to Today")
+
+        // A day with no data at all: far enough back that the seeded month has run out.
+        scrollToTop(app)
+        let previous = app.buttons["date.previous"]
+        XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
+        for _ in 0..<40 {
+            previous.tap()
+        }
+        XCTAssertTrue(
+            app.staticTexts["No heart-rate data yet. Sync your strap."].waitForExistence(timeout: 60),
+            "A day before the seeded month is not drawing the empty state"
+        )
+        XCTAssertFalse(app.staticTexts["What changed"].exists, "An empty day still drew What changed")
+        attach(app, "U5-todayempty-1")
+        walk(app, prefix: "U5-todayempty", milestones: ["Heart rate", "steps"])
+
+        app.terminate()
+
+        // The morning order: the check-in under the score, and last night right after it.
+        let morning = XCUIApplication()
+        morning.launchArguments = ["-demoData", "-todayMorning"]
+        morning.launch()
+        XCTAssertTrue(
+            morning.staticTexts["Morning check-in"].waitForExistence(timeout: 120),
+            "Today never drew the morning check-in"
+        )
+        walk(morning, prefix: "U5-todaymorning", milestones: ["Morning check-in", "What changed", "Heart rate", "steps"])
+        morning.terminate()
+
+        // Monday: the week's recap, under the top card.
+        let monday = XCUIApplication()
+        monday.launchArguments = ["-demoData", "-todayMonday", "-todayEvening"]
+        monday.launch()
+        XCTAssertTrue(
+            monday.staticTexts["Your week"].waitForExistence(timeout: 120),
+            "Monday's recap never drew"
+        )
+        attach(monday, "U5-todayrecap-1")
+        monday.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+            .press(
+                forDuration: 0.1,
+                thenDragTo: monday.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)),
+                withVelocity: .slow,
+                thenHoldForDuration: 0.4
+            )
+        Thread.sleep(forTimeInterval: 0.4)
+        attach(monday, "U5-todayrecap-2")
+    }
+
+    /// Every screenful of a long screen from the top down, until each milestone has been seen inside
+    /// the window, attaching `prefix-1`, `prefix-2`, …. Off-screen children of a SwiftUI stack still
+    /// exist in the tree (the design lab's lesson), so "seen" means the frame is inside the window.
+    @discardableResult
+    private func walk(_ app: XCUIApplication, prefix: String, milestones: [String], limit: Int = 10) -> Int {
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 60), "the app never drew a window")
+        var seen = Set<String>()
+        var shots = 0
+
+        func onScreen(_ label: String) -> Bool {
+            let element = app.staticTexts[label]
+            guard element.exists else { return false }
+            let frame = element.frame
+            return frame.height > 0 && frame.minY < window.frame.maxY && frame.maxY > window.frame.minY
+        }
+
+        func capture() {
+            shots += 1
+            attach(app, "\(prefix)-\(shots)")
+            for milestone in milestones where onScreen(milestone) {
+                seen.insert(milestone)
+            }
+        }
+
+        func scrollOneScreenful() {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(
+                    forDuration: 0.1,
+                    thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)),
+                    withVelocity: .slow,
+                    thenHoldForDuration: 0.4
+                )
+        }
+
+        capture()
+        var screenfuls = 1
+        while seen.count < milestones.count && screenfuls < limit {
+            scrollOneScreenful()
+            Thread.sleep(forTimeInterval: 0.4)
+            capture()
+            screenfuls += 1
+        }
+        XCTAssertEqual(
+            seen.count, milestones.count,
+            "the walk over \(prefix) never showed \(milestones.filter { !seen.contains($0) }), so it has holes"
+        )
+        return shots
+    }
+
+    /// Back to the top of a dated tab, where the header and the day's first card are.
+    private func scrollToTop(_ app: XCUIApplication) {
+        for _ in 0..<8 {
+            app.swipeDown()
+        }
+        Thread.sleep(forTimeInterval: 0.3)
     }
 
     /// Card U2: the same lab, now with the glow charts, the gauges, the quiet panels, the tab bar and

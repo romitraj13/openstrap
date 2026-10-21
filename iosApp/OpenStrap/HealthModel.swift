@@ -30,6 +30,23 @@ final class HealthModel: ObservableObject {
     /// The local days the calendar may offer, oldest first (`ScreenQueries.daysWithData`).
     @Published private(set) var daysWithData: Set<Date> = []
 
+    /// The selected day as `DayViewModel.state` builds it (`ScreenQueries.day`). Card U5's Today
+    /// screen reads this; nil until that screen first asks, so a launch that never shows Today
+    /// pays for none of the day's dozen reads.
+    @Published private(set) var dayState: DayUiState?
+    /// Readiness and Charge for the selected day, as the Recovery tab reads them.
+    @Published private(set) var recoveryResult: RecoveryResult?
+    /// Every workout OpenStrap knows, newest first: Today picks the selected day's out of it.
+    @Published private(set) var workoutList: [WorkoutAnalysis] = []
+    /// The selected day's morning check-in, 1-5; nil until it is answered.
+    @Published private(set) var checkIn: Int?
+    /// The strap's own Readiness score for the selected day, when it reported one.
+    @Published private(set) var strapReadiness: Int?
+    /// A month of daily steps ending yesterday, for Monday's recap (`ScreenQueries.monthHistory`).
+    @Published private(set) var recapSteps: [DayStat] = []
+    /// The statistics What changed shows, in `TODAY_TILES`' order (Android's `todayTiles`).
+    @Published private(set) var todayTiles: [Metric] = TodayGlow.shared.allTodayTiles()
+
     /// What the You tab edits: the same settings rows Android's `SettingsStore` reads.
     @Published private(set) var profile: UserProfile = ProfileRules.shared.blank()
     @Published private(set) var goals: Goals = GoalsRules.shared.defaults()
@@ -51,6 +68,9 @@ final class HealthModel: ObservableObject {
     }
     private let path: String
     private var seeded = false
+    /// Where the tiles picker's answer is kept. Android keeps it in DataStore; iOS in the app's own
+    /// defaults, like the Apple Health switch, because it is this phone's preference.
+    private static let tilesKey = "today.tiles"
 
     init(databasePath: String) {
         date = HealthModel.isoToday()
@@ -86,6 +106,78 @@ final class HealthModel: ObservableObject {
         }
         queries.recovery(date: date) { [weak self] snapshot in
             self?.recovery = snapshot
+        }
+        // Today's own reads, once that screen has asked for them: a launch that never shows Today
+        // (the design lab, a fresh install on Pair) pays for none of them.
+        if dayState != nil { reloadToday() }
+    }
+
+    // MARK: - Today's day (card U5)
+
+    /// Everything card U5's Today screen shows for the selected day: the day itself, Readiness and
+    /// Charge, the workouts, the check-in, the strap's own score and the recap's step history.
+    func reloadToday() {
+        let date = self.date
+        screens.day(date: date) { [weak self] state in
+            guard let self else { return }
+            // A slower answer for a day the user has already left must not overwrite the new one.
+            guard self.date == date else { return }
+            self.dayState = state
+            self.reloadRecapSteps(date: date)
+        }
+        screens.recovery(date: date) { [weak self] result in
+            guard let self, self.date == date else { return }
+            self.recoveryResult = result
+        }
+        screens.workouts { [weak self] list in
+            self?.workoutList = list
+        }
+        screens.checkIn(date: date) { [weak self] answer in
+            guard let self, self.date == date else { return }
+            self.checkIn = answer.feeling?.intValue
+        }
+        screens.strapReadiness(date: date) { [weak self] row in
+            guard let self, self.date == date else { return }
+            self.strapReadiness = row?.score?.intValue
+        }
+        reloadTodayTiles()
+    }
+
+    /// Answers - or clears, with nil - the selected day's check-in (`CheckIn.save`, GlowCheckIn.kt).
+    func saveCheckIn(_ feeling: Int?) {
+        let date = self.date
+        screens.saveCheckIn(date: date, feeling: feeling.map { KotlinInt(int: Int32($0)) }) { [weak self] in
+            guard let self, self.date == date else { return }
+            self.checkIn = feeling
+        }
+    }
+
+    /// The statistics What changed shows, as `MainActivity`'s `todayTiles` reads them: the stored
+    /// names in their order, else all six.
+    func reloadTodayTiles() {
+        let names = UserDefaults.standard.string(forKey: Self.tilesKey)?.split(separator: ",").map(String.init)
+        todayTiles = TodayGlow.shared.todayTiles(names: names)
+    }
+
+    /// Stores the picker's answer. Compose only saves a non-empty choice.
+    func saveTodayTiles(_ tiles: [Metric]) {
+        let names = tiles.map { $0.name }
+        UserDefaults.standard.set(names.joined(separator: ","), forKey: Self.tilesKey)
+        todayTiles = TodayGlow.shared.todayTiles(names: names)
+    }
+
+    /// A Monday's recap compares the seven days before the selected day with the seven before them,
+    /// so it reads a month of steps: the same two weeks Compose's history call covers.
+    private func reloadRecapSteps(date: String) {
+        guard TodayGlow.shared.isRecapDay(iso: date) else {
+            recapSteps = []
+            return
+        }
+        let selected = HealthModel.day(fromIso: date) ?? Date()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: selected) ?? selected
+        screens.monthHistory(metric: Metric.steps, date: HealthModel.iso(yesterday)) { [weak self] list in
+            guard let self, self.date == date else { return }
+            self.recapSteps = list
         }
     }
 
@@ -132,6 +224,9 @@ final class HealthModel: ObservableObject {
             onDone()
         }
     }
+
+    /// The day's `yyyy-MM-dd` in the phone's own zone: the currency the shared screens read.
+    static func isoDay(_ day: Date) -> String { iso(day) }
 
     private static func iso(_ day: Date) -> String {
         let formatter = DateFormatter()

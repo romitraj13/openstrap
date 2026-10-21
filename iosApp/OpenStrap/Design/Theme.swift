@@ -1,3 +1,4 @@
+import OpenStrapShared
 import SwiftUI
 
 /// The colour tokens, ported from `app/src/main/kotlin/org/openstrap/app/ui/theme/Theme.kt`
@@ -156,6 +157,43 @@ enum MetricColors {
         if level <= 15 { return bad }
         if level <= 40 { return warn }
         return good
+    }
+
+    /// Today's top card tells how the day looks before you read a number: teal when the leading
+    /// score is good, amber when it is middling or the strap is straining, coral when it is low,
+    /// and the neutral grey when there is no score. The bands themselves are shared Kotlin
+    /// (`TodayGlow.overviewTone`, GlowTodayScreen.kt:357); this is only the colour they name.
+    static func overview(_ tone: OverviewTone) -> Color {
+        switch tone.name {
+        case "Strain": return Color(hex: 0xF2A33A)
+        case "Good": return hrv
+        case "Middling": return Color(hex: 0xF2A33A)
+        case "Low": return Color(hex: 0xF0605A)
+        default: return Color(hex: 0x6E7280)
+        }
+    }
+
+    /// A What changed tile's dot: the metric's own accent (`Signal` accents, GlowTodayScreen.kt:416).
+    static func signal(_ accent: SignalAccent) -> Color {
+        switch accent.name {
+        case "Heart": return heart
+        case "Hrv": return hrv
+        case "Spo2": return spo2
+        case "Temperature": return temperature
+        case "Stress": return stress
+        case "SleepLight": return sleepLight
+        default: return hrv
+        }
+    }
+
+    /// A score on Today's top card wears the deep accent its tab uses (`MetricColors.chargeDeep`,
+    /// `readinessDeep`, and the Sleep card's blue).
+    static func today(_ accent: TodayAccent) -> Color {
+        switch accent.name {
+        case "Charge": return chargeDeep
+        case "Recovery": return readinessDeep
+        default: return sleepDeep
+        }
     }
 
     /// Every accent, in the order Theme.kt declares them, for the Design lab and the tests.

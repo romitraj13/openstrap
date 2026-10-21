@@ -193,12 +193,15 @@ extension View {
 /// containing scroll view is moving.
 struct GlowCard<Content: View>: View {
     let style: GlowStyle
-    let contentPadding: CGFloat
+    /// Compose's `LocalCardPadding`: the card's own inset. A card built without one takes the
+    /// environment's (GlowLayout.cardPadding, narrowed by `GlowScreenList`), as Compose's does.
+    let contentPadding: EdgeInsets?
     private let content: () -> Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.glowPaused) private var scrollPaused
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.glowCardPadding) private var cardPadding
 
     @State private var layers: GlowLayers?
     @State private var drift = CoreDrift(seed: UInt64.random(in: 0..<UInt64.max))
@@ -206,9 +209,18 @@ struct GlowCard<Content: View>: View {
     @State private var pausedTotal: TimeInterval = 0
     @State private var pauseStarted: Date?
 
-    init(_ style: GlowStyle, contentPadding: CGFloat = 16, @ViewBuilder content: @escaping () -> Content) {
+    /// The same padding on every side, for a card outside the glow layout (the Design lab).
+    init(_ style: GlowStyle, contentPadding: CGFloat, @ViewBuilder content: @escaping () -> Content) {
         self.style = style
-        self.contentPadding = contentPadding
+        self.contentPadding = EdgeInsets(top: contentPadding, leading: contentPadding, bottom: contentPadding, trailing: contentPadding)
+        self.content = content
+    }
+
+    /// A card with Compose's own inset: `LocalCardPadding`, which `GlowScreenList` narrows on a
+    /// narrow or two-column screen (GlowLayout.kt:96-132).
+    init(_ style: GlowStyle, @ViewBuilder content: @escaping () -> Content) {
+        self.style = style
+        self.contentPadding = nil
         self.content = content
     }
 
@@ -231,7 +243,7 @@ struct GlowCard<Content: View>: View {
                     core(layers, size: size)
                         .accessibilityHidden(true)
                     content()
-                        .padding(contentPadding)
+                        .padding(contentPadding ?? cardPadding)
                         .frame(width: size.width, height: size.height, alignment: .topLeading)
                     Image(uiImage: layers.overlay)
                         .resizable()

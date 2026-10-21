@@ -425,6 +425,20 @@ class TodayGlowTest {
         assertEquals("", TodayGlow.napsLine(emptyList(), utc))
     }
 
+    @Test
+    fun `the sleep card's own header names when the night ran`() {
+        val night = SleepSession(start = epoch(LocalDate(2026, 10, 20), 23), end = epoch(7, 0))
+        assertEquals("23:00 – 07:00", TodayGlow.sleepRange(night, utc))
+    }
+
+    @Test
+    fun `a workout row's line names its time, length, average rate and calories`() {
+        val analysis = workoutAt(epoch(18, 5))
+        assertEquals("18:05 · 30m · avg 140 bpm · 210 kcal", TodayGlow.workoutDetail(analysis, showDate = false, zone = utc))
+        // The Activity screen's list shows the day too.
+        assertEquals("Wed 21 Oct · 18:05 · 30m · avg 140 bpm · 210 kcal", TodayGlow.workoutDetail(analysis, showDate = true, zone = utc))
+    }
+
     // ---- GlowSleepScreen.kt:175 GlowSleepStages, shared with Today ---------------------------------
 
     @Test
@@ -506,6 +520,15 @@ class TodayGlowTest {
             HealthAlertRow(timestamp = 200, type = 5, value = 0),
         )
         assertEquals(listOf(300L, 200L, 100L), TodayGlow.alertLines(alerts, utc).map { it.epoch })
+    }
+
+    @Test
+    fun `the alerts' footnote is the wellness advice plus the disclaimer`() {
+        assertEquals(
+            "If you feel unwell, checking in with a healthcare professional may be helpful. "
+                + org.openstrap.app.data.BodySignalsCopy.DISCLAIMER,
+            TodayGlow.alertsDisclaimer(),
+        )
     }
 
     // ---- GlowTodayExtras.kt:74-126 WeeklyRecapPanel ------------------------------------------------
@@ -596,6 +619,62 @@ class TodayGlowTest {
         // 2026-10-19 is a Monday; the 21st is a Wednesday.
         assertTrue(TodayGlow.isRecapDay(LocalDate(2026, 10, 19)))
         assertFalse(TodayGlow.isRecapDay(day))
+    }
+
+    @Test
+    fun `the recap day reads an ISO date as Swift passes it`() {
+        assertTrue(TodayGlow.isRecapDay("2026-10-19"))
+        assertFalse(TodayGlow.isRecapDay("2026-10-21"))
+        // A malformed date is not a recap day, rather than a crash in Swift.
+        assertFalse(TodayGlow.isRecapDay("not a date"))
+    }
+
+    @Test
+    fun `the morning and charge rules read ISO dates as Swift passes them`() {
+        assertTrue(TodayGlow.isMorning("2026-10-21", "2026-10-21", 8))
+        assertFalse(TodayGlow.isMorning("2026-10-21", "2026-10-21", 13))
+        assertTrue(
+            TodayGlow.chargeLeads(
+                "2026-10-21", "2026-10-21", chargeLatest = 60f, sleepEnd = epoch(8, 0), nowEpoch = epoch(11, 0), hour = 11,
+            ),
+        )
+        assertFalse(
+            TodayGlow.chargeLeads(
+                "2026-10-21", "2026-10-21", chargeLatest = 60f, sleepEnd = null, nowEpoch = epoch(11, 0), hour = 11,
+            ),
+        )
+        // The same rule over the day the screen holds: its own sleep end.
+        val dayWithSleep = DayUiState(date = day, sleep = SleepSession(start = epoch(0, 0), end = epoch(8, 0)))
+        assertTrue(TodayGlow.chargeLeads(dayWithSleep, "2026-10-21", chargeLatest = 60f, nowEpoch = epoch(11, 0), hour = 11))
+        assertFalse(TodayGlow.chargeLeads(DayUiState(date = day), "2026-10-21", chargeLatest = 60f, nowEpoch = epoch(11, 0), hour = 11))
+    }
+
+    @Test
+    fun `yesterday's readiness is the trend's second-to-last value`() {
+        val recovery = RecoveryResult(
+            date = day,
+            readiness = readiness(70),
+            charge = Recovery.ChargeDay(
+                points = emptyList(), latest = 60f, atWake = 50f, recharged = 10f, drainedExercise = 5f,
+                drainedStress = 2f, drainedLiving = 3f, highest = 70f, lowest = 40f, anchored = true,
+            ),
+            readinessTrend = listOf(day.minusDays(2) to 60, day.minusDays(1) to 74, day to 70),
+            load = 0f,
+            chronicLoad = null,
+            restingHr = 50f,
+            maxHr = 190f,
+            maxHrFromAge = false,
+            stressThreshold = Recovery.StressThreshold(value = 60, calmLevel = 20, days = 30),
+        )
+        assertEquals(74, TodayGlow.readinessBefore(recovery))
+        assertNull(TodayGlow.readinessBefore(null))
+    }
+
+    @Test
+    fun `a metric is found by the name the tile choice stores`() {
+        assertEquals(Metric.Spo2, TodayGlow.metric("Spo2"))
+        assertNull(TodayGlow.metric("GoneAway"))
+        assertEquals(TODAY_TILES, TodayGlow.allTodayTiles())
     }
 
     // ---- GlowTodayScreen.kt:167,175 TodayWorkouts --------------------------------------------------

@@ -18,7 +18,9 @@ import org.openstrap.app.data.DayStat
 import org.openstrap.app.data.HealthRepository
 import org.openstrap.app.data.RecoveryResult
 import org.openstrap.app.data.WorkoutAnalysis
+import org.openstrap.app.data.atStartOfDay
 import org.openstrap.app.data.db.OpenStrapIosDatabase
+import org.openstrap.app.data.db.StrapReadinessRow
 import org.openstrap.app.data.settings.Goals
 import org.openstrap.app.data.settings.SettingsRepository
 import org.openstrap.app.data.settings.UserProfile
@@ -87,6 +89,22 @@ class ScreenQueries(private val databasePath: String) {
     /** Local days the calendar lets you pick, oldest first, as `yyyy-MM-dd`. */
     fun daysWithData(onResult: (List<String>) -> Unit) = readAll({ emptyList() }, onResult) {
         dayState.daysWithData().map { it.toString() }.sorted()
+    }
+
+    /**
+     * The last month of [metric] ending on [date]: Today's Monday recap reads steps this way so
+     * both weeks it compares are inside the answer. Days without data are absent.
+     */
+    fun monthHistory(metric: Metric, date: String, onResult: (List<DayStat>) -> Unit) =
+        history(metric, Range.Month, date, onResult)
+
+    /**
+     * The strap's own Readiness for [date], or null when it reported none. Android's `strapReadiness`
+     * read: it stands in as "Strap's estimate" while OpenStrap's own score is withheld.
+     */
+    fun strapReadiness(date: String, onResult: (StrapReadinessRow?) -> Unit) = read(date, { null }, onResult) { d ->
+        val day = d.atStartOfDay(TimeZone.currentSystemDefault()).epochSeconds
+        healthDao.strapReadinessOnce(day, day).firstOrNull()
     }
 
     // ---- Workouts --------------------------------------------------------------------------------
