@@ -101,7 +101,9 @@ struct RecoveryScreen: View {
                 }
                 RecoveryScoreCard(model: RecoveryGlow.shared.card(r: rec, strap: health.strapReadinessRow))
                 if !ready.contributors.isEmpty {
-                    ContributorsPanel(readiness: ready)
+                    ContributorsPanel { unfolded in
+                        RecoveryGlow.shared.contributors(ready: ready, open: unfolded)
+                    }
                 }
                 RecoveryChargeCard(
                     model: RecoveryGlow.shared.chargeCard(c: rec.charge, dayStart: day.dayStart, dayEnd: day.dayEnd),
@@ -223,14 +225,16 @@ private struct BodySignalsAlertPanel: View {
 // MARK: - What drove it (ContributorsPanel, GlowRecoveryScreen.kt:296)
 
 /// The score's contributors, grouped by what they are about, folded to the heaviest few until the
-/// panel is tapped.
+/// panel is tapped. The model is rebuilt for the open state, so the fold rule stays Kotlin's; the
+/// builder keeps `Recovery.Readiness`, whose exported Swift name this file would otherwise have to
+/// spell, out of the signature (Today's screens pass it through the same way).
 private struct ContributorsPanel: View {
-    var readiness: RecoveryReadiness
+    var build: (Bool) -> ContributorsModel
 
     @State private var open = false
 
     var body: some View {
-        let model = RecoveryGlow.shared.contributors(ready: readiness, open: open)
+        let model = build(open)
         let unfold: (() -> Void)? = model.foldable ? { open = !open } : nil
         let expanded: Bool? = model.foldable ? open : nil
         return DotPanel(onClick: unfold) {

@@ -842,11 +842,11 @@ reaches, so iOS stacks them (`TodayScreen.swift:110`) exactly as Compose's phone
 | `morning = date == LocalDate.now() && hour < 12` (146) | `TodayGlow.isMorning` (TodayGlow.kt:269); the clock is `TodayFlags.now` (TodayScreen.swift:33) so the UI test can pin both orders | ported |
 | `hasSleep = asleepSeconds != null \|\| naps.isNotEmpty()` (156) | `TodayScreen.content` (TodayScreen.swift:103) | ported |
 | `chargeNow.minus(atWake)`, `readinessNow.minus(before)` (215-224, 271) | `TodayGlow.overview` (TodayGlow.kt:151); `readinessBefore` (:296) | ported |
-| `onOpenRecovery(RecoverySection)` from the card and the bar (242, 264) | `onOpenTab(.recovery)` (TodayScreen.swift:112-115) | ported as the tab tap; card U6 adds the section it lands on |
+| `onOpenRecovery(RecoverySection)` from the card and the bar (242, 264) | `onOpenTab(.recovery)` (TodayScreen.swift:112-115) | ported as the tab tap; the section it lands on is not: card U6 found the tab's scroll view belongs to `DayTab`/`PullSyncScroll`, shared by the four dated tabs, so `GlowRecoveryScreen.kt:70`'s `focus` has no hook yet (U6's own section, below) |
 | `onOpenSleep` from the Sleep bar and card (265, 490) | `onOpenTab(.sleep)` (TodayScreen.swift:115, 177) | ported |
 | `onOpenActivity` from the Activity card (466) | `onOpenTab(.activity)` (TodayScreen.swift:160) | ported |
-| `onOpenMetric(metric)` from the heart card, tiles and alerts (74, 163, 367) | `TodayRoute.metric(name)` → `TodayDetailPlaceholder` (TodayScreen.swift:928) | ported as the route: card U9 replaces the screen the route pushes |
-| `onOpenWorkout(start)` from the workouts rows (79, 178) | `TodayRoute.workout(start)` → `TodayDetailPlaceholder` (TodayScreen.swift:246) | ported as the route: card U9 replaces the screen |
+| `onOpenMetric(metric)` from the heart card, tiles and alerts (74, 163, 367) | `TodayRoute.metric(name)` → `MetricDetailPlaceholder` (TodayScreen.swift:928) | ported as the route: card U9 replaces the screen the route pushes |
+| `onOpenWorkout(start)` from the workouts rows (79, 178) | `TodayRoute.workout(start)` → `MetricDetailPlaceholder` (TodayScreen.swift:246) | ported as the route: card U9 replaces the screen |
 | `left`/`right` layout hints, two columns at 600 pt (141-170) | stacked in the same order (TodayScreen.swift:110) | not ported: the two-column branch; the app declares portrait only, so it never reaches 600 pt |
 | `contentPadding` from the shell | `DayTab`'s `.glowClearsNavBar()` (RootView.swift:176, card F4) | ported in U4/F4 |
 
@@ -962,6 +962,124 @@ ports there.
 | `overviewColor`'s four literals `0xFF6E7280`, `0xFFF2A33A`, `MetricColors.hrv`, `0xFFF0605A` (GlowTodayScreen.kt:357-363) | `MetricColors.overview(_:)` (Theme.swift:170) | ported, and pinned case by case in `GlowCardTests.testEveryOverviewToneGetsTheAndroidColour` (card F6) |
 | What changed's accents — heart, hrv, spo2, temperature, stress, sleepLight (GlowTodayScreen.kt:416-424) | `MetricColors.signal(_:)` (Theme.swift:177) | ported |
 | the three score accents — chargeDeep, readinessDeep, SleepGlow's sleepDeep (GlowTodayScreen.kt:215-224) | `MetricColors.today(_:)` (Theme.swift:191) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt` (card U6)
+
+The Recovery tab, section by section in Compose's order (the list, `:76-95`): `DateHeader`,
+`BodySignalsPanel`, `RecoveryCard`, `ContributorsPanel`, `ChargeCard`, `ChargeFlowPanel`,
+`SignalsPanel`, `HowItWorksPanel`. On a phone every block stacks in that order, and the two-column
+`left`/`right` panes are not reached (portrait only), as on Today.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `RecoverySection { Recovery, Charge }` (54) | `TodayRoute`'s metric push is the only cross-tab hook iOS has; the section a Today tap targets is not carried (see the `focus` row) | not ported: the tab's scroll view belongs to `DayTab`/`PullSyncScroll`, shared by the four dated tabs; Today's taps still open the tab (RootView.swift:85-88) |
+| `GlowScreenList(contentPadding, list, scrollTo = focus, onScrolled = onFocused)` (76) | the tab's list is `DayTab`'s `PullSyncScroll` + a `VStack` spaced `GlowLayout.columnGap` (RecoveryScreen.swift:95), with `glowCardPadding` set to `wideCardPadding` (RecoveryScreen.swift:90) | ported, except `scrollTo`/`focus` (row above) |
+| `full { DateHeader(...) }` (77) | `DateHeader` in `DayTab` (RootView.swift:164-172), ported by card U4 | ported |
+| `recovery?.takeIf { it.date == state.date }` (78) | `RecoveryGlow.forDay` (RecoveryGlow.kt:190), called at RecoveryScreen.swift:94 | ported |
+| `DotPanel { Text("Calculating…", bodyMedium, white 75%) }` (79-81) | `DotPanel` + `Text("Calculating…")` (RecoveryScreen.swift:119-124) | ported |
+| Body-signal alert leads when `state != Normal` (87-88) | `if body.state.name != "Normal"` → `BodySignalsAlertPanel` (RecoveryScreen.swift:98-100) | ported |
+| `BodySignalsCopy.TITLE` "Body signals off baseline" (178) | `BodySignalsModel.title` (RecoveryGlow.kt:152), drawn at RecoveryScreen.swift:209 | ported |
+| `trailing = if (alert) null else "Watching"` (178) | `RecoveryGlow.bodySignals(...).trailing` (RecoveryGlow.kt:522), drawn at RecoveryScreen.swift:209 | ported |
+| `warning = alert` (178) | `warning: model.alert` (RecoveryScreen.swift:209) | ported |
+| the signals sentence: `<Signals, capitalised>. ` + alert's `CAUSES ADVICE`, else "One signal is outside your usual range. OpenStrap is keeping an eye on it." (179-183) | `RecoveryGlow.bodySignals` (RecoveryGlow.kt:520-528) | ported |
+| `Note("Likely cause: ${causes.joinToString(", ")}.")` (184) | `BodySignalsModel.cause` (RecoveryGlow.kt:529) | ported |
+| `Note(BodySignalsCopy.DISCLAIMER)` "This is a wellness estimate, not a medical assessment." (185) | `BodySignalsModel.disclaimer` (RecoveryGlow.kt:530) | ported |
+| `RecoveryCard` glow: `GlowStyle.Bloom` + radial core 0.5/0.8, 0.95×0.75, blur 30, tone 16, shift −10, glow 0.6, bevel 0.6, `Breath(5f)`, `depth = 6.dp` (109-114) | `RecoveryScoreCard.style` (RecoveryScreen.swift:138-156); the slab itself is card F6's in `GlowCard.swift` | ported |
+| `GlowHeader("Recovery", trailing = …)` (117) | `GlowHeader("Recovery", …)` (RecoveryScreen.swift:160) | ported |
+| trailing: `"Learning ${n}/${SCORED_NIGHTS} nights"` / `"Learning ${n}/${SETTLED_NIGHTS} nights"` / `"Calibrated · " + vsYesterday` / `"Calibrated"` / `vsYesterday` / null (119-127) | `RecoveryGlow.trailing` (RecoveryGlow.kt:244-254), in `RecoveryCardModel.trailing` | ported |
+| `"Steady vs yesterday"`, `"+4 vs yesterday"`, `−3 vs yesterday` (218-219) | `RecoveryGlow.vsYesterday` (RecoveryGlow.kt:267) | ported |
+| "Recovery is scored each morning from the night's sleep. Wear the strap to bed." (134) | `noScoreBody`, first branch (RecoveryGlow.kt:258) | ported |
+| "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate." (135-136) | `noScoreBody`, withheld branch (RecoveryGlow.kt:259-261) | ported |
+| "Last night's HRV and resting heart rate didn't have enough clean readings, so there's no Recovery score today. Sleep alone isn't readiness." (137) | `noScoreBody`, else branch (RecoveryGlow.kt:262-265) | ported |
+| `Note("Sleep ${sleep.score} · ${sleep.detail}")` (141) | `RecoveryCardModel.sleepNote` (RecoveryGlow.kt:210) | ported |
+| `Fact("Strap's estimate", "$strapScore")` while `showStrapEstimate` (145) | `RecoveryCardModel.strapValue` (RecoveryGlow.kt:211), drawn with the label at RecoveryScreen.swift:188 | ported |
+| strap parts: `"HRV 70 · resting HR 66 · temperature 60 · breathing 55"` + ". Shown for reference; it never enters OpenStrap's score." (146-150) | `RecoveryCardModel.strapNote` (RecoveryGlow.kt:212-216) | ported |
+| `Note("HRV ${it.toInt()} ms (strap fallback)")`, `Note("Resting HR ${it.toInt()} bpm (strap fallback)")` (152-153) | `RecoveryCardModel.notes` (RecoveryGlow.kt:217-222) | ported |
+| `GlowHeroNumber("$score", "/ 100", listOf(Narrative.readinessHeadline(score, strainAlert)))` (156) | `GlowHeroNumber(...)` (RecoveryScreen.swift:163); the headline is `RecoveryCardModel.heroFacts` (RecoveryGlow.kt:229) | ported |
+| `Spacer(12)` + `Text(Narrative.readinessBody(ready), white 85%)` (157-158) | `Color.clear.frame(height: 12)` + the body text (RecoveryScreen.swift:164-170); the sentence is `heroBody` (RecoveryGlow.kt:230) | ported |
+| `GlowChartGap()` + `GlowTrend(days, height = ChartHeight)` when any day has a score (159-165) | `GlowChartGap` + `GlowTrend` (RecoveryScreen.swift:171-178); `hasTrend`/`trend` (RecoveryGlow.kt:231-232, 271) | ported |
+| `GlowDay(dayOfWeek SHORT take(2), v?.toFloat())` (162) | `RecoveryTrendDay.label` (RecoveryGlow.kt:271-274), the `WEEKDAYS` table cut to two letters | ported |
+| `ChargeCard(c, dayStart..dayEnd)` (91) | `RecoveryChargeCard` (RecoveryScreen.swift:271), model from `RecoveryGlow.chargeCard` (RecoveryGlow.kt:282) | ported |
+| `HOURS = 00, 06, 12, 18, 24` (101) | `CHARGE_HOURS` (RecoveryGlow.kt:178), `ChargeCardModel.labels` | ported |
+| Charge glow: `GlowStyle.Ember` + `chargeAt(now)` + `Breath(4f)` (193) | `RecoveryChargeCard.style` (RecoveryScreen.swift:275-280) | ported |
+| `GlowHeader("Charge", trailing = "$atWake at waking")` (196) | `ChargeCardModel.trailing` (RecoveryGlow.kt:291), drawn at RecoveryScreen.swift:291 | ported |
+| "Charge starts after your first night wearing the strap. Sleep is what fills it, so it needs one to measure from." (198) / "Charge appears once the strap has a few hours of heart rate." (199) (200-205) | `ChargeCardModel.hint` (RecoveryGlow.kt:285-290), drawn at RecoveryScreen.swift:293-296 | ported |
+| `GlowHeroNumber("${now.toInt()}", "/ 100", listOf(chargeHeadline, "${signed(recharged,+1)} · ${signed(drained,-1)}"))` (207-208) | `ChargeCardModel.value/unit/facts` (RecoveryGlow.kt:292-301), drawn at RecoveryScreen.swift:298 | ported |
+| `"−0" reads oddly, so zero prints "0"` (251-254) | `RecoveryGlow.signed` (RecoveryGlow.kt:334) | ported |
+| `GlowLineChart(bucket(points, day, 900), height = ChartHeight, labels = HOURS, showAverage = false, yRange = 0..100, readout "${v.toInt()} · ${clock(day.first + i*15*60)}")` (210-214) | `ChargeCardModel.values` (RecoveryGlow.kt:308) + `GlowLineChart` (RecoveryScreen.swift:302-313) + `chargeReadout` (RecoveryGlow.kt:312) | ported |
+| `bucket(points, range, seconds)` — 15-minute averages, empty buckets as gaps (222-231) | `RecoveryGlow.bucket` (RecoveryGlow.kt:322) | ported |
+| `ChargeFlowPanel` shown when `charge.latest != null` (92) | `if rec.charge.latest != nil` → `ChargeFlowPanel` (RecoveryScreen.swift:108-110) | ported |
+| `DotHeader("Where your charge went")` (239) | `DotHeader("Where your charge went")` (RecoveryScreen.swift:325) | ported |
+| rows: "Sleep and calm rest", "Movement and exercise", "Physiological stress (estimate)", "Being awake", each `signed` and a fraction of `max(recharged, drain, 1)` (241-244) | `RecoveryGlow.flow` (RecoveryGlow.kt:341-357), drawn at RecoveryScreen.swift:326-338 | ported |
+| `GlowBar(fraction, color)` per row (263) | `GlowBar` (GlowRecoveryParts.swift:14), colours from `RecoveryColors.flow` (RecoveryScreen.swift:37) | ported |
+| `Note("Highest ${highest.toInt()} · lowest ${lowest.toInt()} this day")` (245) | `ChargeFlowModel.highLow` (RecoveryGlow.kt:361-365) | ported |
+| `Note(Narrative.stressThreshold(threshold))` (246) | `ChargeFlowModel.stressNote` (RecoveryGlow.kt:366) | ported |
+| `ContributorsPanel` shown when `contributors.isNotEmpty()` (90) | `if !ready.contributors.isEmpty` (RecoveryScreen.swift:102-104) | ported |
+| `DotPanel(onClick = if (folds) toggle else null)` (306) | `DotPanel(onClick: unfold)` (RecoveryScreen.swift:237) | ported |
+| `DotHeader("What drove it", trailing = "Top 3 of N", expanded = open)` (307) | `DotHeader("What drove it", …)` (RecoveryScreen.swift:238); `trailing`/`foldable` (RecoveryGlow.kt:404-405) | ported |
+| groups `Body` / `Sleep` / `Load`, uppercase, `DotDivider()` between them (302-313) | `ContributorGroup.name/afterDivider` (RecoveryGlow.kt:396-402), drawn at RecoveryScreen.swift:239-246 | ported |
+| rows: factor label, `Narrative.ratingFor(score).label` in its colour, `Note(detail)`, `GlowBar(score/100f, rating.color)` (316-325) | `ContributorRow` (RecoveryGlow.kt:114) + `SignalTileView`-style row (RecoveryScreen.swift:247-262); colours from `RecoveryColors.rating` (RecoveryScreen.swift:48) | ported |
+| fold: `size > CONTRIBUTORS_FOLDED`, `sortedByDescending { weight }.take(3).toSet()` (297-300, 339) | `RecoveryGlow.contributors` (RecoveryGlow.kt:367-372), `CONTRIBUTORS_FOLDED` (RecoveryGlow.kt:181) | ported |
+| `Note("Capped: one body signal is far from your normal, so good sleep can't fully make up for it.")` (327) | `ContributorsModel.notes` (RecoveryGlow.kt:406-410) | ported |
+| `Note("7-night HRV is $word your normal range" + " (thin: N of 7 nights).")` (328-331) | `RecoveryGlow.contributors` (RecoveryGlow.kt:411-415) | ported |
+| fallback notes with ": our own reading wasn't clean enough last night." (332-333) | `RecoveryGlow.contributors` (RecoveryGlow.kt:416-421) | ported |
+| `Note("Check: $it")` per quality flag (334) | `RecoveryGlow.contributors` (RecoveryGlow.kt:422) | ported |
+| `SignalsPanel` → `DotHeader("Body signals", trailing = "vs. your normal")` (390) | `DotHeader("Body signals", trailing: "vs. your normal")` (RecoveryScreen.swift:356) | ported |
+| `TileGrid(signals)` two columns, `GlowTile(label, accent, onClick, …)` (391, 411) | `TileGrid` + `GlowTile` (RecoveryScreen.swift:357-359, 391) | ported |
+| tiles: "Resting HR", "HRV", "Skin temp", "Breathing", "Blood oxygen", "Stress" (374-382) | `RecoveryGlow.signals` (RecoveryGlow.kt:430-470) | ported |
+| value + unit on the number's baseline, unit at 60% (413-421) | `SignalTileView` (RecoveryScreen.swift:392-404) | ported |
+| `StatusPill(word ?: "Normal", TrendGood/TrendBad, alpha 0 when no word)` (423-426) | `SignalTileView` (RecoveryScreen.swift:405-408) | ported |
+| word: `1 -> up`, `-1 -> down`, `0 -> "Normal"`, else null; Faster/Slower for resting HR (405-410, 374) | `RecoveryGlow.build` (RecoveryGlow.kt:474-505) | ported |
+| skin temperature as `±deviation` from the normal, `m.format(abs(d))` (399-404) | `RecoveryGlow.build` (RecoveryGlow.kt:490-497) | ported |
+| `Sparkline(s.week, accent, height 22, top 10)` (428) | `Sparkline` (GlowRecoveryParts.swift:99), drawn at RecoveryScreen.swift:411-412 | ported |
+| `Sparkline` itself: dots joined by a faint line, gaps, last day at full colour (434-452) | `Sparkline` (GlowRecoveryParts.swift:99-140) | ported |
+| `Note("Your normal builds over the first week of wear; until then each signal shows its week.")` (392) | `SignalsModel.note` (RecoveryGlow.kt:466-471) | ported |
+| a tile opens its metric (`onOpenMetric`) (391) | `route = .metric(metric.name)` → `MetricDetailPlaceholder` (RecoveryScreen.swift:113-116, 85-92) | ported as a placeholder: card U9 builds the real detail |
+| `HowItWorksPanel` (466-496) | `HowItWorksPanel` (RecoveryScreen.swift:425) | ported |
+| `DotPanel(onClick = { open = !open })` + `DotHeader("How it works", expanded = open)` (468-470) | `DotPanel(onClick:)` + `DotHeader("How it works", expanded: open)` (RecoveryScreen.swift:431-433) | ported |
+| "Each morning OpenStrap compares your night … one signal far from normal caps it." (471-476) | `HowItWorksModel.explainer` (RecoveryGlow.kt:542-546) | ported |
+| "Charge is a running battery: sleep and calm rest fill it, movement, stress and simply being awake drain it." (477-480) | `HowItWorksModel.chargeExplainer` (RecoveryGlow.kt:547-548) | ported |
+| `Fact("The strap's own score", "$strapScore")` / `Fact("Ours", "$ours")` (484-488) | `HowItWorksModel.strapLabel/strapValue/oursLabel/oursValue` (RecoveryGlow.kt:549-552), drawn at RecoveryScreen.swift:437-446 | ported |
+| "The strap's score doesn't count sleep length … once there are a couple of weeks to compare." (489-492) | `HowItWorksModel.strapNote` (RecoveryGlow.kt:553-557) | ported |
+| `Note(BodySignalsCopy.DISCLAIMER)` (494) | `HowItWorksModel.disclaimer` (RecoveryGlow.kt:558) | ported |
+| "Training load" (the card body's section) | — | not ported: no such section exists in this file — the panel title lives only in `GlowActivityScreen.kt:272` (card U8); the Load factor shows in "What drove it" (`Recovery.Factor.PreviousDayLoad`) and in the How it works paragraph, both ported above |
+| `GlowBar` (272-290) | `GlowBar` (GlowRecoveryParts.swift:14) | ported by card U5 |
+| `Note(text)` (292) | `QuietNote` (GlowRecoveryParts.swift:74) | ported by card U5 |
+| `Fact(label, value)` (457-462) | `Fact` (GlowRecoveryParts.swift:76) | ported by card U5 |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/ChargeCard.kt` (card U6's reading of it)
+
+The Recovery tab draws the glow `ChargeCard` inside `GlowRecoveryScreen.kt:191`, not this dashboard
+`Panel`, and words the at-waking note "at waking" where this file says "Woke at". The parts of this
+file that do reach the tab are ported from the glow card; the rest belongs to the non-glow dashboard
+iOS does not have.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `PanelHeader("Charge", Lightning, chargeAt(latest), trailing = "Woke at N")` (75) | `GlowHeader("Charge", trailing: "N at waking")` (RecoveryScreen.swift:291, from `RecoveryGlow.chargeCard`) | ported in the glow card's wording, per GlowRecoveryScreen.kt:196 |
+| `EmptyHint("Charge starts after your first night wearing the strap. …")` (77-80) | `ChargeCardModel.hint` (RecoveryGlow.kt:286-288) | ported |
+| `EmptyHint("Charge appears once the strap has a few hours of heart rate.")` (81-84) | `ChargeCardModel.hint` (RecoveryGlow.kt:289) | ported |
+| `BigValue("${now.toInt()}", "/ 100", caption = chargeHeadline)` + Recharged / Drained (85-90) | `ChargeCardModel.value/unit/facts` (RecoveryGlow.kt:292-301) | ported: one hero with "+41 · −33", as the glow card draws it (GlowRecoveryScreen.kt:208) |
+| `LineChart(points, chargeAt(now), dayRange, height = 130.dp, band = sleepBand, segments = chargeSegments(points), valueGradient = chargeScale)` (91-95) | `GlowLineChart` over `ChargeCardModel.values`, height `GlowLayout.chartHeight` (RecoveryScreen.swift:302-313) | not ported: this file's chart carries the sleep band, the state strip and the value gradient; the Recovery tab's chart is the glow one (`GlowRecoveryScreen.kt:211`: no band, no segments, `yRange = 0..100`), which is what Swift draws |
+| `chargeSegments(points)` — 15-minute most-common state, joined (49-61) | — | not ported: only the dashboard chart draws the strip (`:93`); the glow chart does not take segments |
+| `STATE_COLORS` per state (35-42) and `LegendDot("Sleep"/"Calm"/"Active"/"Physiological stress")` (96-101) | — | not ported: the legend belongs to the dashboard Panel, which no live screen calls; the Recovery tab's Charge card has no legend (GlowRecoveryScreen.kt:191-216) |
+| `HowItWorks()` and `ExplainerSection` (105-160) | — | not ported: private to this file and not called from it; the Recovery tab's "How it works" is GlowRecoveryScreen.kt:466-496, ported above |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowQuiet.kt` — the tiles Recovery draws with (card U6)
+
+`DotPanel`, `DotHeader`, `GlowTile`, `TileGrid`, `StatusPill`, `DotDivider`, `glass` and `DotStatTile`
+were ported by card U2 (`GlowQuiet.swift`). Card U6 only consumes them; no rows change. The one
+element the Recovery screen brings into Swift from elsewhere in that file's language is `Sparkline`,
+which lives in `GlowRecoveryScreen.kt:434` and is filed under that section above.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GlowTile(label, accent, onClick, modifier, content)` (170-191) | `GlowTile` (GlowQuiet.swift:234) | ported by U2, used for the six tiles (RecoveryScreen.swift:391) |
+| `TileGrid(items, tile)` (204-213) | `TileGrid` (GlowQuiet.swift:288) | ported by U2, used at RecoveryScreen.swift:357 |
+| `StatusPill(text, color)` (195-200) | `StatusPill` (GlowQuiet.swift:322) | ported by U2, used at RecoveryScreen.swift:405 |
+| `DotDivider()` (126-134) | `DotDivider` (GlowQuiet.swift:158) | ported by U2, used between contributor groups (RecoveryScreen.swift:241) |
+| `DotHeader(title, trailing, chevron, warning, expanded)` (88-109) | `DotHeader` (GlowQuiet.swift:88) | ported by U2; Recovery uses `trailing`, `warning` and `expanded` |
+| `glowInk`-based text colours: title white, trailing 70%, group label 55% (94-95, 314) | `glowInk`, `.opacity(0.7)`, `.opacity(0.55)` (RecoveryScreen.swift:244, 248-250) | ported |
 
 ## Not in this card
 

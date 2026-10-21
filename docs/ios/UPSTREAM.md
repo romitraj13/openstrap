@@ -859,3 +859,94 @@ same clamped-frame cause), 39652336343 (`testEveryTabAndYouScreen`: `licence.OFL
 matched two texts, because `LicencesView` puts an identifier on a DotPanel — fixed test-side in
 `clearsNavBar`, card F4 told), and 39661545695 / 39664474482 (red only on card F2's recorded
 `testDesignLab` query timeout, retried as U4 did).
+
+## Card U6 (Recovery)
+
+### Kotlin copied out of the Compose screens (standing instruction 5)
+
+`GlowRecoveryScreen.kt` works out more than formatting: which sentence a day without a score leads
+with, how far the score moved and against what, the seven-day trend's labels, Charge's quarter-hour
+buckets and their clock readouts, the fold of the contributors, and the six body signals with their
+normal, their word against it and their week. All of it is in one shared file, in the package of the
+Compose file it came from, with JVM tests; Swift draws only what it returns.
+
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:78        -> shared/src/commonMain/kotlin/org/openstrap/app/ui/glow/RecoveryGlow.kt  forDay (recovery?.takeIf { it.date == state.date })
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:101       -> RecoveryGlow.kt  CHARGE_HOURS
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:105-168   -> RecoveryGlow.kt  card, RecoveryCardModel, RecoveryTrendDay, trailing, noScoreBody, trend
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:175-187   -> RecoveryGlow.kt  bodySignals, BodySignalsModel
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:191-216   -> RecoveryGlow.kt  chargeCard, ChargeCardModel
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:218-219   -> RecoveryGlow.kt  vsYesterday
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:222-233   -> RecoveryGlow.kt  chargeBuckets, chargeReadout, clock
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:237-254   -> RecoveryGlow.kt  flow, ChargeFlowModel, ChargeFlowRow, ChargeFlowAccent, signed
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:296-339   -> RecoveryGlow.kt  contributors, ContributorsModel, ContributorGroup, ContributorRow, CONTRIBUTORS_FOLDED
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:344-356   -> RecoveryGlow.kt  (BodySignal; built inside signals)
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:360-430   -> RecoveryGlow.kt  signals, SignalsModel, BodySignalTile
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:466-496   -> RecoveryGlow.kt  howItWorks, HowItWorksModel
+
+Reads added to the screen layer, not copied from Compose:
+
+    app/src/main/kotlin/org/openstrap/app/ui/glow/GlowRecoveryScreen.kt:360-384   -> shared/src/commonMain/kotlin/org/openstrap/shared/screens/ScreenQueries.kt  signalHistories, and `SignalHistories` (six month-long reads in one pass)
+    (the strap's whole row)                                                     -> ScreenQueries.strapReadiness, which HealthModel now keeps whole (`strapReadinessRow`)
+
+Drawn in Swift, not computed there: `Sparkline` (`GlowRecoveryParts.swift`), the two glow cards'
+`GlowStyle`s, the tile and flow-row colours, and the panels' layouts.
+
+What changed in the move, and why:
+
+- `java.time` is `kotlinx.datetime`, as in cards U4 and U5: `Instant.ofEpochSecond(…).atZone(zone)`
+  is `Instant.fromEpochSeconds(…).toLocalDateTime(zone)`; `clock` keeps a `zone` overload for the
+  tests and a one-argument form that fills in the phone's zone for Swift, because Kotlin/Native does
+  not export default arguments.
+- Compose passes `Color` values into the flow rows and the signal tiles (`MetricColors.good`,
+  `.steps`, `.stress`, `.sleepLight`, `.heart`, `.hrv`, `.temperature`, `.spo2`). `shared/` has no
+  colour type, so the models carry a name (`ChargeFlowAccent`, `RecoveryAccent`) and
+  `RecoveryScreen.swift` maps it to `Theme.swift`'s token, exactly as `TodayGlow`'s `SignalAccent`
+  does.
+- `recoveryColor(score, strain)` is `TodayGlow.overviewTone` plus `MetricColors.overview`, which card
+  F6 made switch on the enum: the same five bands the Android `overviewColor` returns
+  (`GlowTodayScreen.kt:357-363`), so the Recovery card cannot drift from Today's.
+- `Narrative.ratingFor` comes from the shared copy (`app/data/Narrative.kt`), whose `Rating` has no
+  colour; the four colours are `MetricColors.good` / `.hrv` / `.warn` / `.stress` as the dashboard
+  `Narrative.Rating` declares them (`ui/dashboard/Narrative.kt:14-19`), mapped in
+  `RecoveryScreen.swift`.
+- `signed(v, sign)` truncates with `toInt()`, as Compose does: `Resting HR 54.6` prints 54, not 55.
+- The contributors' fold uses Compose's `sortedByDescending { it.factor.weight }.take(3).toSet()`
+  over the contributors themselves, then re-filters in the original order, so the rows keep
+  Compose's order inside each group rather than the weight order it selected them by.
+
+Tests: `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/RecoveryGlowTest.kt`, 40 tests (the
+header note's five forms, the three no-score sentences, the sleep contributor's note, the strap's
+estimate and its parts, the strap's fallbacks, the hero's headline and body, the trend's two-letter
+weekdays and its empty case, Charge's at-waking note and its four hint/fact forms, `signed`'s zero,
+the 96 quarter-hour buckets and their clock readout, the four flow rows' signs and fractions, the
+highest/lowest note, the contributors' fold and unfold, Compose's group order with its rules, the
+five caveat notes, the six tiles' order/units/accents, faster/slower vs higher/lower, the skin
+temperature deviation, a missing reading, the seven-day week with gaps, the normal note, the alert's
+and the watch's wording, How it works' comparison and its two paragraphs, `forDay`, the empty
+histories and the 30-day window), and `TodayQueriesTest.kt` gained one (a real database: the six
+signals' month, the four the seed writes every day and the two it never writes, the window's last
+day, and a malformed date answering six empty lists). `:shared:jvmTest` 314 -> 356 tests, 0 failures,
+1 opt-in skip.
+
+### Not copied
+
+- The `left`/`right` two-column layout: the app declares portrait only, so the 600 pt branch is never
+  reached; Recovery stacks its blocks in Compose's phone order, as Today does.
+- `focus` / `onFocused` and `GlowScreenList`'s `scrollTo`: Android scrolls the Recovery tab to the
+  Recovery or Charge section when Today's top card opens it. On iOS the tab's scroll view belongs to
+  `DayTab`/`PullSyncScroll`, which the four dated tabs share, so the hook is not this card's to add;
+  Today's two taps still open the tab, which is the user-visible step. Recorded in UI-PARITY.md.
+- `ui/dashboard/ChargeCard.kt`: the Recovery tab draws the glow `ChargeCard` inside
+  `GlowRecoveryScreen.kt:191`, not this dashboard `Panel`; its state strip and legend belong to the
+  non-glow dashboard iOS does not have. The parts that do show on the tab (the headline, the two
+  empty hints, the at-waking note) are ported from the glow card, which words the note "at waking"
+  where the dashboard says "Woke at". Every row of the dashboard file is in UI-PARITY.md with that
+  reason.
+- The "Training load" section the card's body names: none of the three named Compose files has one.
+  `Training load` as a panel title exists only in `GlowActivityScreen.kt:272` (card U8); on Recovery
+  the Load factor appears inside "What drove it" (`Recovery.Factor.PreviousDayLoad`) and in "How it
+  works". Nothing was invented to fill it; the parity table says so on the row.
+
+### What the CI runs found
+
+(see the summary of card t_3a1afc6f for the run ids and what each cost)

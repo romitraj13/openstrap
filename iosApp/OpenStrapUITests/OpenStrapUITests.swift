@@ -270,7 +270,7 @@ final class OpenStrapUITests: XCTestCase {
         )
         app.buttons["Recovery"].tap()
         XCTAssertTrue(
-            app.staticTexts["recovery.title"].waitForExistence(timeout: 60),
+            app.staticTexts["recovery.title"].firstMatch.waitForExistence(timeout: 60),
             "The Recovery tab never drew its score card"
         )
 
@@ -281,13 +281,19 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(missing.isEmpty, "Recovery never drew: \(missing)")
         walk(app, prefix: "U6-recovery", milestones: sections, screenfuls: 5)
 
-        // "How it works" is folded away: the last block of the screen is its header, so the walk
-        // above ends on it. Tapping it opens Compose's two paragraphs.
-        app.staticTexts["How it works"].tap()
+        // "How it works" is folded away at the bottom of the screen: scroll until it can take a tap,
+        // then open it for Compose's two paragraphs.
+        let howItWorks = app.staticTexts["How it works"]
+        for _ in 0..<6 where !howItWorks.isHittable {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.4)
+        }
+        XCTAssertTrue(howItWorks.isHittable, "How it works never came into reach")
+        howItWorks.tap()
         let chargeParagraph = "Charge is a running battery: sleep and calm rest fill it, movement, stress "
             + "and simply being awake drain it."
         XCTAssertTrue(
-            app.staticTexts[chargeParagraph].waitForExistence(timeout: 30),
+            app.staticTexts[chargeParagraph].firstMatch.waitForExistence(timeout: 30),
             "Tapping How it works opened nothing"
         )
         attach(app, "U6-recovery-6")
@@ -302,7 +308,7 @@ final class OpenStrapUITests: XCTestCase {
         // score needs, so the card says what it is waiting for (GlowRecoveryScreen.kt:135-137).
         scrollToTop(app)
         let learning = "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate."
-        let body = app.staticTexts["recovery.body"]
+        let body = app.staticTexts["recovery.body"].firstMatch
         let previous = app.buttons["date.previous"]
         XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
         var found = false
