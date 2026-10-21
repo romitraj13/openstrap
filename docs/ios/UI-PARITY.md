@@ -953,6 +953,7 @@ ports there.
 | Compose element or string (file:line) | Swift (file:line) | Status |
 |---|---|---|
 | `contentPadding: PaddingValues = LocalCardPadding.current` (96) | `GlowCard`'s `contentPadding ?? cardPadding` (GlowCard.swift:244); the inset comes from `glowCardPadding`, which `GlowScreenList` sets and Today sets to `wideCardPadding` (TodayScreen.swift:79) | ported |
+| the card measures from its content (`Column(Modifier.padding(contentPadding))` inside a `Box` that wraps the content, 108-160) | `GlowCard(sizesToContent: true)` (GlowCard.swift:245-252) draws the glow behind the content, so the content sets the height; Today's four cards use it (TodayScreen.swift:287, 656, 726, 762). The older `GeometryReader` form is kept for the Design lab, which imposes `frame(height: 160)` | ported |
 
 ## `app/src/main/kotlin/org/openstrap/app/ui/theme/Theme.kt` — the colours Today names (card U5)
 

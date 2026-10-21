@@ -845,6 +845,13 @@ Two traps in one screen, both worth knowing before U6-U9:
   is the same behaviour.
 - **The floating bar eats a tap that lands on its rectangle**, including a line that is "in the
   window" and reports `isHittable == true`. Anything a test taps must be above `navBar.top`.
+- **`GlowCard` must be told to size from its content.** SwiftUI's bare `GeometryReader` has no
+  height of its own, so a glow card in a `VStack` that proposes none collapses to 10 pt with its
+  text clipped — which is what the first screenshots showed: every Today card was a thin coloured
+  capsule, and the page looked like the overview and the three glowing cards were missing. Compose
+  measures a card from its content, so `GlowCard(sizesToContent: true)` now draws the glow behind
+  the content and lets the content set the height. The Design lab keeps the old form, which is only
+  ever right under its `frame(height: 160)`.
 
 Red runs, in order: 39640117088 (the two interop errors), 39644024771 / 39647481836 / 39649434424 /
 39655540385 / 39658773525 (`testToday`'s off-screen tap, one hypothesis each, the last five all the
