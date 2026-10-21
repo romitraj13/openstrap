@@ -149,13 +149,18 @@ final class OpenStrapUITests: XCTestCase {
             print("F4 \(screen): there is no navBar.top. Tree:\n\(app.debugDescription)")
             return "\(screen): the floating bar never reported its top edge"
         }
-        let row = app.descendants(matching: .any)[identifier]
+        let row = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
         guard row.waitForExistence(timeout: 30) else {
             return "\(screen): \(identifier) never appeared"
         }
         scrollToEnd(app, until: row)
         let barTop = bar.frame.minY
-        let rowBottom = row.frame.maxY
+        // An identifier set on a container is repeated by SwiftUI on every text inside it
+        // (`LicencesView`'s DotPanel does this, so `licence.OFL-MuseoModerno` matches the label and
+        // the body). The row's bottom edge is what must clear the bar, so measure the lowest match.
+        let lowest = app.descendants(matching: .any).matching(identifier: identifier)
+            .allElementsBoundByIndex.max { $0.frame.maxY < $1.frame.maxY }
+        let rowBottom = (lowest ?? row).frame.maxY
         print("F4 \(screen): \(identifier) maxY=\(rowBottom) barTop=\(barTop) window=\(app.windows.firstMatch.frame)")
         guard rowBottom <= barTop else {
             return "\(screen): \(identifier) ends at \(rowBottom), under the floating bar whose top is "
@@ -230,6 +235,33 @@ final class OpenStrapUITests: XCTestCase {
         row.tap()
     }
 
+    /// Tap a line of text, dragging the list first so the line is really on screen.
+    ///
+    /// `staticTexts[...].tap()` resolves the element and taps the coordinates it would occupy, so an
+    /// off-screen match taps whatever card is at those points (card U5: "Heart rate" opened Sleep from
+    /// the overview card instead). The direction follows the frame, so a line above the viewport is
+    /// reached too.
+    private func tapText(_ app: XCUIApplication, _ label: String) {
+        let element = app.staticTexts[label]
+        XCTAssertTrue(element.waitForExistence(timeout: 30), "\(label) never appeared")
+        let window = app.windows.firstMatch.frame
+        var drags = 0
+        while drags < 20 {
+            let frame = element.frame
+            let inside = frame.minY >= window.minY && frame.maxY <= window.maxY
+            if inside && element.isHittable { break }
+            if frame.minY > window.midY {
+                drag(app, from: 0.78, to: 0.22)
+            } else {
+                drag(app, from: 0.22, to: 0.78)
+            }
+            Thread.sleep(forTimeInterval: 0.25)
+            drags += 1
+        }
+        XCTAssertTrue(element.isHittable, "\(label) never came on screen")
+        element.tap()
+    }
+
     /// A medium sheet has no close button: drag it down, as a finger would.
     private func dismissSheet(_ app: XCUIApplication) {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -272,8 +304,11 @@ final class OpenStrapUITests: XCTestCase {
         app.buttons["tiles.cancel"].tap()
         XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 30), "Cancel never closed the tile chooser")
 
-        // A metric tap pushes the detail route card U9 fills in.
-        app.staticTexts["Heart rate"].tap()
+        // A metric tap pushes the detail route card U9 fills in. The line is below the fold at the
+        // top of Today, so bring it on screen first: tapping an off-screen element taps the
+        // coordinates it would have had, which in `U5-today`'s first run landed on the overview
+        // card's Sleep bar and opened Sleep instead.
+        tapText(app, "Heart rate")
         if !app.staticTexts["today.detail"].waitForExistence(timeout: 30) {
             attach(app, "U5-detail-missing")
             print("U5 after tapping Heart rate:\n\(app.debugDescription)")

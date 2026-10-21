@@ -894,7 +894,7 @@ reaches, so iOS stacks them (`TodayScreen.swift:110`) exactly as Compose's phone
 | Compose element or string (file:line) | Swift (file:line) | Status |
 |---|---|---|
 | `NapsPanel(naps, onClick)` (21-27) | — | not ported: this composable is not called by any live screen (GlowSleepScreen.kt:300 has its own naps panel for the Sleep tab); the naps Today shows are its sleep card's line (`GlowTodayScreen.kt:503-513`), ported as `TodayGlow.napsLine` (TodayGlow.kt:424) |
-| `PanelHeader("Naps", Moon, sleepLight, chevron)` (23) | — | not ported, same reason: Today has no separate naps panel, as its Compose source has none |
+| `PanelHeader("Naps", Moon, sleepLight, chevron)` (23) | — | not ported: the same reason as the panel above — Today has no separate naps panel, as its Compose source has none |
 | `"HH:mm – HH:mm · duration"` per nap (25) | `TodayGlow.napsLine` (TodayGlow.kt:424) carries the same figures into Today's sleep card | ported where Today shows naps |
 
 ## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/ScreenParts.kt` (card U5's part)
