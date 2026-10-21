@@ -245,14 +245,18 @@ final class OpenStrapUITests: XCTestCase {
     /// signal that cannot be stale.
     private func openHeartDetail(_ app: XCUIApplication) {
         let detail = app.staticTexts["today.detail"]
-        for attempt in 0..<8 {
+        for attempt in 0..<6 {
+            // Move the list a screenful first. The card is below the fold, and `drag()`'s fast flick
+            // does not move this scroll view; `swipeUp()` is what card U4's row taps use.
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.4)
             let line = app.staticTexts["Heart rate"]
-            guard line.waitForExistence(timeout: 30) else {
+            guard line.waitForExistence(timeout: 15) else {
                 return XCTFail("Heart rate was never in Today's tree")
             }
             print("U5 attempt \(attempt): heart=\(line.frame) top=\(app.staticTexts["app.wordmark"].frame) hittable=\(line.isHittable)")
             line.tap()
-            if detail.waitForExistence(timeout: 5) {
+            if detail.waitForExistence(timeout: 4) {
                 print("U5 attempt \(attempt): opened \(detail.label)")
                 XCTAssertEqual(detail.label, "Heart rate", "the heart card opened a different detail")
                 return
@@ -266,8 +270,6 @@ final class OpenStrapUITests: XCTestCase {
                 app.buttons["Today"].tap()
                 _ = app.staticTexts["What changed"].waitForExistence(timeout: 15)
             }
-            drag(app, from: 0.72, to: 0.40)
-            Thread.sleep(forTimeInterval: 0.3)
         }
         attach(app, "U5-detail-missing")
         print("U5 after tapping Heart rate:\n\(app.debugDescription)")
