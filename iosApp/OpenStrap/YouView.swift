@@ -167,8 +167,8 @@ struct YouView: View {
                     .padding(.top, 8)
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 104)
         }
+        .glowClearsNavBar()
         .background(ThemeColors.background.ignoresSafeArea())
         .sheet(isPresented: $goalsOpen) {
             GoalsSheet(health: health)

@@ -374,6 +374,7 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `Pane { Full, Left, Right }` (70) | `Pane` (GlowLayout.swift:54) | ported |
 | `GlowBlocks.full/left/right(key)` (76-86) | `GlowBlock.full/left/right(key:)` (GlowLayout.swift:62) | ported |
 | `GlowScreenList(contentPadding, state, scrollTo, onScrolled)` (96-132) | `GlowScreenList` (GlowLayout.swift:85) | ported |
+| `ScreenList`'s `contentPadding.bottom + 24.dp` under the floating bar (`ScreenParts.kt:80-84`), which every pushed Compose screen gets from `Scaffold(bottomBar = …)`'s `padding` (`MainActivity.kt:304-311`) | `GlowLayout.barClearance` = `navBarHeight` 88 + `navBarGap` 24 (GlowLayout.swift:279-291), applied by `View.glowClearsNavBar()` (GlowLayout.swift:293-309) on the tab roots, ProfileScreen, StrapView, PairView, LicencesView and DiagnosticsView (card F4) | ported; `GoalsSheet` is a sheet over the shell and does not scroll under the bar, so it takes none |
 | gutter `max((w - 1040)/2, tight ? 16 : 20)` and tight = wide or < 400 (104-106) | the same (GlowLayout.swift:91-97) | ported |
 | runs of left/right blocks in two columns, full blocks spanning; a lopsided run stacks (117-127) | `sections` + `sectionView` (GlowLayout.swift:135-168) | ported |
 | `scrollTo` animates to the block's key (110-113) | `ScrollViewReader` + `onAppear` / `onChange` (GlowLayout.swift:113-124) | ported |

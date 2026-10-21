@@ -31,8 +31,8 @@ struct StrapView: View {
                 morePanel
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 40)
         }
+        .glowClearsNavBar()
         .background(ThemeColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .onAppear { controller.refreshSyncLog() }

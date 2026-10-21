@@ -273,3 +273,37 @@ struct GlowChartGap: View {
         Color.clear.frame(height: GlowLayout.chartGap)
     }
 }
+
+// MARK: - The floating tab bar's clearance (card F4)
+
+extension GlowLayout {
+    /// The floating tab bar's own height (`FloatingNavBar`): a 24 pt icon over a 16 pt label line,
+    /// each cell's 8 pt padding above and below, the glass capsule's 6 pt inset, and the bar's own
+    /// 10 pt margin over the home indicator.
+    static let navBarHeight: CGFloat = 88
+    /// What `ScreenList` leaves over the bar's height: `contentPadding.bottom + 24.dp`
+    /// (`ScreenParts.kt:80-84`), the Compose rule this clearance follows.
+    static let navBarGap: CGFloat = 24
+    /// The room a screen that scrolls under the floating bar leaves under its last row, so the row
+    /// can be dragged fully clear of the bar. The one number for every such screen: `glowClearsNavBar()`
+    /// is the only place it is used, and the UI test measures the bar itself against it.
+    static let barClearance: CGFloat = navBarHeight + navBarGap
+}
+
+extension View {
+    /// `RootView` draws `FloatingNavBar` as an overlay in a `ZStack`, so a scroll view inside it does
+    /// not know the bar is there. This adds the bar's clearance to the bottom safe area: the content
+    /// still scrolls under the glass (so the bar's blur has something to blur), and its last row can
+    /// come fully clear of the bar. Compose gets the same from
+    /// `Scaffold(bottomBar = FloatingNavBar)`, which hands every screen the bar's height as
+    /// `contentPadding` (`MainActivity.kt:304-311`) and `ScreenList` adds 24 dp to it. The strip is
+    /// transparent to touches, so a drag that starts just above the bar still scrolls the list.
+    func glowClearsNavBar() -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear
+                .frame(height: GlowLayout.barClearance)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+}

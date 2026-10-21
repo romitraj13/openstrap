@@ -8,6 +8,9 @@ import OpenStrapShared
  *
  * Compose shows this in its glass alert dialog; on iOS it is a sheet in the same glass, with the
  * same ranges (`GoalsRules` in shared Kotlin) and the same strings.
+ *
+ * Card F4: the sheet has its own 520 pt detent and covers the shell, so it never scrolls under
+ * the floating bar and takes no bottom clearance.
  */
 struct GoalsSheet: View {
     @ObservedObject var health: HealthModel

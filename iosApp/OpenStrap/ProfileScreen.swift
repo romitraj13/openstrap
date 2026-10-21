@@ -68,8 +68,8 @@ struct ProfileScreen: View {
                 panel
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 40)
         }
+        .glowClearsNavBar()
         .background(ThemeColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .onAppear(perform: hydrate)

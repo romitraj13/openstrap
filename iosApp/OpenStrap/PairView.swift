@@ -5,6 +5,9 @@ import SwiftUI
 ///
 /// The card restyles this screen in the quiet panels of the glow language (`DotPanel`, U2); its
 /// logic is unchanged: the same `StrapController` calls, the same Keychain, the same Zepp sheet.
+///
+/// Card F4: the fresh-install screen is shown outside `RootView`'s shell, so no bar sits over it,
+/// but it takes the same bottom clearance as every other scrolling screen.
 struct PairView: View {
     @ObservedObject var controller: StrapController
 
@@ -20,8 +23,8 @@ struct PairView: View {
                     PairPanel(controller: controller)
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
+            .glowClearsNavBar()
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
         }

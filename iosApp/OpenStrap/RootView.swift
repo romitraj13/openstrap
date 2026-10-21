@@ -173,9 +173,8 @@ struct DayTab<Content: View>: View {
                     content()
                 }
                 .padding(.horizontal, 16)
-                // Clear of the floating bar, as ScreenList's content padding is.
-                .padding(.bottom, 104)
             }
+            .glowClearsNavBar()
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { health.reload() }

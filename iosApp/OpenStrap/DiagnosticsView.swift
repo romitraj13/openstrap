@@ -39,6 +39,7 @@ struct DiagnosticsView: View {
             }
             .padding()
         }
+        .glowClearsNavBar()
         .navigationTitle("Diagnostics")
         .onAppear { controller.refreshSyncLog() }
         .refreshable { controller.refreshSyncLog() }

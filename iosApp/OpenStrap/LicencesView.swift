@@ -38,13 +38,15 @@ struct LicencesView: View {
                             .foregroundStyle(ThemeColors.onSurfaceVariant)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            // Card F4: on the text, not the panel. An identifier on the panel lands on
+                            // every descendant, and the UI test then finds three of them for one name.
+                            .accessibilityIdentifier("licence.\(name)")
                     }
-                    .accessibilityIdentifier("licence.\(name)")
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 40)
         }
+        .glowClearsNavBar()
         .background(ThemeColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
