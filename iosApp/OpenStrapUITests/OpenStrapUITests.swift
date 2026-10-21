@@ -38,7 +38,7 @@ final class OpenStrapUITests: XCTestCase {
 
         app.buttons["Recovery"].tap()
         XCTAssertTrue(
-            app.descendants(matching: .any)["interim.recovery"].waitForExistence(timeout: 30),
+            app.staticTexts["Recovery"].waitForExistence(timeout: 30),
             "The Recovery tab never drew its panel"
         )
         attach(app, "U4-recovery-1")
@@ -49,7 +49,7 @@ final class OpenStrapUITests: XCTestCase {
 
         app.buttons["Activity"].tap()
         XCTAssertTrue(
-            app.descendants(matching: .any)["interim.activity"].waitForExistence(timeout: 30),
+            app.staticTexts["Activity"].waitForExistence(timeout: 30),
             "The Activity tab never drew its panel"
         )
         attach(app, "U4-activity-1")
@@ -57,41 +57,53 @@ final class OpenStrapUITests: XCTestCase {
         // The date navigator's calendar sheet, from the shared header.
         XCTAssertTrue(app.buttons["date.pick"].waitForExistence(timeout: 30), "The header has no day picker")
         app.buttons["date.pick"].tap()
-        XCTAssertTrue(app.staticTexts["Has data"].waitForExistence(timeout: 30), "The calendar sheet never opened")
+        if !app.staticTexts["Has data"].waitForExistence(timeout: 30) {
+            attach(app, "U4-calendar-missing")
+            XCTFail("The calendar sheet never opened")
+        }
         attach(app, "U4-calendar-1")
         dismissSheet(app)
+        XCTAssertTrue(
+            app.staticTexts["Has data"].waitForNonExistence(timeout: 30),
+            "The calendar sheet never closed, so the tab bar is covered"
+        )
 
-        // You, and everything it opens.
+        // You, and everything it opens. Each step waits on an element only that screen has: the
+        // hub's own rows carry the same words.
         app.buttons["You"].tap()
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
         attach(app, "U4-you-1")
 
         app.buttons["you.profile"].tap()
-        XCTAssertTrue(app.staticTexts["Your profile"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["profile.back"].waitForExistence(timeout: 30), "Your profile never opened")
         attach(app, "U4-profile-1")
         app.buttons["profile.back"].tap()
+        XCTAssertTrue(app.buttons["you.profile"].waitForExistence(timeout: 30), "Back from Your profile never returned to You")
 
-        XCTAssertTrue(app.buttons["you.goals"].waitForExistence(timeout: 30))
         app.buttons["you.goals"].tap()
-        XCTAssertTrue(app.staticTexts["Your goals"].waitForExistence(timeout: 30), "The goals sheet never opened")
+        if !app.buttons["goals.cancel"].waitForExistence(timeout: 30) {
+            // A screenshot of whatever is on screen, so a failure here says what it saw.
+            attach(app, "U4-goalssheet-missing")
+            XCTFail("The goals sheet never opened")
+        }
         attach(app, "U4-goals-1")
         app.buttons["goals.cancel"].tap()
+        XCTAssertTrue(app.buttons["you.goals"].waitForExistence(timeout: 30), "Cancel never closed the goals sheet")
 
-        XCTAssertTrue(app.buttons["you.strap"].waitForExistence(timeout: 30))
         app.buttons["you.strap"].tap()
-        XCTAssertTrue(app.staticTexts["Your strap"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["strap.back"].waitForExistence(timeout: 30), "Your strap never opened")
         attach(app, "U4-strap-1")
         app.buttons["strap.back"].tap()
+        XCTAssertTrue(app.buttons["you.strap"].waitForExistence(timeout: 30), "Back from Your strap never returned to You")
 
-        XCTAssertTrue(app.buttons["you.diagnostics"].waitForExistence(timeout: 30))
         app.buttons["you.diagnostics"].tap()
         XCTAssertTrue(app.navigationBars["Diagnostics"].waitForExistence(timeout: 30), "Diagnostics never opened")
         attach(app, "U4-diagnostics-1")
         app.navigationBars["Diagnostics"].buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["you.diagnostics"].waitForExistence(timeout: 30), "Back from Diagnostics never returned to You")
 
-        XCTAssertTrue(app.buttons["you.licences"].waitForExistence(timeout: 30))
         app.buttons["you.licences"].tap()
-        XCTAssertTrue(app.staticTexts["Licences"].waitForExistence(timeout: 30), "The licence texts never opened")
+        XCTAssertTrue(app.buttons["licences.back"].waitForExistence(timeout: 30), "The licence texts never opened")
         attach(app, "U4-licences-1")
         app.buttons["licences.back"].tap()
 
@@ -100,7 +112,7 @@ final class OpenStrapUITests: XCTestCase {
 
     /// A medium sheet has no close button: drag it down, as a finger would.
     private func dismissSheet(_ app: XCUIApplication) {
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.58))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .press(
                 forDuration: 0.1,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.05)),
