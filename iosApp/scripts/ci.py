@@ -5,6 +5,9 @@
   ci.py wait [SHA]          poll until every run for SHA has finished; exit 0 only if all succeeded
   ci.py logs RUN_ID         print the last 150 log lines of each failed job (needs the token file)
 
+SHA may be any abbreviation `git rev-parse` accepts; it is resolved to the full SHA first, because
+the API's head_sha filter does not match a short one.
+
 Environment:
   OPENSTRAP_REPO   owner/name (default romitraj13/openstrap)
   TOKEN_FILE       default /opt/data/tools/secrets/github-openstrap.token
@@ -64,6 +67,37 @@ def _head():
     return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 
 
+def _full_sha(ref):
+    """The 40-character SHA a ref names, or None when git cannot say.
+
+    The API's `head_sha=` filter compares against the full SHA, so a short SHA matches no run at
+    all and `wait` sits there until its timeout ("no workflow runs", card F4). Resolving the
+    abbreviation locally first is what turns `ci.py wait 4ff619a` into a query the API answers.
+    """
+    ref = (ref or "").strip()
+    if not ref:
+        return None
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--verify", "--quiet", ref + "^{commit}"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    return out.strip() or None
+
+
+def resolve(ref):
+    """`ref` as a full SHA, or exit with a sentence when git cannot resolve it."""
+    sha = _full_sha(ref)
+    if sha is None:
+        sys.exit(f"cannot resolve {ref!r} to a commit with git rev-parse; a short SHA must be in this clone")
+    if sha != ref:
+        print(f"{ref} -> {sha}")
+    return sha
+
+
 def runs(sha):
     return _get(f"/repos/{REPO}/actions/runs?head_sha={sha}&per_page=50")["workflow_runs"]
 
@@ -113,9 +147,9 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
     arg = sys.argv[2] if len(sys.argv) > 2 else None
     if cmd == "status":
-        status(arg or _head())
+        status(resolve(arg or _head()))
     elif cmd == "wait":
-        sys.exit(wait(arg or _head()))
+        sys.exit(wait(resolve(arg or _head())))
     elif cmd == "logs" and arg:
         logs(arg)
     else:

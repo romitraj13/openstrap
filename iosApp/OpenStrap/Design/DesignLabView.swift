@@ -20,6 +20,27 @@ struct DesignLabView: View {
         ProcessInfo.processInfo.arguments.contains("-designLabStill")
     }
 
+    /// Set by the UI test (`-designLabSection <name>`): draw one section instead of thirteen. Card F5
+    /// split the lab this way because one screen holding the whole tree — thirteen glow cards, 46
+    /// icons, five tab bars, two calendar sheets and every type row — made XCUITest's queries time
+    /// out on a lab that was otherwise correct: three green-again reruns of the same tree since F2
+    /// (runs 39647481836, 39664474482 and the retries of 883bb5b). Each launch now walks about a
+    /// screenful of tree, which is a query the accessibility server answers.
+    static var requestedSection: LabSection? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let flag = arguments.firstIndex(of: "-designLabSection"),
+            arguments.indices.contains(flag + 1)
+        else { return nil }
+        return LabSection(rawValue: arguments[flag + 1])
+    }
+
+    /// Whether `-designLabSection` was passed at all. A name the enum does not know is a test bug,
+    /// and draws `lab.unknown` rather than the whole lab, so it cannot pass for the wanted section.
+    private static var askedForSection: Bool {
+        ProcessInfo.processInfo.arguments.contains("-designLabSection")
+    }
+
     // The switches' state lives here so the lab can show both of them.
     @State private var switchOn = true
     @State private var switchOff = false
@@ -32,19 +53,14 @@ struct DesignLabView: View {
                     .foregroundStyle(ThemeColors.onBackground)
                     .accessibilityIdentifier("lab.title")
 
-                typeSection
-                colourSection
-                cardSection
-                motionSection
-                dotMatrixSection
-                iconSection
-                chartSection
-                gaugeSection
-                hypnogramSection
-                partsSection
-                quietSection
-                navSection
-                calendarSection
+                if Self.askedForSection && Self.requestedSection == nil {
+                    Text("Unknown -designLabSection")
+                        .appTextStyle(AppTypography.bodyLarge)
+                        .foregroundStyle(ThemeColors.error)
+                        .accessibilityIdentifier("lab.unknown")
+                } else {
+                    sections(Self.requestedSection)
+                }
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -52,6 +68,34 @@ struct DesignLabView: View {
         .glowScrollPhasePause(always: Self.still)
         .background(ThemeColors.background)
         .accessibilityIdentifier("lab.scroll")
+    }
+
+    /// Every section, in layout order, or only `only` when the test asked for one.
+    @ViewBuilder
+    private func sections(_ only: LabSection?) -> some View {
+        if only == nil || only == .type { typeSection }
+        if only == nil || only == .colours { colourSection }
+        if only == nil || only == .cards { cardSection }
+        if only == nil || only == .motions { motionSection }
+        if only == nil || only == .dotmatrix { dotMatrixSection }
+        if only == nil || only == .icons { iconSection }
+        if only == nil || only == .charts { chartSection }
+        if only == nil || only == .gauges { gaugeSection }
+        if only == nil || only == .hypnogram { hypnogramSection }
+        if only == nil || only == .parts { partsSection }
+        if only == nil || only == .quiet { quietSection }
+        if only == nil || only == .navbar { navSection }
+        if only == nil || only == .calendar { calendarSection }
+    }
+
+    /// The lab's sections, in layout order. The raw value is the name the UI test passes to
+    /// `-designLabSection`; `identifier` is what the section's own view sets (`lab.quiet`), which is
+    /// also the name the frame assertion prints.
+    enum LabSection: String, CaseIterable {
+        case type, colours, cards, motions, dotmatrix, icons, charts
+        case gauges, hypnogram, parts, quiet, navbar, calendar
+
+        var identifier: String { "lab.\(rawValue)" }
     }
 
     // MARK: Type
