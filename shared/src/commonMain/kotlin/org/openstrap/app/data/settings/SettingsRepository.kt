@@ -86,6 +86,42 @@ class SettingsRepository(private val dao: SettingsDao) {
         dao.put(KeyValue("live_hr", enabled.toString()))
     }
 
+    /** Your daily goals, as `SettingsStore.goals` reads them: the app's defaults until set. */
+    suspend fun goals(): Goals = Goals(
+        steps = dao.value("goal_steps")?.toIntOrNull() ?: Goals.DEFAULT_STEPS,
+        sleepMinutes = dao.value("goal_sleep_minutes")?.toIntOrNull() ?: Goals.DEFAULT_SLEEP_MINUTES,
+        activeHours = dao.value("goal_active_hours")?.toIntOrNull() ?: Goals.DEFAULT_ACTIVE_HOURS,
+    )
+
+    suspend fun saveGoals(g: Goals) {
+        dao.put(KeyValue("goal_steps", g.steps.toString()))
+        dao.put(KeyValue("goal_sleep_minutes", g.sleepMinutes.toString()))
+        dao.put(KeyValue("goal_active_hours", g.activeHours.toString()))
+    }
+
+    /**
+     * Writes the profile, field by field: a value that is set is stored and a value the user cleared
+     * is removed, exactly as `SettingsStore.saveProfile` edits its preferences.
+     */
+    suspend fun saveProfile(p: UserProfile) {
+        putOrRemove("profile_birth_year", p.birthYear?.toString())
+        putOrRemove("profile_sex", p.sex?.name)
+        putOrRemove("profile_weight_kg", p.weightKg?.toString())
+        putOrRemove("profile_height_cm", p.heightCm?.toString())
+        putOrRemove("profile_imperial", p.imperial?.toString())
+        putOrRemove("profile_sleep_need_minutes", p.sleepNeedMinutes?.toString())
+        putOrRemove("profile_max_hr", p.maxHeartRate?.toString())
+        putOrRemove("profile_activity_level", p.activityLevel?.toString())
+        putOrRemove("profile_activity_answered_at", p.activityAnsweredAt?.toString())
+        putOrRemove("profile_body_measured_at", p.bodyMeasuredAt?.toString())
+        dao.put(KeyValue("profile_beta_blocker", p.betaBlocker.toString()))
+        dao.put(KeyValue("profile_pregnant", p.pregnant.toString()))
+    }
+
+    private suspend fun putOrRemove(key: String, value: String?) {
+        if (value == null) dao.remove(key) else dao.put(KeyValue(key, value))
+    }
+
     /** Null until a strap has been paired. The key itself is not in this table. */
     suspend fun pairedDevice(): PairedDevice? {
         val address = dao.value("device_address") ?: return null
