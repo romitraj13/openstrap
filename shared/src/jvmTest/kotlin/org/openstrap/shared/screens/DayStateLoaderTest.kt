@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -21,6 +22,8 @@ import org.openstrap.app.data.db.SleepStage
 import org.openstrap.app.data.minusDays
 import org.openstrap.app.data.settings.SettingsRepository
 import org.openstrap.app.ui.dashboard.DayStateLoader
+import org.openstrap.app.ui.dashboard.Metric
+import org.openstrap.app.ui.dashboard.Range
 import org.openstrap.app.ui.dashboard.SLEEP_NIGHTS
 import org.openstrap.protocol.services.StepTotals
 import kotlin.time.Clock
@@ -204,5 +207,102 @@ class DayStateLoaderTest {
         assertTrue(state.nights.all { it.session == null })
         assertNull(state.baselines.restingHr)
         assertEquals(24, state.hourlySteps.size)
+    }
+
+    // ---- Recovery, history and the calendar ------------------------------------------------------
+
+    @Test
+    fun recoveryIsScoredAfterTheLearningPeriod() = runTest {
+        val (loader, _) = loader()
+        val result = assertNotNull(loader.recovery(today), "recovery answers for a seeded day")
+        // A month of wear is past the seven nights the baselines need, so the score is there.
+        assertNotNull(result.readiness.score, "a month of sample data is scored")
+        assertEquals(today, result.date)
+    }
+
+    @Test
+    fun recoveryOfAnEmptyDatabaseIsNoScoreRatherThanNull() = runTest {
+        val (loader, _) = loader(days = 0)
+        val result = assertNotNull(loader.recovery(today), "recovery still answers with nothing to score")
+        assertNull(result.readiness.score)
+    }
+
+    @Test
+    fun historyReturnsOnePointPerDayOfTheRange() = runTest {
+        val (loader, db) = loader()
+        val dao = db.healthDao()
+        val repository = HealthRepository(dao)
+
+        // The read behind the screen, from the same place the Android detail screen asks: one row per
+        // day that has data, and history is that list cut to the range. (The count is taken from the
+        // read rather than written down: SQLite's date() and kotlinx-datetime's zone can disagree on
+        // this machine for the one row that sits exactly on a day's midnight, and the year window is
+        // the only one old enough to see it.)
+        suspend fun daily(metric: Metric, days: Int) =
+            repository.daily(metric.daily, today.minusDays((days - 1).toLong()), today, zone).first()
+                .filter { it.date in today.minusDays((days - 1).toLong())..today }
+
+        // Week: the last seven days, one point each, in order.
+        val week = loader.history(Metric.Steps, Range.Week, today)
+        val weekRead = daily(Metric.Steps, Range.Week.days)
+        assertEquals(7, week.size)
+        assertEquals(today.minusDays(6), week.first().date)
+        assertEquals(today, week.last().date)
+        assertEquals(weekRead.map { it.date }, week.map { it.date })
+        assertEquals(weekRead.map { it.value }, week.map { it.value })
+        week.zipWithNext().forEach { (a, b) -> assertEquals(1, b.date.toEpochDays().toInt() - a.date.toEpochDays().toInt()) }
+
+        // Month: thirty days, one point each, still consecutive and still ending today.
+        val month = loader.history(Metric.Steps, Range.Month, today)
+        val monthRead = daily(Metric.Steps, Range.Month.days)
+        assertEquals(30, month.size)
+        assertEquals(today.minusDays(29), month.first().date)
+        assertEquals(today, month.last().date)
+        assertEquals(monthRead.map { it.date }, month.map { it.date })
+        month.zipWithNext().forEach { (a, b) -> assertEquals(1, b.date.toEpochDays().toInt() - a.date.toEpochDays().toInt()) }
+
+        // Year: every day of the sample month, none outside the year, and the same dates as the month
+        // because the sample wears a month and no more.
+        val year = loader.history(Metric.Steps, Range.Year, today)
+        val yearRead = daily(Metric.Steps, Range.Year.days)
+        assertEquals(yearRead.map { it.date }, year.map { it.date })
+        assertEquals(today, year.last().date)
+        assertTrue(year.all { it.date in today.minusDays(364)..today })
+        assertTrue(year.map { it.date }.containsAll(month.map { it.date }), "the year covers the month")
+        assertEquals(year.size, year.map { it.date }.distinct().size, "one point per day")
+
+        // Day: the day itself, one point.
+        val day = loader.history(Metric.Steps, Range.Day, today)
+        assertEquals(1, day.size)
+        assertEquals(today, day.first().date)
+
+        // Another metric through the same call: heart rate is that day's average of the heart-rate
+        // table, exactly as HealthRepository.daily gives it.
+        val heart = loader.history(Metric.HeartRate, Range.Week, today)
+        val heartRead = daily(Metric.HeartRate, Range.Week.days)
+        assertEquals(7, heart.size)
+        assertEquals(heartRead.map { it.value }, heart.map { it.value })
+        // The point is a real average of the day's readings, so it has readings and sits in bpm range.
+        assertTrue(heart.last().count > 0)
+        assertTrue(heart.last().value in 30f..230f)
+    }
+
+    @Test
+    fun historyOfADayWithNoDataIsEmpty() = runTest {
+        val (loader, _) = loader()
+        assertTrue(loader.history(Metric.Steps, Range.Week, LocalDate(1999, 1, 1)).isEmpty())
+    }
+
+    @Test
+    fun daysWithDataIsTheSeededMonth() = runTest {
+        val (loader, db) = loader()
+        val days = loader.daysWithData()
+        // Every seeded day has heart rate, steps and a sleep, so every one of them is pickable.
+        val seeded = (0 until 30).map { today.minusDays(it) }.toSet()
+        assertTrue(days.containsAll(seeded), "every seeded day is in the calendar")
+        assertTrue(days.contains(today), "today is in the calendar")
+        assertEquals(today, days.max())
+        // The loader hands over the repository's own set, unchanged.
+        assertEquals(HealthRepository(db.healthDao()).daysWithData(zone).first(), days)
     }
 }
