@@ -74,40 +74,62 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
         attach(app, "U4-you-1")
 
-        app.buttons["you.profile"].tap()
+        tap(app, "you.profile")
         XCTAssertTrue(app.buttons["profile.back"].waitForExistence(timeout: 30), "Your profile never opened")
         attach(app, "U4-profile-1")
         app.buttons["profile.back"].tap()
         XCTAssertTrue(app.buttons["you.profile"].waitForExistence(timeout: 30), "Back from Your profile never returned to You")
 
-        app.buttons["you.goals"].tap()
+        tap(app, "you.goals")
         if !app.buttons["goals.cancel"].waitForExistence(timeout: 30) {
-            // A screenshot of whatever is on screen, so a failure here says what it saw.
+            // A screenshot and the hierarchy, so a failure here says what it saw.
             attach(app, "U4-goalssheet-missing")
+            print("U4 after you.goals:\n\(app.debugDescription)")
             XCTFail("The goals sheet never opened")
         }
         attach(app, "U4-goals-1")
         app.buttons["goals.cancel"].tap()
         XCTAssertTrue(app.buttons["you.goals"].waitForExistence(timeout: 30), "Cancel never closed the goals sheet")
 
-        app.buttons["you.strap"].tap()
+        tap(app, "you.strap")
         XCTAssertTrue(app.buttons["strap.back"].waitForExistence(timeout: 30), "Your strap never opened")
         attach(app, "U4-strap-1")
         app.buttons["strap.back"].tap()
         XCTAssertTrue(app.buttons["you.strap"].waitForExistence(timeout: 30), "Back from Your strap never returned to You")
 
-        app.buttons["you.diagnostics"].tap()
+        tap(app, "you.diagnostics")
         XCTAssertTrue(app.navigationBars["Diagnostics"].waitForExistence(timeout: 30), "Diagnostics never opened")
         attach(app, "U4-diagnostics-1")
         app.navigationBars["Diagnostics"].buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["you.diagnostics"].waitForExistence(timeout: 30), "Back from Diagnostics never returned to You")
 
-        app.buttons["you.licences"].tap()
+        tap(app, "you.licences")
         XCTAssertTrue(app.buttons["licences.back"].waitForExistence(timeout: 30), "The licence texts never opened")
         attach(app, "U4-licences-1")
         app.buttons["licences.back"].tap()
 
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "Back from Licences never returned to You")
+    }
+
+    /// Taps a row once it can actually take the tap. A popped `NavigationStack` keeps the old
+    /// screen's frame over the list for a moment, and a tap sent then lands on the screen leaving
+    /// (run 39619975079: no goals sheet, because the tap went to Your profile's fading view). Rows
+    /// below the fold are scrolled up first.
+    private func tap(_ app: XCUIApplication, _ identifier: String) {
+        let row = app.buttons[identifier]
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(identifier) never appeared")
+        let deadline = Date().addingTimeInterval(20)
+        var swipes = 0
+        while !row.isHittable && Date() < deadline {
+            // A row past the bottom of the list needs the list moved, not more waiting.
+            if swipes < 4 && row.frame.minY > app.windows.firstMatch.frame.maxY - 120 {
+                app.swipeUp()
+                swipes += 1
+            }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        XCTAssertTrue(row.isHittable, "\(identifier) never became tappable")
+        row.tap()
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.
