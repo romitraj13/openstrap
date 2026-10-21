@@ -28,6 +28,7 @@ import org.openstrap.app.ui.dashboard.DayStateLoader
 import org.openstrap.app.ui.dashboard.DayUiState
 import org.openstrap.app.ui.dashboard.Metric
 import org.openstrap.app.ui.dashboard.Range
+import org.openstrap.app.ui.glow.SignalHistories
 import org.openstrap.app.ui.workout.WorkoutsLoader
 import kotlin.time.Clock
 
@@ -106,6 +107,23 @@ class ScreenQueries(private val databasePath: String) {
         val day = d.atStartOfDay(TimeZone.currentSystemDefault()).epochSeconds
         healthDao.strapReadinessOnce(day, day).firstOrNull()
     }
+
+    /**
+     * The month behind each of the Recovery tab's six body signals: `rememberSignals`' six
+     * `history(m.daily, History.NORMAL_DAYS ending on the day)` reads (GlowRecoveryScreen.kt:360-384),
+     * answered together so the screen paints its tiles in one pass. Days without data are absent.
+     */
+    fun signalHistories(date: String, onResult: (SignalHistories) -> Unit) =
+        read(date, { SignalHistories() }, onResult) { d ->
+            SignalHistories(
+                restingHr = dayState.history(Metric.RestingHr, Range.Month, d),
+                hrv = dayState.history(Metric.Hrv, Range.Month, d),
+                skinTemperature = dayState.history(Metric.SkinTemperature, Range.Month, d),
+                breathing = dayState.history(Metric.Breathing, Range.Month, d),
+                spo2 = dayState.history(Metric.Spo2, Range.Month, d),
+                stress = dayState.history(Metric.Stress, Range.Month, d),
+            )
+        }
 
     // ---- Workouts --------------------------------------------------------------------------------
 

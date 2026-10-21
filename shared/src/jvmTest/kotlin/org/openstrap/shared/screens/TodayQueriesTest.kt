@@ -128,4 +128,31 @@ class TodayQueriesTest {
     }
 
     private fun LocalDate.minusDays29(): LocalDate = LocalDate.fromEpochDays(toEpochDays() - 29)
+
+    @Test
+    fun `the six signals' month is read for the day, one list each`() = kotlinx.coroutines.runBlocking {
+        val queries = seeded()
+        val histories = await<org.openstrap.app.ui.glow.SignalHistories> { done -> queries.signalHistories(todayIso, done) }
+
+        // The sample month writes resting HR, HRV, blood oxygen and stress every day, so each of those
+        // is the whole window; a signal the seed never wrote comes back empty rather than invented.
+        assertEquals(30, histories.restingHr.size, "the sample month's resting HR")
+        assertEquals(30, histories.hrv.size, "the sample month's HRV")
+        assertEquals(30, histories.spo2.size, "the sample month's blood oxygen")
+        assertEquals(30, histories.stress.size, "the sample month's stress")
+        assertTrue(histories.skinTemperature.isEmpty(), "the sample month writes no skin temperature")
+        assertTrue(histories.breathing.isEmpty(), "the sample month writes no breathing rate")
+
+        // The same 30 days ending on the selected one that History.normal reads.
+        val from = today.minusDays29()
+        assertTrue(histories.restingHr.all { it.date in from..today })
+        assertEquals(today, histories.restingHr.last().date)
+        // Today's own resting HR is the day's, as the Recovery tile shows it.
+        val day = await<org.openstrap.app.ui.dashboard.DayUiState> { done -> queries.day(todayIso, done) }
+        assertEquals(day.restingHeartRate?.toFloat(), histories.restingHr.last().value)
+
+        // A malformed date answers six empty lists rather than crashing Swift.
+        val empty = await<org.openstrap.app.ui.glow.SignalHistories> { done -> queries.signalHistories("not a date", done) }
+        assertTrue(empty.restingHr.isEmpty() && empty.hrv.isEmpty() && empty.skinTemperature.isEmpty())
+    }
 }
