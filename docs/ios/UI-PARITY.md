@@ -688,7 +688,7 @@ thing exists yet or why not.
 | `"No events yet."` (475) | `"Nothing logged yet."` (DiagnosticsView.swift:34) | not ported: the existing iOS diagnostics screen keeps its own wording |
 | sample-data button (118-120) | — | not ported: `-demoData` is the iOS debug seed (card C6) |
 | `"OpenStrap ${BuildConfig.VERSION_NAME} · local-first, no cloud"` (124) | `"OpenStrap \(appVersion) · local-first, no cloud"` (YouView.swift:161) | ported: the version comes from `CFBundleShortVersionString` |
-| `"Licences"` row | `you.licences` (YouView.swift:145-158) | ported: the card's own exception; opens `LicencesView` (LicencesView.swift:6) with the three bundled texts |
+| `"Licences"` row | `you.licences` (YouView.swift:145-158) | ported: the card's own exception; opens `LicencesView` (LicencesView.swift:6) with the three texts U1 put in `Design/Licenses/` |
 
 ## `app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt` (card U4)
 

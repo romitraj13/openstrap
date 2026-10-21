@@ -99,11 +99,13 @@ struct ProfileScreen: View {
                 .foregroundStyle(glowInk)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("Save", action: save)
-                .appTextStyle(AppTypography.labelLarge)
-                .foregroundStyle(valid ? ThemeColors.primary : ThemeColors.onSurfaceVariant)
-                .disabled(!valid)
-                .accessibilityIdentifier("profile.save")
+            Button(action: save) {
+                Text("Save")
+                    .appTextStyle(AppTypography.labelLarge)
+                    .foregroundStyle(valid ? ThemeColors.primary : ThemeColors.onSurfaceVariant)
+            }
+            .disabled(!valid)
+            .accessibilityIdentifier("profile.save")
         }
         .padding(.top, 4)
     }

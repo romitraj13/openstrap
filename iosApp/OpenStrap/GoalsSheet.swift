@@ -60,19 +60,25 @@ struct GoalsSheet: View {
 
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
-                Button("Cancel") { dismiss() }
-                    .appTextStyle(AppTypography.labelLarge)
-                    .foregroundStyle(ThemeColors.onSurfaceVariant)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .accessibilityIdentifier("goals.cancel")
-                Button("Save", action: save)
-                    .appTextStyle(AppTypography.labelLarge)
-                    .foregroundStyle(valid ? ThemeColors.primary : ThemeColors.onSurfaceVariant)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .disabled(!valid)
-                    .accessibilityIdentifier("goals.save")
+                Button { dismiss() } label: {
+                    Text("Cancel")
+                        .appTextStyle(AppTypography.labelLarge)
+                        .foregroundStyle(ThemeColors.onSurfaceVariant)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("goals.cancel")
+                Button(action: save) {
+                    Text("Save")
+                        .appTextStyle(AppTypography.labelLarge)
+                        .foregroundStyle(valid ? ThemeColors.primary : ThemeColors.onSurfaceVariant)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .disabled(!valid)
+                .accessibilityIdentifier("goals.save")
             }
         }
         .padding(20)

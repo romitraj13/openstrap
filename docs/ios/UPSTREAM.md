@@ -701,13 +701,17 @@ this box also executes F1's untracked scratch probe, which is not part of this c
 
 ### Copies, not ports
 
-    licenses/MIT-Phosphor.txt     -> iosApp/OpenStrap/Licences/MIT-Phosphor.txt
-    licenses/OFL-Funnel.txt       -> iosApp/OpenStrap/Licences/OFL-Funnel.txt
-    licenses/OFL-MuseoModerno.txt -> iosApp/OpenStrap/Licences/OFL-MuseoModerno.txt
+The three licence texts were already in the app from card U1, byte-identical to the repository's
+own files:
 
-Byte-identical (`cmp` clean). They are bundle resources so the "Licences" row can show the three
-texts the app ships with; `project.yml` already treats everything under `OpenStrap/` as a resource
-unless it is Swift. A change to `licenses/` has to be copied here too.
+    licenses/MIT-Phosphor.txt     == iosApp/OpenStrap/Design/Licenses/MIT-Phosphor.txt
+    licenses/OFL-Funnel.txt       == iosApp/OpenStrap/Design/Licenses/OFL-Funnel.txt
+    licenses/OFL-MuseoModerno.txt == iosApp/OpenStrap/Design/Licenses/OFL-MuseoModerno.txt
+
+U4 adds no second copy: `LicencesView` reads those three out of the bundle by name. A first attempt
+put fresh copies under `OpenStrap/Licences/`, and CI rejected it with "Multiple commands produce
+…/MIT-Phosphor.txt" — XcodeGen copies every resource to the bundle root, so two folders with the
+same file names are two build commands for one path (run 39609938000).
 
 ### Not copied
 

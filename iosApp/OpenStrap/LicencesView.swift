@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The licence texts of the three assets OpenStrap bundles: the Phosphor icons (MIT), and the two
-/// fonts, Funnel and MuseoModerno (SIL OFL 1.1). The texts are the repository's own `licenses/`
-/// files, copied into the app bundle so they travel with the build.
+/// fonts, Funnel and MuseoModerno (SIL OFL 1.1). The files are U1's copies of the repository's
+/// `licenses/` in `Design/Licenses/`, which XcodeGen copies to the bundle root.
 struct LicencesView: View {
     @Environment(\.dismiss) private var dismiss
 
