@@ -495,3 +495,42 @@ Two things were decided for iOS and are recorded here rather than hidden:
   finished arc, because standing instruction 7 allows only offset, scale and opacity to animate. The
   same rule leaves `DotHeader`'s caret turn instant and `GlowSwitch`'s track colour un-animated.
 
+## Card F2 (the Design lab's column was wider than the screen)
+
+Found in product review V1: every section of the lab was shifted about 24 pt left, so the first letter
+of each heading was cut ("lisplayLarge", "ype", "auges", "ab bar", "eart", "leepRem") and the outer
+colour swatches ran off both edges. Nothing was wrong with the lab's padding: one child had a fixed
+width larger than the column, so the VStack took that width, `.padding(20)` added 40 pt to it, and the
+scroll view centred the resulting 451 pt column in its 402 pt viewport.
+
+The culprit was `DotMatrixText("0123456789")` (`DesignLabView.swift:176`) at the component's default
+`dot` 5 and `gap` 2: ten digits are 59 columns of a 7 pt pitch, so the component asked for
+`7 * 59 - 2 = 411` pt — 49 pt more than the 362 pt the lab offers. Measured from the committed
+screenshots rather than by eye: on `U2-designlab-3` the colour grid's swatches are 285 px wide with
+31 px gaps (4 * 285 + 3 * 30 = 1230 px = 410 pt, which matches the 411 pt row), and both outer swatches
+are cut by 12 px — with the 60 px of padding that is the 72 px (24 pt) the centred column overshoots on
+each side.
+
+The fix is in the component, because the Today, Sleep, Heart and Recovery screens draw their hero
+numbers with it:
+
+- `DotMatrixText` sizes itself through `DotMatrixSize` (`DotMatrixText.swift:102`) instead of
+  `.frame(width:height:)`. The layout gives the ideal size to a parent that asks for it — nothing else
+  about the component changes: same glyphs, same `dot`, same `gap`, same drawing — and the width on
+  offer when that is narrower, which is Compose's `Modifier.size()` with `enforceIncoming`
+  (`GlowParts.kt:77`). A number too wide for its column is cropped at the column's edge, exactly as
+  Compose coerces the Canvas, and `.clipped()` keeps the dots inside that width.
+- The Design lab itself is unchanged: the ten-digit row now ends at the lab's right margin instead of
+  pushing the column off both sides. It is the only place in the app that asks for more width than it
+  is given, which is what makes the UI test below catch a regression.
+
+`testDesignLab` asserts, for every section identifier the lab sets (`lab.title`, `lab.type`,
+`lab.colours`, `lab.cards`, `lab.motions`, `lab.dotmatrix`, `lab.icons`, `lab.charts`, `lab.gauges`,
+`lab.hypnogram`, `lab.parts`, `lab.quiet`, `lab.navbar`, `lab.calendar`), that
+`element.frame.minX >= 0` and `element.frame.maxX <= app.windows.firstMatch.frame.maxX`, before it
+starts scrolling. On fd5e09d's lab those sections are 411 pt wide starting at -4.5 pt, so the test
+fails there and passes after the fix; the failure message prints the offending frame and the window's.
+The same test also writes the eight screenfuls card U1 shipped (`U1-designlab-1` … `8`) from the same
+captures as `U2-designlab-1` … `15`, because U1's eight are this lab at the same scroll offsets and the
+committed U1 set still showed the clipped column.
+

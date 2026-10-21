@@ -254,10 +254,11 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `ROWS = 7` (57) | `DotMatrixText.rows` (DotMatrixText.swift:36) | ported |
 | `DotMatrixText(text, modifier, dot, gap, color)` (64-70) | `DotMatrixText.init(_:dot:gap:color:)` (DotMatrixText.swift:38) | ported: `dot` 5, `gap` 2, white |
 | one empty column between glyphs (73) | `columns` (DotMatrixText.swift:50) | ported |
-| `size(pitch * columns - gap, pitch * ROWS - gap)` (77) | `size` (DotMatrixText.swift:56) | ported |
-| `contentDescription = text` (78) | `.accessibilityLabel(text)` (DotMatrixText.swift:82) | ported |
-| `drawCircle(color, d / 2, …)` (86) | `context.fill(Path(ellipseIn:), with: .color(color))` (DotMatrixText.swift:69) | ported |
-| glyph advance `(rows[0].length + 1) * step` (89) | `x0 += CGFloat(rows[0].count + 1) * pitch` (DotMatrixText.swift:79) | ported |
+| `size(pitch * columns - gap, pitch * ROWS - gap)` (77) | `size` (DotMatrixText.swift:56) | ported, and the size is a ceiling: `DotMatrixSize` (DotMatrixText.swift:102) gives that size to a parent that asks for it and the width on offer when that is narrower, which is what Compose's `size()` does with `enforceIncoming` (card F2: `.frame(width:)` refused to shrink, so one 411 pt row made the Design lab column 411 pt on a 402 pt screen and both edges were cut) |
+| `contentDescription = text` (78) | `.accessibilityLabel(text)` (DotMatrixText.swift:95) | ported |
+| `drawCircle(color, d / 2, …)` (86) | `context.fill(Path(ellipseIn:), with: .color(color))` (DotMatrixText.swift:83) | ported |
+| glyph advance `(rows[0].length + 1) * step` (89) | `x0 += CGFloat(rows[0].count + 1) * pitch` (DotMatrixText.swift:86) | ported |
+| nothing clips the Canvas, so a coerced size still draws past its own bounds until a parent clips | `.clipped()` (DotMatrixText.swift:91) | ported as the stricter version: the dots stop at the width the layout settled on (card F2) |
 
 ## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowParts.kt` — the rest of the file (card U2)
 
