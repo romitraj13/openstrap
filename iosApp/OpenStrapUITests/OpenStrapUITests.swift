@@ -41,8 +41,9 @@ final class OpenStrapUITests: XCTestCase {
         attach(app, "strap")
     }
 
-    /// Card U1: the design lab, opened with `-designLab`. Scrolls to the icon grid at the end and
-    /// attaches a screenshot per screenful, named `U1-designlab-1` … `U1-designlab-N`.
+    /// Card U2: the same lab, now with the glow charts, the gauges, the quiet panels, the tab bar and
+    /// the calendar sheet at the end. Scrolls to the last section and attaches a screenshot per
+    /// screenful, named `U2-designlab-1` … `U2-designlab-N`.
     func testDesignLab() {
         let app = XCUIApplication()
         app.launchArguments = ["-designLab"]
@@ -55,13 +56,13 @@ final class OpenStrapUITests: XCTestCase {
         var shots = 0
         func capture() {
             shots += 1
-            attach(app, "U1-designlab-\(shots)")
+            attach(app, "U2-designlab-\(shots)")
         }
         capture()
 
-        let end = app.staticTexts["lab.icons.title"]
+        let end = app.staticTexts["lab.calendar.title"]
         var swipes = 0
-        while !(end.exists && end.isHittable) && swipes < 12 {
+        while !(end.exists && end.isHittable) && swipes < 40 {
             app.swipeUp()
             swipes += 1
             // The glow layers are rendered off the main thread on first appearance.
@@ -69,7 +70,7 @@ final class OpenStrapUITests: XCTestCase {
             capture()
         }
 
-        XCTAssertTrue(end.exists, "The design lab never reached the icon grid")
+        XCTAssertTrue(end.exists, "The design lab never reached the calendar section")
         XCTAssertGreaterThan(shots, 1, "The lab fits on one screen, so nothing scrolled")
     }
 

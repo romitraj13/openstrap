@@ -12,6 +12,10 @@ struct DesignLabView: View {
         ProcessInfo.processInfo.arguments.contains("-designLab")
     }
 
+    // The switches' state lives here so the lab can show both of them.
+    @State private var switchOn = true
+    @State private var switchOff = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
@@ -26,6 +30,13 @@ struct DesignLabView: View {
                 motionSection
                 dotMatrixSection
                 iconSection
+                chartSection
+                gaugeSection
+                hypnogramSection
+                partsSection
+                quietSection
+                navSection
+                calendarSection
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -189,8 +200,336 @@ struct DesignLabView: View {
         }
     }
 
-    // MARK: Section frame
+    // MARK: Charts (GlowCharts.kt)
 
+    private var chartSection: some View {
+        section("Charts", identifier: "lab.charts") {
+            VStack(alignment: .leading, spacing: 14) {
+                DotPanel {
+                    DotHeader("Heart rate", trailing: "62 bpm", chevron: true)
+                    GlowChartGap()
+                    GlowLineChart(
+                        values: Self.dayHours,
+                        height: GlowLayout.chartHeight,
+                        labels: Self.dayLabels,
+                        color: MetricColors.heart,
+                        describe: { index, value in "\(Int(value)) bpm at \(Self.hourLabel(index))" }
+                    )
+                }
+                DotPanel {
+                    DotHeader("Steps", trailing: "8,240")
+                    GlowChartGap()
+                    GlowDotBars(
+                        values: Self.hourlySteps,
+                        height: GlowLayout.chartHeight,
+                        rows: 10,
+                        labels: Self.dayLabels,
+                        accent: MetricColors.steps,
+                        describe: { index, value in "\(Int(value)) steps at \(Self.hourLabel(index))" }
+                    )
+                }
+                DotPanel {
+                    DotHeader("Resting heart rate", trailing: "Last 7 days")
+                    GlowChartGap()
+                    GlowTrend(days: Self.week, height: 130, average: 61)
+                }
+            }
+        }
+    }
+
+    // MARK: Gauges (GlowArcGauge, GlowHorizon)
+
+    private var gaugeSection: some View {
+        section("Gauges", identifier: "lab.gauges") {
+            VStack(alignment: .leading, spacing: 14) {
+                DotPanel {
+                    DotHeader("Recovery")
+                    GlowArcGauge(progress: 0.73, color: MetricColors.readiness) {
+                        VStack(spacing: 4) {
+                            DotMatrixText("73", dot: GlowLayout.heroDot, gap: GlowLayout.heroGap)
+                            Text("Ready")
+                                .appTextStyle(AppTypography.bodySmall)
+                                .foregroundStyle(glowInk.opacity(0.7))
+                        }
+                        .padding(.bottom, 8)
+                    }
+                }
+                DotPanel {
+                    DotHeader("Sleep score", trailing: "84")
+                    GlowHorizon(progress: 0.84, color: MetricColors.sleepDeep)
+                }
+            }
+        }
+    }
+
+    // MARK: Hypnogram (GlowHypnogram)
+
+    private var hypnogramSection: some View {
+        section("Hypnogram", identifier: "lab.hypnogram") {
+            DotPanel {
+                DotHeader("Sleep stages", trailing: "7h 42m")
+                GlowChartGap()
+                GlowHypnogram(
+                    stages: Self.night,
+                    rowNames: ["Awake", "REM", "Light", "Deep"],
+                    height: 130,
+                    labels: ["23:00", "03:00", "07:00"],
+                    describe: { stage in Self.stageName(stage) }
+                )
+            }
+        }
+    }
+
+    // MARK: Parts (GlowParts.kt)
+
+    private var partsSection: some View {
+        section("Parts", identifier: "lab.parts") {
+            VStack(alignment: .leading, spacing: 14) {
+                DotPanel {
+                    DotHeader("Breath volume", trailing: "12.4 L")
+                    ArcTimeline(
+                        marks: [
+                            ArcMark(at: 0.2, color: MetricColors.heart),
+                            ArcMark(at: 0.55, color: MetricColors.sleepDeep),
+                            ArcMark(at: 0.8, color: MetricColors.steps),
+                        ],
+                        arcs: [(from: 0.1, to: 0.3), (from: 0.45, to: 0.65), (from: 0.7, to: 0.9)],
+                        height: 44
+                    )
+                }
+                DotPanel {
+                    HStack {
+                        Text("Training")
+                            .appTextStyle(GlowType.title)
+                            .foregroundStyle(glowInk)
+                        Spacer(minLength: 0)
+                        GlowSwitch(checked: $switchOn)
+                    }
+                    HStack {
+                        Text("Training (off)")
+                            .appTextStyle(GlowType.title)
+                            .foregroundStyle(glowInk)
+                        Spacer(minLength: 0)
+                        GlowSwitch(checked: $switchOff)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Quiet panels (GlowQuiet.kt)
+
+    private var quietSection: some View {
+        section("Quiet panels", identifier: "lab.quiet") {
+            VStack(alignment: .leading, spacing: 14) {
+                DotPanel {
+                    DotHeader("Heart rate", trailing: "62 bpm", chevron: true)
+                    DotDivider()
+                    HStack(alignment: .center, spacing: 8) {
+                        Text("Resting")
+                            .appTextStyle(AppTypography.bodySmall)
+                            .foregroundStyle(glowInk.opacity(0.7))
+                        Spacer(minLength: 0)
+                        Text("58")
+                            .appTextStyle(AppTypography.titleLarge)
+                            .foregroundStyle(glowInk)
+                        DotArrow(up: true, color: trendGood)
+                    }
+                    HStack(alignment: .center, spacing: 8) {
+                        Text("HRV")
+                            .appTextStyle(AppTypography.bodySmall)
+                            .foregroundStyle(glowInk.opacity(0.7))
+                        Spacer(minLength: 0)
+                        Text("42")
+                            .appTextStyle(AppTypography.titleLarge)
+                            .foregroundStyle(glowInk)
+                        DotArrow(up: false, color: trendBad)
+                        DotLevel(color: glowInk.opacity(0.6))
+                    }
+                    HStack(spacing: 8) {
+                        StatusPill("Normal", color: MetricColors.good)
+                        StatusPill("Higher", color: MetricColors.warn)
+                        StatusPill("Lower", color: MetricColors.bad)
+                    }
+                }
+                DotPanel {
+                    DotHeader("Skin temperature", trailing: "36.4°C", warning: true)
+                    DotDivider()
+                    HStack(alignment: .center, spacing: 8) {
+                        Text("36.4")
+                            .appTextStyle(AppTypography.titleLarge)
+                            .foregroundStyle(glowInk)
+                        DotArrow(up: true, color: trendBad)
+                        Spacer(minLength: 0)
+                        StatusPill("Higher", color: MetricColors.warn)
+                    }
+                    Text("usually 36.2°C")
+                        .appTextStyle(AppTypography.bodySmall)
+                        .foregroundStyle(glowInk.opacity(0.5))
+                }
+                DotPanel {
+                    DotHeader("Recovery", chevron: true)
+                    DotPanel {
+                        DotHeader("Sleep", trailing: "7h 42m", expanded: true)
+                        DotDivider()
+                        HStack(spacing: 8) {
+                            StatusPill("Awake", color: MetricColors.sleepAwake)
+                            StatusPill("REM", color: MetricColors.sleepRem)
+                            StatusPill("Light", color: MetricColors.sleepLight)
+                            StatusPill("Deep", color: MetricColors.sleepDeep)
+                        }
+                    }
+                }
+                TileGrid(Self.statTiles) { tile in
+                    DotStatTile(
+                        label: tile.label,
+                        accent: tile.accent,
+                        value: tile.value,
+                        unit: tile.unit,
+                        baseline: tile.baseline,
+                        direction: tile.direction,
+                        higherIsBetter: tile.higherIsBetter,
+                        onClick: {}
+                    )
+                }
+                GlowTile("Sleep", accent: MetricColors.sleepDeep, onClick: {}) {
+                    Text("7h 42m")
+                        .appTextStyle(AppTypography.titleLarge)
+                        .foregroundStyle(glowInk)
+                        .padding(.top, 8)
+                }
+            }
+        }
+    }
+
+    // MARK: Tab bar (Insights.kt)
+
+    private var navSection: some View {
+        section("Tab bar", identifier: "lab.navbar") {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(Self.navItems.indices), id: \.self) { selected in
+                    FloatingNavBar(items: Self.navItems, selected: selected, onSelect: { _ in })
+                        .padding(.horizontal, 0)
+                }
+                HStack {
+                    FloatingNavRail(items: Self.navItems, selected: 1, onSelect: { _ in })
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    // MARK: Calendar (DayCalendar.kt)
+
+    private var calendarSection: some View {
+        section("Calendar", identifier: "lab.calendar") {
+            VStack(alignment: .leading, spacing: 14) {
+                DayCalendarSheet(
+                    selected: Calendar.current.startOfDay(for: Date()),
+                    available: Self.sampleAvailable,
+                    onPick: { _ in },
+                    onDismiss: {}
+                )
+                DayCalendarSheet(
+                    selected: Self.sampleSelected,
+                    available: Self.sampleAvailable,
+                    onPick: { _ in },
+                    onDismiss: {}
+                )
+            }
+        }
+    }
+
+    // MARK: Sample data
+
+    /// A day of heart rate, one reading an hour, with a gap where the strap was off.
+    private static let dayHours: [Float?] = [
+        58, 56, 54, 53, 52, 53, 55, 57, 61, 68, 74, 79,
+        83, 86, 88, 85, 81, nil, 76, 74, 72, 68, 64, 61,
+    ]
+
+    /// Steps per hour, for the dot-bar grid.
+    private static let hourlySteps: [Float] = [
+        0, 0, 0, 0, 0, 0, 20, 180, 600, 900, 1100, 700,
+        500, 650, 900, 1200, 800, 400, 300, 900, 1400, 600, 120, 0,
+    ]
+
+    private static let dayLabels = ["00:00", "06:00", "12:00", "18:00", "23:00"]
+
+    private static let week: [GlowDay] = [
+        GlowDay(label: "Mon", value: 58),
+        GlowDay(label: "Tue", value: 55),
+        GlowDay(label: "Wed", value: 61),
+        GlowDay(label: "Thu", value: 57),
+        GlowDay(label: "Fri", value: 64),
+        GlowDay(label: "Sat", value: 62),
+        GlowDay(label: "Sun", value: 60),
+    ]
+
+    /// One night, as stretches of a fraction of it. Row 0 is awake, then REM, light and deep.
+    private static let night: [GlowStage] = [
+        GlowStage(from: 0.00, to: 0.05, row: 0),
+        GlowStage(from: 0.05, to: 0.12, row: 2),
+        GlowStage(from: 0.12, to: 0.20, row: 3),
+        GlowStage(from: 0.20, to: 0.26, row: 2),
+        GlowStage(from: 0.26, to: 0.34, row: 1),
+        GlowStage(from: 0.34, to: 0.42, row: 2),
+        GlowStage(from: 0.42, to: 0.50, row: 3),
+        GlowStage(from: 0.50, to: 0.56, row: 2),
+        GlowStage(from: 0.56, to: 0.62, row: 1),
+        GlowStage(from: 0.62, to: 0.70, row: 2),
+        GlowStage(from: 0.70, to: 0.78, row: 3),
+        GlowStage(from: 0.78, to: 0.84, row: 2),
+        GlowStage(from: 0.84, to: 0.90, row: 1),
+        GlowStage(from: 0.90, to: 0.96, row: 0),
+        GlowStage(from: 0.96, to: 1.00, row: 0),
+    ]
+
+    private static let stageNames = ["Awake", "REM", "Light", "Deep"]
+
+    private static func stageName(_ stage: GlowStage) -> String {
+        let name = stageNames.indices.contains(stage.row) ? stageNames[stage.row] : "Light"
+        let minutes = Int(((stage.to - stage.from) * 8 * 60).rounded())
+        return "\(name) \(minutes) min"
+    }
+
+    private static func hourLabel(_ index: Int) -> String {
+        String(format: "%02d:00", index)
+    }
+
+    private static let navItems: [NavItem] = [
+        NavItem(label: "Today", icon: .house, selectedIcon: .houseFill),
+        NavItem(label: "Recovery", icon: .plant),
+        NavItem(label: "Sleep", icon: .moon, selectedIcon: .moonFill),
+        NavItem(label: "Activity", icon: .footprints),
+        NavItem(label: "You", icon: .user),
+    ]
+
+    private static var sampleAvailable: Set<Date> {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return Set((1...14).compactMap { calendar.date(byAdding: .day, value: -$0, to: today) })
+    }
+
+    private static var sampleSelected: Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .day, value: -5, to: today) ?? today
+    }
+
+    /// Four statistics for the grid, in the shape `DotStatTile` takes.
+    private static let statTiles: [LabStatTile] = [
+        LabStatTile(label: "Resting heart rate", accent: MetricColors.heart, value: "58", unit: "bpm",
+                    baseline: "56 bpm", direction: 1, higherIsBetter: false),
+        LabStatTile(label: "HRV", accent: MetricColors.hrv, value: "42", unit: "ms",
+                    baseline: "38 ms", direction: 1, higherIsBetter: true),
+        LabStatTile(label: "Skin temperature", accent: MetricColors.temperature, value: "36.4", unit: "°C",
+                    baseline: "36.2°C", direction: 0, higherIsBetter: nil),
+        LabStatTile(label: "Blood oxygen", accent: MetricColors.spo2, value: nil, unit: "%",
+                    baseline: nil, direction: nil, higherIsBetter: nil),
+    ]
+
+    // MARK: Section frame
     private func section<Content: View>(
         _ title: String,
         identifier: String,
@@ -215,5 +554,17 @@ private struct LabCard: Identifiable {
     let name: String
     let style: GlowStyle
     var id: String { name }
+}
+
+/// One statistic in the lab's tile grid (card U2).
+private struct LabStatTile: Identifiable {
+    let label: String
+    let accent: Color
+    let value: String?
+    let unit: String
+    let baseline: String?
+    let direction: Int?
+    let higherIsBetter: Bool?
+    var id: String { label }
 }
 #endif
