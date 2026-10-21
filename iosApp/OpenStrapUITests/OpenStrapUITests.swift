@@ -283,7 +283,7 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["What changed"].waitForExistence(timeout: 120),
             "Today never drew its What changed panel from the seeded month"
         )
-        walk(app, prefix: "U5-today", milestones: ["What changed", "Heart rate", "steps", "asleep"])
+        walk(app, prefix: "U5-today", milestones: ["What changed", "Heart rate", "steps", "asleep"], screenfuls: 4)
 
         // The tile chooser, from the top of the screen.
         scrollToTop(app)
@@ -324,8 +324,7 @@ final class OpenStrapUITests: XCTestCase {
             "A day before the seeded month is not drawing the empty state"
         )
         XCTAssertFalse(app.staticTexts["What changed"].exists, "An empty day still drew What changed")
-        attach(app, "U5-todayempty-1")
-        walk(app, prefix: "U5-todayempty", milestones: ["Heart rate", "steps"])
+        walk(app, prefix: "U5-todayempty", milestones: ["Heart rate", "steps"], screenfuls: 2)
 
         app.terminate()
 
@@ -337,7 +336,7 @@ final class OpenStrapUITests: XCTestCase {
             morning.staticTexts["Morning check-in"].waitForExistence(timeout: 120),
             "Today never drew the morning check-in"
         )
-        walk(morning, prefix: "U5-todaymorning", milestones: ["Morning check-in", "What changed", "Heart rate", "steps"])
+        walk(morning, prefix: "U5-todaymorning", milestones: ["Morning check-in", "What changed", "Heart rate", "steps"], screenfuls: 4)
         morning.terminate()
 
         // Monday: the week's recap, under the top card.
@@ -360,29 +359,25 @@ final class OpenStrapUITests: XCTestCase {
         attach(monday, "U5-todayrecap-2")
     }
 
-    /// Every screenful of a long screen from the top down, until each milestone has been seen inside
-    /// the window, attaching `prefix-1`, `prefix-2`, …. Off-screen children of a SwiftUI stack still
-    /// exist in the tree (the design lab's lesson), so "seen" means the frame is inside the window.
+    /// Every screenful of a long screen from the top down, attaching `prefix-1`, `prefix-2`, ….
+    ///
+    /// The stop condition is a count, not a frame: a SwiftUI stack's off-screen children report
+    /// frames clamped into the viewport (card F2's note), so "the milestone is inside the window"
+    /// is true even at the very top of the list — card U5's first walk stopped after one screenshot
+    /// for that reason. `screenfuls` is how many screenfuls the screen is tall, so the screenshots
+    /// really do run top to bottom. The milestones are then asserted to have rendered at all.
     @discardableResult
-    private func walk(_ app: XCUIApplication, prefix: String, milestones: [String], limit: Int = 10) -> Int {
+    private func walk(_ app: XCUIApplication, prefix: String, milestones: [String], screenfuls: Int = 4) -> Int {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 60), "the app never drew a window")
-        var seen = Set<String>()
-        var shots = 0
+        let missing = milestones.filter { !app.staticTexts[$0].exists }
+        XCTAssertTrue(
+            missing.isEmpty,
+            "the walk over \(prefix) found no \(missing) in the tree at all, so the screen is missing a section"
+        )
 
-        func onScreen(_ label: String) -> Bool {
-            let element = app.staticTexts[label]
-            guard element.exists else { return false }
-            let frame = element.frame
-            return frame.height > 0 && frame.minY < window.frame.maxY && frame.maxY > window.frame.minY
-        }
-
-        func capture() {
-            shots += 1
-            attach(app, "\(prefix)-\(shots)")
-            for milestone in milestones where onScreen(milestone) {
-                seen.insert(milestone)
-            }
+        func capture(_ number: Int) {
+            attach(app, "\(prefix)-\(number)")
         }
 
         func scrollOneScreenful() {
@@ -395,19 +390,13 @@ final class OpenStrapUITests: XCTestCase {
                 )
         }
 
-        capture()
-        var screenfuls = 1
-        while seen.count < milestones.count && screenfuls < limit {
+        capture(1)
+        for number in 2...max(screenfuls, 1) {
             scrollOneScreenful()
-            Thread.sleep(forTimeInterval: 0.4)
-            capture()
-            screenfuls += 1
+            Thread.sleep(forTimeInterval: 0.5)
+            capture(number)
         }
-        XCTAssertEqual(
-            seen.count, milestones.count,
-            "the walk over \(prefix) never showed \(milestones.filter { !seen.contains($0) }), so it has holes"
-        )
-        return shots
+        return max(screenfuls, 1)
     }
 
     /// Back to the top of a dated tab, where the header and the day's first card are.

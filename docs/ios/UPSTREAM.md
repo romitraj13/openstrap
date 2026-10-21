@@ -820,3 +820,35 @@ skip.
   never reached; Today stacks its blocks in Compose's phone order.
 - The Design lab and `TODAY_TILES`' picker storage: Android keeps the chosen names in DataStore, iOS
   in the app's own defaults (`HealthModel.saveTodayTiles`), because it is this phone's preference.
+
+### The Kotlin-to-Swift boundary, and what it cost
+
+Two traps in one screen, both worth knowing before U6-U9:
+
+- **A Kotlin enum entry whose name is not one word arrives all-lowercase.** Kotlin's ObjC export
+  lowercases the whole entry name, so `Metric.HeartRate` is `Metric.heartrate` and
+  `SignalAccent.SleepLight` is `Metric.sleeplight`; `Metric.Steps` is `steps` either way, which is
+  why the one-word entry read correctly and hid the rule. `Theme.swift` sidesteps it by switching on
+  the entry's `name` (`"HeartRate"`), which is stable. Run 39640117088: `type 'Metric' has no member
+  'heartRate'`.
+- **A `List<Float?>` comes across as `[Any]`.** A nullable boxed `Float` has no ObjC generic element
+  type, so `TodayGlow.heartBuckets` arrives as `[Any]` and each gap must be read back as the
+  `NSNumber` Kotlin boxes a `Float` into (`($0 as? NSNumber)?.floatValue`). Run 39640117088:
+  `cannot use optional chaining on non-optional value of type 'Any'`. `List<Float>` stays
+  `[KotlinFloat]` and is fine.
+- **A SwiftUI stack's off-screen children report frames clamped into the viewport.** Tapping one
+  taps whatever really sits at those coordinates, so `staticTexts["Heart rate"].tap()` opened Sleep
+  five runs running (runs 39644024771, 39647481836, 39649434424, 39655540385, 39658773525) — first
+  from the overview card's Sleep score, later from the bar. Scrolling cannot fix it, because the
+  frame does not follow the scroll. U5's UI test therefore proves `TodayRoute.metric` from a What
+  changed tile, which is on screen and whose frame is real; card F2's note in `OpenStrapUITests.swift`
+  is the same behaviour.
+- **The floating bar eats a tap that lands on its rectangle**, including a line that is "in the
+  window" and reports `isHittable == true`. Anything a test taps must be above `navBar.top`.
+
+Red runs, in order: 39640117088 (the two interop errors), 39644024771 / 39647481836 / 39649434424 /
+39655540385 / 39658773525 (`testToday`'s off-screen tap, one hypothesis each, the last five all the
+same clamped-frame cause), 39652336343 (`testEveryTabAndYouScreen`: `licence.OFL-MuseoModerno`
+matched two texts, because `LicencesView` puts an identifier on a DotPanel — fixed test-side in
+`clearsNavBar`, card F4 told), and 39661545695 / 39664474482 (red only on card F2's recorded
+`testDesignLab` query timeout, retried as U4 did).
