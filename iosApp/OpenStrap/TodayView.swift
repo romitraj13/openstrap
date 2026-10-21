@@ -5,37 +5,30 @@ import SwiftUI
 
 /// Today: Recovery's score and why, last night's sleep, the day's steps and the last sync — the
 /// Android Today and Recovery cards, with the wording the shared Kotlin carries.
+///
+/// Card U4 puts this under the app shell's shared header and pull to sync, so the view is the
+/// screen's content only; its cards change in card U5.
 struct TodayView: View {
     @ObservedObject var controller: StrapController
     @ObservedObject var health: HealthModel
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let recovery = health.recovery {
-                        RecoveryCard(recovery: recovery)
-                    } else {
-                        Text("Calculating…")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 60)
-                    }
+        VStack(alignment: .leading, spacing: 20) {
+            if let recovery = health.recovery {
+                RecoveryCard(recovery: recovery)
+            } else {
+                Text("Calculating…")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 60)
+            }
 
-                    if let today = health.today {
-                        SleepSummary(today: today)
-                    }
-                }
-                .padding()
+            if let today = health.today {
+                SleepSummary(today: today)
             }
-            .navigationTitle("Today")
-            .onAppear {
-                health.prepareDemoData()
-                health.reload()
-            }
-            .refreshable { health.reload() }
-            .onChange(of: controller.lastSyncEpochSeconds) { _, _ in health.reload() }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { health.reload() }
     }
 }
 

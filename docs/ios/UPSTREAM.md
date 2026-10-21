@@ -662,3 +662,59 @@ One flake outside this card: the retry run of the same tree failed `:shared:iosS
 on `StrapEngineTest.theAuthKeyNeverAppearsInTheLog` with a `GattException`, and the empty rerun of the
 same tree passed all 302 tests. That test is in the BLE code this card does not touch.
 
+
+## Card U4 (the app shell: five tabs, header, date navigator, You)
+
+### Kotlin copied out of the Compose screens (standing instruction 5)
+
+The profile and goals screens compute their own ranges, unit conversions and timestamps. Those
+functions are now in shared Kotlin, in the package of the file they came from, with JVM tests, and
+Swift calls them instead of re-implementing them.
+
+    app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt:56-63   -> shared/src/commonMain/kotlin/org/openstrap/app/ui/device/DeviceRules.kt  ProfileRules.summary
+    app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt:88-102  -> DeviceRules.kt  ProfileRules.valid / .fields
+    app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt:100-149 -> DeviceRules.kt  ProfileRules.toProfile
+    app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt:74,78-86 -> DeviceRules.kt  sexIndex, heightText, feetText, inchesText, weightText, sleepNeedText
+    app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt:250      -> DeviceRules.kt  formatNumber
+    app/src/main/kotlin/org/openstrap/app/ui/device/GoalsDialog.kt:23-31      -> DeviceRules.kt  GoalsRules.valid, stepsText, sleepHoursText, sleepMinutesText, activeHoursText
+    app/src/main/kotlin/org/openstrap/app/ui/device/GoalsDialog.kt:52-58      -> DeviceRules.kt  GoalsRules.toGoals
+
+What changed in the move, and why:
+
+- `String.format` has no Locale in common Kotlin, so `"%.1f".format(Locale.ROOT, v).removeSuffix(".0")`
+  is `(v * 10).roundToInt() / 10f` and a trailing `.0` check. Same output for every value the fields
+  can hold; the JVM test pins `72`, `158.7` and the kg/lb conversion.
+- `LocalDate.now()` and `System.currentTimeMillis() / 1000` are parameters (`todayIso`,
+  `nowEpochSeconds`) so the save is testable and Swift passes the phone's own clock.
+- The extension function `UserProfile.summary()` became `ProfileRules.summary(profile)`, and the
+  inline `when`/`copy` expressions became object members, because Swift cannot call a Kotlin
+  extension or read Kotlin's default arguments: `ProfileRules.blank()` and `GoalsRules.defaults()`
+  exist only for that.
+- `ProfileRules.fields()` returns the per-field errors the Compose screen draws red
+  (`age.isNotBlank() && ageValue == null`), so the Swift field outline is Kotlin's answer, not a
+  second copy of the ranges.
+
+Tests: `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/DeviceRulesTest.kt`, 17 tests
+(summary, every range, the imperial conversions, the save's copy(), the goals ranges and the four
+opening texts). `:shared:jvmTest` 251 -> 268 tests, 0 failures, 1 opt-in skip; the full-suite run on
+this box also executes F1's untracked scratch probe, which is not part of this card.
+
+### Copies, not ports
+
+    licenses/MIT-Phosphor.txt     -> iosApp/OpenStrap/Licences/MIT-Phosphor.txt
+    licenses/OFL-Funnel.txt       -> iosApp/OpenStrap/Licences/OFL-Funnel.txt
+    licenses/OFL-MuseoModerno.txt -> iosApp/OpenStrap/Licences/OFL-MuseoModerno.txt
+
+Byte-identical (`cmp` clean). They are bundle resources so the "Licences" row can show the three
+texts the app ships with; `project.yml` already treats everything under `OpenStrap/` as a resource
+unless it is Swift. A change to `licenses/` has to be copied here too.
+
+### Not copied
+
+- `MainActivity.kt`'s pager, rail, folding-tabletop layout, `ListDetail` side-by-side panes,
+  `recoveryFocus`, alarms and firmware pages: iPhone layouts and screens this card does not build.
+  The rows are in `docs/ios/UI-PARITY.md` with the reason for each.
+- `YouScreen.kt`'s Export CSV, Import CSV and Restore from Health Connect rows: iOS has no CSV path
+  and the card names one Apple Health row.
+- `DeviceScreen.kt`'s scan-and-pair flow, `Disconnect`, alarms and firmware rows: the card keeps the
+  existing pairing logic and only restyles it, and iOS has no scan API in this card.

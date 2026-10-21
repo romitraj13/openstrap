@@ -24,6 +24,13 @@ class DeviceRulesTest {
     private val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
     private val now = 1_760_000_000L
 
+    @Test
+    fun theSheetOpensOnADefaultWhenNothingIsStoredYet() {
+        // Swift cannot call Kotlin's default arguments, so the screens ask for the blanks.
+        assertEquals(Goals(), GoalsRules.defaults())
+        assertEquals(UserProfile(), ProfileRules.blank())
+    }
+
     // ---- UserProfile.summary() (ProfileScreen.kt:56-63) -----------------------------------------
 
     @Test
@@ -76,7 +83,58 @@ class DeviceRulesTest {
         assertEquals("168", ProfileRules.heightText(168))
     }
 
+    @Test
+    fun theImperialHeightFieldsOpenAsFeetAndInches() {
+        // `profile.heightCm?.let { Units.cmToFeetInches(it) }` (ProfileScreen.kt:79).
+        assertEquals("5", ProfileRules.feetText(178))
+        assertEquals("10", ProfileRules.inchesText(178))
+        assertEquals("0", ProfileRules.inchesText(152))
+    }
+
     // ---- valid (ProfileScreen.kt:88-102) ---------------------------------------------------------
+
+    @Test
+    fun fieldsReportWhichFieldIsInErrorAndTheParsedValues() {
+        // The screen draws a red outline on each field that is filled but out of range
+        // (`age.isNotBlank() && ageValue == null`, ProfileScreen.kt:171 and the same per field).
+        val empty = ProfileRules.fields("", false, "", "", "", "", "", "")
+        assertTrue(empty.valid)
+        assertFalse(empty.ageError)
+        assertFalse(empty.weightError)
+        assertFalse(empty.heightError)
+        assertFalse(empty.maxHrError)
+        assertFalse(empty.sleepNeedError)
+        assertNull(empty.weightKg)
+        assertNull(empty.heightCm)
+
+        assertTrue(ProfileRules.fields("9", false, "", "", "", "", "", "").ageError)
+        assertTrue(ProfileRules.fields("", false, "24", "", "", "", "", "").weightError)
+        assertTrue(ProfileRules.fields("", true, "", "", "5", "12", "", "").heightError)
+        assertTrue(ProfileRules.fields("", false, "", "", "", "", "100", "").maxHrError)
+        assertTrue(ProfileRules.fields("", false, "", "", "", "", "", "6").sleepNeedError)
+
+        // In range: no error, and the parsed value the unit switch carries across.
+        val good = ProfileRules.fields("34", false, "72", "178", "", "", "180", "7.5")
+        assertTrue(good.valid)
+        assertFalse(good.weightError)
+        assertEquals(72f, good.weightKg)
+        assertEquals(178, good.heightCm)
+    }
+
+    @Test
+    fun theSexToggleOpensOnTheProfilesAnswer() {
+        // `when (profile.sex) { Female -> 0; Male -> 1; null -> 2 }` (ProfileScreen.kt:74).
+        assertEquals(0, ProfileRules.sexIndex(UserProfile(sex = UserProfile.Sex.Female)))
+        assertEquals(1, ProfileRules.sexIndex(UserProfile(sex = UserProfile.Sex.Male)))
+        assertEquals(2, ProfileRules.sexIndex(UserProfile()))
+    }
+
+    @Test
+    fun theSleepNeedFieldOpensOnHours() {
+        // `profile.sleepNeedMinutes?.let { formatNumber(it / 60f) }` (ProfileScreen.kt:86).
+        assertEquals("7.5", ProfileRules.sleepNeedText(450))
+        assertEquals("8", ProfileRules.sleepNeedText(480))
+    }
 
     @Test
     fun everyFieldIsOptional() {
@@ -245,5 +303,16 @@ class DeviceRulesTest {
             Goals(steps = 8000, sleepMinutes = 480, activeHours = 10),
             GoalsRules.toGoals("8000", "8", "", "10", Goals()),
         )
+    }
+
+    @Test
+    fun theGoalsFieldsOpenOnTheStoredValues() {
+        // `goals.steps.toString()`, `(goals.sleepMinutes / 60).toString()`, `% 60`, `activeHours`.
+        val goals = Goals(steps = 9000, sleepMinutes = 450, activeHours = 12)
+        assertEquals("9000", GoalsRules.stepsText(goals))
+        assertEquals("7", GoalsRules.sleepHoursText(goals))
+        assertEquals("30", GoalsRules.sleepMinutesText(goals))
+        assertEquals("12", GoalsRules.activeHoursText(goals))
+        assertEquals("0", GoalsRules.sleepMinutesText(Goals(sleepMinutes = 480)))
     }
 }

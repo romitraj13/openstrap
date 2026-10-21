@@ -571,6 +571,211 @@ thing exists yet or why not.
 | `todayTileNames`, `todayTiles` (174-180) | — | not ported: which metrics Today's "What changed" shows; no card asks for the picker yet |
 | `strapReadiness` (184) | — | not ported: the strap's own readiness for calibration; no screen shows it yet |
 
+## `app/src/main/kotlin/org/openstrap/app/MainActivity.kt` — the shell (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Tab` enum, five entries (125-131) | `AppTab` (RootView.swift:4) | ported |
+| `Tab.Today("Today", House, HouseFill)` (126) | `AppTab.today`, label/icon/selectedIcon (RootView.swift:5-38) | ported |
+| `Tab.Recovery("Recovery", Plant, Plant)` (127) | `AppTab.recovery` | ported |
+| `Tab.Sleep("Sleep", Moon, MoonFill)` (128) | `AppTab.sleep` | ported |
+| `Tab.Activity("Activity", Footprints, Footprints)` (129) | `AppTab.activity` | ported |
+| `Tab.You("You", User, User)` (130) | `AppTab.you` | ported |
+| `YouPage` enum (134) | `YouRoute` (RootView.swift:45) | ported: Hub is the You list itself, as it is on Android; Alarms and Firmware have no iOS screens |
+| one `DayViewModel` for the four dated tabs (146) | `HealthModel.date`, shared by the four `DayTab`s (HealthModel.swift:37) | ported: one selected day, reloaded on change |
+| `tab` state (149) | `RootView.tab` (RootView.swift:60) | ported |
+| `todayStack/activityStack/recoveryStack/sleepStack` (165-168) | each `DayTab`'s own `NavigationPath` (RootView.swift:141) | ported: a detail opens inside its tab |
+| `showStrap`, `showAlarms`, `showFirmware`, `profileTab` (155, 171) | `YouRoute` path (RootView.swift:62) | ported for profile/strap/diagnostics/licences; alarms and firmware not ported (no iOS screen) |
+| `openStrap` = You + `showStrap` (262) | `RootView.openStrap()` (RootView.swift:124) | ported |
+| `LaunchedEffect(tab)` clears nothing; `selectTab` clears every stack (298-303) | nav bar sets `youPath = []` (RootView.swift:102-107) | ported: picking a tab drops that tab's detail |
+| `FloatingNavBar(navItems, tab, selectTab)` (306) | `FloatingNavBar` (RootView.swift:102) | ported |
+| `HorizontalPager` swipe between tabs (241-245, 355) | — | not ported: swipe-between-tabs is not part of this card's list, and iOS keeps the tab bar's tap |
+| `rail` for windows wider than tall (296, 496) | — | not ported: iPhone only |
+| `ListDetail`, `SideBySideWidth` (367, 405, 426, 449, 483) | `NavigationStack` per tab | ported: iPhone shows the detail full width; the side-by-side panes are a tablet layout |
+| `BackHandler` (258, 261) | `NavigationStack` back, and the explicit `ArrowLeft` rows (ProfileScreen.swift:88, StrapView.swift:55) | ported: iOS's own back gesture and a visible back button |
+| `recoveryFocus` (151) | — | not ported: Today's "open Recovery section" is a U5/U6 link |
+| `pullToSync` wrapper over each tab (362-364) | `PullSyncScroll` (DateHeader.swift:46) | ported |
+| `OledSurfaces` around the You tab (483) | — | not ported: Android's OLED scroll surface; iOS draws the same black directly |
+| `GlassOverlay`/`GlassHost` (266, 500) | `.sheet` with a glass background | ported: the calendar and goals open over a glass surface |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/components/PullToSync.kt` (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `PullSyncState(fraction, syncing)` (55) | `PullSyncState` (DateHeader.swift:19) | ported |
+| `LocalPullSync` (58) | `EnvironmentValues.pullSync` (DateHeader.swift:30) | ported |
+| `PullToSync` box, `isRefreshing = pulled \|\| running` (104-123) | `PullSyncScroll` (DateHeader.swift:46) | ported with `.refreshable`; see the note below |
+| `onRefresh` calls the strap's sync (107-115) | `.refreshable { onSync() }` (DateHeader.swift:76) → `controller.syncNow()` (RootView.swift:144) | ported |
+| `"The strap isn't connected"` (110) | — | not ported: `StrapController.syncNow()` logs the reason instead of showing a toast |
+| `REVEAL = 48.dp` (164) | `reveal: CGFloat = 48` (DateHeader.swift:91) | ported |
+| `TICKS = 4` ratchet haptics (165, 93-102) | — | not ported: haptics are not in this card's list |
+| `START_GRACE_MS = 3000` (166, 88) | — | not ported: `.refreshable` ends the gap when the sync's own state says done |
+| `PullSyncReveal` (127) | `PullSyncReveal` (DateHeader.swift:87) | ported |
+| height = `fraction * 48`, alpha = `fraction` (137, 143) | `.frame(height: fraction * reveal)`, `.opacity(alpha)` (DateHeader.swift:110-112) | ported |
+| watch icon 18 pt, turns with the pull, spins while syncing (146-150) | 18 pt, `.rotationEffect(fraction * 180)`, an opacity pulse while syncing (DateHeader.swift:96-104) | ported with the motion rule: standing instruction 7 allows only offset, scale and opacity to animate, so the continuous spin is a pulse |
+| `"Syncing strap…"` (153) | `label(ready:)` (DateHeader.swift:123) | ported |
+| `"Release to sync strap"` (154) | same | ported |
+| `"Pull to sync strap"` (155) | same | ported |
+| tint: primary when ready or syncing, else onSurfaceVariant (149) | same (DateHeader.swift:103) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowLayout.kt` — `GlowHeader` (card U4 uses it)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GlowHeader` title row (162-177) | `GlowHeader` (GlowLayout.swift:171, card U2) | ported: no new instance is added in U4; the You screens keep the U2 panes' own `DotHeader` |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/ScreenParts.kt` — `DateHeader` (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `DateHeader` (101-173) | `DateHeader` (DateHeader.swift:133) | ported |
+| `WordmarkDot = Color(0xFFFF4D5E)` (94) | `wordmarkDot` (DateHeader.swift:141) | ported |
+| `"OpenStrap"` in MuseoModerno SemiBold 22 sp (113-124) | `wordmark` (DateHeader.swift:225) | ported |
+| the coloured `"."` (116) | same | ported |
+| strap chip: battery text, `"⚡$battery%"` (135) | `strapChip` (DateHeader.swift:232-266) | ported: `charging ? "⚡\(battery)%" : "\(battery)%"` |
+| battery tint at ≤15% or charging (137) | same | ported through `MetricColors.battery` |
+| watch icon 20 pt + 6 pt battery dot (141-147) | same | ported |
+| `"Strap connected"` / `"Strap not connected"` (143) | `strapChip` accessibility label (DateHeader.swift:264) | ported |
+| `"Open your strap"` click label (129) | `.accessibilityValue("Open your strap")` (DateHeader.swift:265) | ported |
+| `PullSyncReveal()` under the wordmark (151) | `PullSyncReveal()` (DateHeader.swift:162) | ported |
+| `"Previous day"` (153) | `date.previous` (DateHeader.swift:168-175) | ported |
+| `"Pick a day"` (155) | `date.pick` (DateHeader.swift:177-193) | ported |
+| `"Today"` (161) | `label(for:)` (DateHeader.swift:268) | ported |
+| `"Yesterday"` (162) | same | ported |
+| `date.format("EEE d MMM")` (163) | same, via `Locale.current` | ported |
+| caret-down 14 pt beside the date (168) | same (DateHeader.swift:184) | ported |
+| `"Next day"`, disabled on today (170) | `date.next`, `.disabled(isToday)` (DateHeader.swift:195-208) | ported |
+| `DayCalendarSheet` opened from the date (110) | `.sheet` presenting `DayCalendarSheet` (DateHeader.swift:210-219) | ported (U2's sheet, unchanged) |
+| `ScreenList` gutter 16, top 4, spacing 12 (69-88) | `.padding(.horizontal, 16)`, `spacing: 12` (RootView.swift:157-160) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/device/YouScreen.kt` (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `"You"` headline (63) | `you.title` (YouView.swift:26) | ported |
+| profile panel (67-78) | `you.profile` panel (YouView.swift:31-50) | ported |
+| `"Your profile"` (72) | same (YouView.swift:37) | ported |
+| `profile.summary()` (73) | `ProfileRules.summary` (YouView.swift:41) | ported: the Kotlin function, copied from ProfileScreen.kt |
+| goals panel (81-92) | `you.goals` panel (YouView.swift:52-70) | ported |
+| `"Your goals"` (86) | same (YouView.swift:58) | ported |
+| `goals.summary()` (87) | shared `Goals.summary()` (YouView.swift:62) | ported: already in shared Kotlin |
+| `Group("Device")` (94) | `GroupLabel("Device")` (YouView.swift:73) | ported |
+| `StrapCard(paired?.name, …)` (95, 139-179) | strap card (YouView.swift:75-102) | ported: iOS has no device name, so the title is Android's own `"Your strap"` when a key is stored |
+| `"Pair your Helio Strap"` (146) | same (YouView.swift:80) | ported |
+| `"Scan, or sign in with Zepp to fetch the key"` (147) | same (YouView.swift:91) | ported |
+| `"Connected"` (152) | `statusText` (YouView.swift:189) | ported |
+| `"Connecting…"` (153) | same | ported |
+| `"Connection failed"` (154) | same | ported |
+| `"Not connected"` (155) | same | ported |
+| `"Charging $it%"` / `"$it%"` (163) | `statusLine` (YouView.swift:199) | ported |
+| `"Syncing…"` (165) | same, from `controller.syncRunning` | ported |
+| `"Synced ${clock(...)}"` (166) | `"Synced \(controller.lastSyncText)"` | ported: Android's `d MMM HH:mm` is iOS's `lastSyncText` |
+| `" · "` between the status parts (169) | same | ported |
+| `YouIcon` 52 pt circle, 26 pt white icon (196-201) | `YouIcon` (QuietRows.swift:47) | ported |
+| `LinkRow` (182-192) | `LinkRow` (QuietRows.swift:138) | ported |
+| `Group("Your data")` (97) | `GroupLabel("Your data")` (YouView.swift:105) | ported |
+| `"Health data stays on this phone. Nothing leaves it unless you export it."` (101) | same (YouView.swift:108) | ported |
+| `"Export CSV"` / `"A zip of every synced record"` (105) | — | not ported: iOS has no CSV path, and the card names only the Apple Health row |
+| `"Import CSV"` / its subtitle (107) | — | not ported: same reason |
+| `"Health Connect"` / `"Copy your data to Android Health Connect"` (109) | `"Apple Health"` / `"Copy your data to Apple Health"` (YouView.swift:112) | ported as the standing instruction's Apple Health exception; it drives `controller.setAppleHealth` |
+| `"Restore from Health Connect"` (111) | — | not ported: no iOS import path |
+| `Group("Support")` (115) | `GroupLabel("Support")` (YouView.swift:124) | ported |
+| `DiagnosticsPanel(log, asRow = true)` (116, 441-482) | `you.diagnostics` row (YouView.swift:126-142) | ported as a row that opens the existing Diagnostics screen |
+| `"Diagnostics"` (453) | same (YouView.swift:132) | ported |
+| `"${lines.size} lines"` (453) | `"\(controller.logLines.count) lines"` (YouView.swift:137) | ported |
+| `"Tap to hide"` / `"Hide"` (453, 456) | — | not ported: the row opens a screen instead of expanding in place |
+| `"Copy log"` (461) | `Copy` in DiagnosticsView's toolbar (DiagnosticsView.swift:47) | ported (pre-existing screen) |
+| `"No events yet."` (475) | `"Nothing logged yet."` (DiagnosticsView.swift:34) | not ported: the existing iOS diagnostics screen keeps its own wording |
+| sample-data button (118-120) | — | not ported: `-demoData` is the iOS debug seed (card C6) |
+| `"OpenStrap ${BuildConfig.VERSION_NAME} · local-first, no cloud"` (124) | `"OpenStrap \(appVersion) · local-first, no cloud"` (YouView.swift:161) | ported: the version comes from `CFBundleShortVersionString` |
+| `"Licences"` row | `you.licences` (YouView.swift:145-158) | ported: the card's own exception; opens `LicencesView` (LicencesView.swift:6) with the three bundled texts |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/device/ProfileScreen.kt` (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `UserProfile.summary()` (56-63) | `ProfileRules.summary` (DeviceRules.kt:23) | ported into shared Kotlin, with JVM tests |
+| `ProfileScreen` (72-216) | `ProfileScreen` (ProfileScreen.swift:20) | ported |
+| `"Your profile"` (158) | same (ProfileScreen.swift:97) | ported |
+| `"Save"` (159) | `profile.save` (ProfileScreen.swift:101-106) | ported |
+| back arrow (157) | `profile.back` (ProfileScreen.swift:88-95) | ported |
+| `"Age sets your maximum heart rate, …"` (166-168) | same (ProfileScreen.swift:113-116) | ported |
+| `"Age"` / `"years"` (171) | `NumberField("Age", "years")` (ProfileScreen.swift:121-124) | ported |
+| `SexToggle` female/male (173-174, 257-268) | `SexToggle` (ProfileScreen.swift:324) | ported |
+| `"Female"`, `"Male"` (173-174) | same (ProfileScreen.swift:126-131) | ported |
+| `"Units"` (177) | same (ProfileScreen.swift:136) | ported |
+| `SegmentedTabs("Metric", "Imperial")` (178) | `SegmentedTabs` (ProfileScreen.swift:353) | ported |
+| `"Metric"`, `"Imperial"` (178) | same | ported |
+| `"Weight"`, `"lb"`/`"kg"` (180-183) | same (ProfileScreen.swift:141-147) | ported |
+| `"Feet"`, `"Inches"`, `"Height"`, `"ft"/"in"/"cm"` (184-191) | same (ProfileScreen.swift:149-157) | ported |
+| `"Usual activity (for the fitness estimate)"` (193) | same (ProfileScreen.swift:160) | ported |
+| the 1-5 chips (194-201) | `ActivityChip` (ProfileScreen.swift:419) | ported |
+| `Vo2max.ACTIVITY_LEVELS[i]` (203) | `Vo2max.shared.ACTIVITY_LEVELS` (ProfileScreen.swift:255) | ported: already shared Kotlin |
+| `"Pick the level that best matches a usual week."` (203) | same (ProfileScreen.swift:258) | ported |
+| `"Taking beta-blockers"` (207) | same (ProfileScreen.swift:173) | ported |
+| `"Pregnant"` (208) | same (ProfileScreen.swift:174) | ported |
+| Checkbox (244) | `PhosphorIcon.checkCircle` + tap (ProfileScreen.swift:386-412) | ported with a glyph: iOS has no square checkbox |
+| `"Max heart rate from a test (optional)"`, `"bpm"` (209) | same (ProfileScreen.swift:175-180) | ported |
+| `"Sleep need (7–9, blank for your age's default)"`, `"h"` (210) | same (ProfileScreen.swift:181-187) | ported |
+| `NumberField` outline 14 pt, label, suffix, error state (219-239) | `NumberField` (ProfileScreen.swift:274) | ported: the label sits above the field, since SwiftUI's `TextField` has no floating label |
+| `formatNumber` (250) | `ProfileRules` `formatNumber` (DeviceRules.kt:186) | ported into shared Kotlin |
+| `FemaleColor`/`MaleColor` (252-253) | `ThemeColors.female`/`.male` (Theme.swift:224-225) | ported |
+| `"Discard changes?"` (124) | same (ProfileScreen.swift:75) | ported |
+| `"Your profile changes haven't been saved."` (125) | same (ProfileScreen.swift:79) | ported |
+| `"Discard"`, `"Keep editing"` (126-127) | same (ProfileScreen.swift:76-77) | ported |
+| the `valid` expression (101-102) | `ProfileRules.fields`/`valid` (DeviceRules.kt:37-82) | ported into shared Kotlin |
+| `copy(birthYear, sex, weight, height, imperial, sleepNeed, maxHr, activity, activityAnsweredAt, bodyMeasuredAt, betaBlocker, pregnant)` (131-147) | `ProfileRules.toProfile` (DeviceRules.kt:115) | ported into shared Kotlin |
+| `switchUnits` carrying entries across (104-113) | `switchUnits` (ProfileScreen.swift:216-229) | ported: the conversion itself is Kotlin (`weightText`/`feetText`) |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/device/GoalsDialog.kt` (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GoalsDialog` (22-60) | `GoalsSheet` (GoalsSheet.swift:13) | ported as a sheet in the same glass |
+| `"Your goals"` (36) | same (GoalsSheet.swift:39) | ported |
+| `ChartLineUp` icon (35) | same (GoalsSheet.swift:31) | ported |
+| `"What you aim for each day. Change them when they stop fitting."` (39) | same (GoalsSheet.swift:44) | ported |
+| `"Steps"`, `"steps"` (40) | same (GoalsSheet.swift:48) | ported |
+| `"Sleep"`, `"h"`, `""`, `"min"` (42-43) | same (GoalsSheet.swift:51-52) | ported |
+| `"Active hours"`, `"of 24"` (45) | same (GoalsSheet.swift:55) | ported |
+| `"An active hour is one with at least 250 steps."` (47) | same (GoalsSheet.swift:57) | ported |
+| `"Save"`, `"Cancel"` (56-58) | same (GoalsSheet.swift:62-76) | ported |
+| the ranges and `sleepValue` (28-31) | `GoalsRules.valid`/`toGoals` (DeviceRules.kt:199-220) | ported into shared Kotlin, with JVM tests |
+| `Goals(steps, sleepMinutes, activeHours)` (55) | `GoalsRules.toGoals` (DeviceRules.kt:206) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/device/DeviceScreen.kt` — the strap screens, restyled (card U4)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `DeviceScreen` (72-193) | `StrapView` (StrapView.swift:9) | ported and restyled in `DotPanel`s; the logic is the iOS controller's own, unchanged |
+| `"Your strap"` (137) | same (StrapView.swift:65) | ported |
+| back arrow (136) | `strap.back` (StrapView.swift:55-63) | ported |
+| `StatusHero` (197-260) | `statusHero` (StrapView.swift:73) | ported as a quiet panel |
+| `"Connected to"`, `"Connecting to"`, `"Authenticating"`, `"Connection failed"`, `"Not connected"` (201-207) | `statusLabel` (StrapView.swift:219-228) | ported |
+| `"Last sync"` (213) | same (StrapView.swift:93) | ported |
+| `"Syncing…"` for a running sync (217) | same (StrapView.swift:94) | ported |
+| battery ring / `"$it%"` / `"Battery"` / `"Charging"` (229-239) | battery text + `SectionLabel` (StrapView.swift:101-113) | ported without the ring: the ring is `ProgressRing`, which U4 doesn't port; the number and colour are the same |
+| `"Firmware $it"` (246) | same (StrapView.swift:109) | ported |
+| `"Sync now"` (155, 171) | same (StrapView.swift:124) | ported |
+| `"Disconnect"` and its dialog (89-109, 157-163) | — | not ported: the iOS controller has no disconnect, and this card changes no device logic |
+| `"Connect"` (172) | `"Connect"` on the pairing panel (PairView.swift:74) | ported |
+| `"Cancel"` while connecting (167) | — | not ported: no iOS mid-connection cancel |
+| `"Alarms & alerts"` (178) | — | not ported: no iOS alarms screen |
+| `"Firmware update"` (182) | — | not ported: no iOS firmware install |
+| `"Forget this strap"` (186) | same (StrapView.swift:138) | ported |
+| `"Forget this strap?"` (115) | same (StrapView.swift:39) | ported |
+| the forget dialog's body (119-121) | same (StrapView.swift:42-48) | ported |
+| `"Forget"`, `"Cancel"` (125-129) | same (StrapView.swift:40-41) | ported |
+| `PairPanel` (263-315) | `PairPanel` (PairView.swift:31) | ported with iOS's own key entry |
+| `"Pair your Helio Strap"` (281) | same (PairView.swift:43) | ported |
+| `"OpenStrap needs the strap's auth key, …"` (282-285) | same (PairView.swift:46-49) | ported |
+| `"Sign in with Zepp"` (308) | same (PairView.swift:96) | ported: opens the existing `ZeppSignInView` |
+| the three pair steps (286-300) | — | not ported: the Zepp steps describe Android's scan-and-pair flow; iOS pairs with a pasted key or the Zepp sheet |
+| `"Enter the key yourself"` / `ManualPairDialog` (310, 344-423) | `PairPanel`'s key field (PairView.swift:59-78) | ported as the screen's only manual entry: no scan, no address field (no iOS scan API in this card) |
+| `KeyRejectedPanel` (427-437) | `pairError` (PairView.swift:81-85) | ported as the controller's error line |
+| `DiagnosticsPanel(lines, asRow = false)` (441-482) | `morePanel` (StrapView.swift:190-215) | ported as a row that opens the existing `DiagnosticsView` |
+| `clock(epochSeconds)` `"d MMM HH:mm"` (484-485) | `StrapController.lastSyncText` | ported (pre-existing) |
+
 ## Not in this card
 
 The debug Design lab (`DesignLabView.swift`, `-designLab`) has no Compose counterpart: Android has

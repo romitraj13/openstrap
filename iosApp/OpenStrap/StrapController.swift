@@ -66,6 +66,10 @@ final class StrapController: ObservableObject {
     @Published private(set) var syncLogRows: [SyncLogRow] = []
     /// True while the app is not on screen. Syncs then run from a Bluetooth wake, on borrowed time.
     @Published private(set) var inBackground = false
+
+    /// Whether the shared engine says a history sync is running (`sync running` / `sync done`).
+    /// Card U4's header reads it for the same gap Android's `PullToSync` opens.
+    @Published private(set) var syncRunning = false
     /// Card C7: "Write to Apple Health". Off until the user turns it on, and remembered after that.
     @Published private(set) var appleHealthEnabled: Bool
     /// What the Strap screen says under the toggle: the permission answer, or why it is unavailable.
@@ -306,6 +310,12 @@ final class StrapController: ObservableObject {
     fileprivate func engineSync(state: String, detail: String?, lastSyncEpochSeconds: Int64) {
         if state == "running" {
             beginSyncBackgroundTask()
+        }
+        // The screens' one sync indicator (card U4): Android's PullToSync reads the same two states.
+        if state == "running" {
+            syncRunning = true
+        } else if state == "done" || state == "failed" {
+            syncRunning = false
         }
         if lastSyncEpochSeconds > 0 {
             self.lastSyncEpochSeconds = lastSyncEpochSeconds

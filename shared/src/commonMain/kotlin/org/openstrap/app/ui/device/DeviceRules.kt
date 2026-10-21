@@ -19,7 +19,6 @@ import kotlin.math.roundToInt
 
 /** One line for the settings row: "34 years, male, 72 kg, 178 cm", or a prompt when empty. */
 object ProfileRules {
-
     /** `UserProfile.summary()` (ProfileScreen.kt:56). */
     fun summary(profile: UserProfile): String =
         if (profile.isEmpty) "Add age and sex for accurate effort and recovery"
@@ -44,12 +43,56 @@ object ProfileRules {
         inches: String,
         maxHr: String,
         sleepNeed: String,
-    ): Boolean =
-        (age.isBlank() || ageValue(age) != null) &&
-            (weight.isBlank() || weightValue(weight, imperial) != null) &&
-            (heightBlank(heightCm, feet, inches, imperial) || heightValue(heightCm, feet, inches, imperial) != null) &&
-            (sleepNeed.isBlank() || sleepNeedValue(sleepNeed) != null) &&
-            (maxHr.isBlank() || maxHrValue(maxHr) != null)
+    ): Boolean = fields(age, imperial, weight, heightCm, feet, inches, maxHr, sleepNeed).valid
+
+    /** The same ranges, per field: the screen reddens only the field that is filled and out of
+     * range (`age.isNotBlank() && ageValue == null`, ProfileScreen.kt:171), and the unit switch
+     * needs the parsed weight and height to carry across.
+     */
+    fun fields(
+        age: String,
+        imperial: Boolean,
+        weight: String,
+        heightCm: String,
+        feet: String,
+        inches: String,
+        maxHr: String,
+        sleepNeed: String,
+    ): ProfileFields {
+        val ageValue = ageValue(age)
+        val weightValue = weightValue(weight, imperial)
+        val heightValue = heightValue(heightCm, feet, inches, imperial)
+        val maxHrValue = maxHrValue(maxHr)
+        val sleepNeedValue = sleepNeedValue(sleepNeed)
+        val ageError = age.isNotBlank() && ageValue == null
+        val weightError = weight.isNotBlank() && weightValue == null
+        val heightError = !heightBlank(heightCm, feet, inches, imperial) && heightValue == null
+        val maxHrError = maxHr.isNotBlank() && maxHrValue == null
+        val sleepNeedError = sleepNeed.isNotBlank() && sleepNeedValue == null
+        return ProfileFields(
+            valid = !ageError && !weightError && !heightError && !maxHrError && !sleepNeedError,
+            ageError = ageError,
+            weightError = weightError,
+            heightError = heightError,
+            maxHrError = maxHrError,
+            sleepNeedError = sleepNeedError,
+            weightKg = weightValue,
+            heightCm = heightValue,
+        )
+    }
+
+    /** `UserProfile()`: Swift cannot call Kotlin's default arguments. */
+    fun blank(): UserProfile = UserProfile()
+
+    /** `when (profile.sex) { Female -> 0; Male -> 1; null -> 2 }` (ProfileScreen.kt:74). */
+    fun sexIndex(profile: UserProfile): Int = when (profile.sex) {
+        UserProfile.Sex.Female -> 0
+        UserProfile.Sex.Male -> 1
+        null -> 2
+    }
+
+    /** The sleep-need field's opening text: minutes as hours (`formatNumber(it / 60f)`, ProfileScreen.kt:86). */
+    fun sleepNeedText(minutes: Int): String = formatNumber(minutes / 60f)
 
     /** The weight field's opening text: the stored kg, or pounds when the profile is imperial (`formatNumber`). */
     fun weightText(kg: Float, imperial: Boolean): String =
@@ -57,6 +100,12 @@ object ProfileRules {
 
     /** The height field's opening text: the stored centimetres (ProfileScreen.kt:78). */
     fun heightText(cm: Int): String = cm.toString()
+
+    /** The imperial height fields' opening text: the stored centimetres as feet (ProfileScreen.kt:79). */
+    fun feetText(cm: Int): String = Units.cmToFeetInches(cm).first.toString()
+
+    /** The inches half of the same conversion. */
+    fun inchesText(cm: Int): String = Units.cmToFeetInches(cm).second.toString()
 
     /**
      * The `profile.copy(...)` the Save button performs (ProfileScreen.kt:130-149). A blank field
@@ -166,6 +215,21 @@ object GoalsRules {
         activeHours = activeValue(activeHours) ?: current.activeHours,
     )
 
+    /** `goals.steps.toString()` (GoalsDialog.kt:23). */
+    fun stepsText(goals: Goals): String = goals.steps.toString()
+
+    /** `(goals.sleepMinutes / 60).toString()` (GoalsDialog.kt:24). */
+    fun sleepHoursText(goals: Goals): String = (goals.sleepMinutes / 60).toString()
+
+    /** `(goals.sleepMinutes % 60).toString()` (GoalsDialog.kt:25). */
+    fun sleepMinutesText(goals: Goals): String = (goals.sleepMinutes % 60).toString()
+
+    /** `goals.activeHours.toString()` (GoalsDialog.kt:26). */
+    fun activeHoursText(goals: Goals): String = goals.activeHours.toString()
+
+    /** `Goals()`: Swift cannot call Kotlin's default arguments. */
+    fun defaults(): Goals = Goals()
+
     private fun stepsValue(steps: String): Int? = steps.toIntOrNull()?.takeIf { it in Goals.STEPS }
 
     private fun sleepValue(hours: String, minutes: String): Int? =
@@ -175,3 +239,19 @@ object GoalsRules {
 
     private fun activeValue(active: String): Int? = active.toIntOrNull()?.takeIf { it in Goals.ACTIVE_HOURS }
 }
+
+/**
+ * `ProfileScreen`'s per-field state: which field is filled but out of range, and the weight and
+ * height a save (or the unit switch) would use. The constructor is internal because the screen
+ * only ever reads it.
+ */
+class ProfileFields internal constructor(
+    val valid: Boolean,
+    val ageError: Boolean,
+    val weightError: Boolean,
+    val heightError: Boolean,
+    val maxHrError: Boolean,
+    val sleepNeedError: Boolean,
+    val weightKg: Float?,
+    val heightCm: Int?,
+)

@@ -27,19 +27,31 @@ final class HealthModel: ObservableObject {
     /// The Diagnostics line the demo seed wrote; nil until `-demoData` has run.
     @Published private(set) var demoMessage: String?
 
-    /// The day every screen shows, `yyyy-MM-dd` in the phone's own time zone.
-    let date: String
+    /// The local days the calendar may offer, oldest first (`ScreenQueries.daysWithData`).
+    @Published private(set) var daysWithData: Set<Date> = []
+
+    /// What the You tab edits: the same settings rows Android's `SettingsStore` reads.
+    @Published private(set) var profile: UserProfile = ProfileRules.shared.blank()
+    @Published private(set) var goals: Goals = GoalsRules.shared.defaults()
+
+    /// The day every dated screen shows, `yyyy-MM-dd` in the phone's own time zone. Card U4 makes
+    /// it the one selected day the four date tabs share, as Android's `DayViewModel` is shared.
+    private(set) var date: String
 
     private let queries: HealthQueries
+    /// The U3 object the screens' new state comes from: the calendar, the profile and the goals.
+    private let screens: ScreenQueries
     private var seeded = false
 
     init(databasePath: String) {
         date = HealthModel.isoToday()
         queries = HealthQueries(databasePath: databasePath)
+        screens = ScreenQueries(databasePath: databasePath)
     }
 
     deinit {
         queries.close()
+        screens.close()
     }
 
     /// Seeds the sample month once when the app was launched with `-demoData` in a debug build.
@@ -66,6 +78,66 @@ final class HealthModel: ObservableObject {
         queries.recovery(date: date) { [weak self] snapshot in
             self?.recovery = snapshot
         }
+    }
+
+    // MARK: - The one selected day (card U4)
+
+    /// Moves every dated screen to [day], as `DayViewModel.select` does.
+    func select(_ day: Date) {
+        let iso = HealthModel.iso(day)
+        guard iso != date else { return }
+        date = iso
+        reload()
+    }
+
+    /// The days the calendar lights up, as `Date`s at the start of each local day.
+    func reloadDaysWithData() {
+        screens.daysWithData { [weak self] list in
+            self?.daysWithData = Set(list.compactMap { HealthModel.day(fromIso: $0) })
+        }
+    }
+
+    // MARK: - The profile and goals (card U4)
+
+    func reloadSettings() {
+        screens.profile { [weak self] value in
+            self?.profile = value
+        }
+        screens.goals { [weak self] value in
+            self?.goals = value
+        }
+    }
+
+    /// Saves and hands the write's own completion back, so a caller only reads after it landed.
+    func saveProfile(_ value: UserProfile, onDone: @escaping () -> Void) {
+        screens.saveProfile(profile: value) { [weak self] in
+            self?.profile = value
+            onDone()
+        }
+    }
+
+    /// Saves the goals and calls [onDone] once the row is stored.
+    func saveGoals(_ value: Goals, onDone: @escaping () -> Void) {
+        screens.saveGoals(goals: value) { [weak self] in
+            self?.goals = value
+            onDone()
+        }
+    }
+
+    private static func iso(_ day: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: day)
+    }
+
+    private static func day(fromIso value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
     }
 
     private static func isoToday() -> String {

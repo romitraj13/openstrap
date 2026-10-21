@@ -13,9 +13,12 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(app.secureTextFields["authKeyField"].exists)
     }
 
-    /// Card C6: `-demoData` seeds the sample month, so each of the four screens has something to
-    /// draw. A screenshot of every tab is attached to the `.xcresult` with lifetime `keepAlways`.
-    func testEveryTabShowsItsScreen() {
+    /// Card U4: five tabs, the shared header, the calendar and every You screen. `-demoData`
+    /// seeds the sample month, so each tab has something to draw without a strap.
+    ///
+    /// One screenshot per state the card touches, named `U4-<screen>-<n>` so `screens.py` picks
+    /// them up.
+    func testEveryTabAndYouScreen() {
         let app = XCUIApplication()
         app.launchArguments = ["-demoData"]
         app.launch()
@@ -24,21 +27,86 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["todayScore"].waitForExistence(timeout: 120),
             "Today never drew a Recovery score from the seeded sample data"
         )
-        attach(app, "today")
+        // The header the four date tabs share.
+        XCTAssertTrue(app.staticTexts["app.wordmark"].exists, "The header never drew its wordmark")
+        attach(app, "U4-today-1")
 
-        app.tabBars.buttons["Sleep"].tap()
-        XCTAssertTrue(app.navigationBars["Sleep"].waitForExistence(timeout: 30))
+        // The five destinations, in the order MainActivity's Tab enum declares them.
+        for label in ["Today", "Recovery", "Sleep", "Activity", "You"] {
+            XCTAssertTrue(app.buttons[label].exists, "There is no \(label) tab")
+        }
+
+        app.buttons["Recovery"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["interim.recovery"].waitForExistence(timeout: 30),
+            "The Recovery tab never drew its panel"
+        )
+        attach(app, "U4-recovery-1")
+
+        app.buttons["Sleep"].tap()
         XCTAssertTrue(app.staticTexts["sleepScore"].waitForExistence(timeout: 30), "Sleep never drew the night's score")
-        attach(app, "sleep")
+        attach(app, "U4-sleep-1")
 
-        app.tabBars.buttons["Heart"].tap()
-        XCTAssertTrue(app.navigationBars["Heart"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["heartLatest"].waitForExistence(timeout: 30), "Heart never drew the day's rate")
-        attach(app, "heart")
+        app.buttons["Activity"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["interim.activity"].waitForExistence(timeout: 30),
+            "The Activity tab never drew its panel"
+        )
+        attach(app, "U4-activity-1")
 
-        app.tabBars.buttons["Strap"].tap()
-        XCTAssertTrue(app.navigationBars["Strap"].waitForExistence(timeout: 30))
-        attach(app, "strap")
+        // The date navigator's calendar sheet, from the shared header.
+        XCTAssertTrue(app.buttons["date.pick"].waitForExistence(timeout: 30), "The header has no day picker")
+        app.buttons["date.pick"].tap()
+        XCTAssertTrue(app.staticTexts["Has data"].waitForExistence(timeout: 30), "The calendar sheet never opened")
+        attach(app, "U4-calendar-1")
+        dismissSheet(app)
+
+        // You, and everything it opens.
+        app.buttons["You"].tap()
+        XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
+        attach(app, "U4-you-1")
+
+        app.buttons["you.profile"].tap()
+        XCTAssertTrue(app.staticTexts["Your profile"].waitForExistence(timeout: 30))
+        attach(app, "U4-profile-1")
+        app.buttons["profile.back"].tap()
+
+        XCTAssertTrue(app.buttons["you.goals"].waitForExistence(timeout: 30))
+        app.buttons["you.goals"].tap()
+        XCTAssertTrue(app.staticTexts["Your goals"].waitForExistence(timeout: 30), "The goals sheet never opened")
+        attach(app, "U4-goals-1")
+        app.buttons["goals.cancel"].tap()
+
+        XCTAssertTrue(app.buttons["you.strap"].waitForExistence(timeout: 30))
+        app.buttons["you.strap"].tap()
+        XCTAssertTrue(app.staticTexts["Your strap"].waitForExistence(timeout: 30))
+        attach(app, "U4-strap-1")
+        app.buttons["strap.back"].tap()
+
+        XCTAssertTrue(app.buttons["you.diagnostics"].waitForExistence(timeout: 30))
+        app.buttons["you.diagnostics"].tap()
+        XCTAssertTrue(app.navigationBars["Diagnostics"].waitForExistence(timeout: 30), "Diagnostics never opened")
+        attach(app, "U4-diagnostics-1")
+        app.navigationBars["Diagnostics"].buttons.firstMatch.tap()
+
+        XCTAssertTrue(app.buttons["you.licences"].waitForExistence(timeout: 30))
+        app.buttons["you.licences"].tap()
+        XCTAssertTrue(app.staticTexts["Licences"].waitForExistence(timeout: 30), "The licence texts never opened")
+        attach(app, "U4-licences-1")
+        app.buttons["licences.back"].tap()
+
+        XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "Back from Licences never returned to You")
+    }
+
+    /// A medium sheet has no close button: drag it down, as a finger would.
+    private func dismissSheet(_ app: XCUIApplication) {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.58))
+            .press(
+                forDuration: 0.1,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.05)),
+                withVelocity: .fast,
+                thenHoldForDuration: 0.1
+            )
     }
 
     /// Card U2: the same lab, now with the glow charts, the gauges, the quiet panels, the tab bar and

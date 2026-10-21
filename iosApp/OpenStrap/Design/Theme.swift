@@ -220,4 +220,8 @@ enum ThemeColors {
     static let outline = Color(hex: 0x2C2C2E)
     static let outlineVariant = Color(hex: 0x232323)
     static let error = Color(hex: 0xFF6B6B)
+
+    /// The two sex toggles' accents (`FemaleColor`/`MaleColor`, ProfileScreen.kt:252-253).
+    static let female = Color(hex: 0xFFF472B6)
+    static let male = Color(hex: 0xFF60A5FA)
 }

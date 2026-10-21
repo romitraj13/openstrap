@@ -4,39 +4,33 @@ import OpenStrapShared
 import SwiftUI
 
 /// Last night: the score, the sentence, the night as a hypnogram, and the stage totals.
+///
+/// Card U4 puts this under the app shell's shared header and pull to sync, so the view is the
+/// screen's content only; its cards change in card U7.
 struct SleepView: View {
     @ObservedObject var health: HealthModel
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let sleep = health.sleep {
-                        if sleep.end > sleep.start {
-                            Headline(sleep: sleep)
-                            Hypnogram(sleep: sleep)
-                            Breakdown(sleep: sleep)
-                        } else {
-                            Text("Recovery is scored each morning from the night's sleep. Wear the strap to bed.")
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("sleepEmpty")
-                        }
-                    } else {
-                        Text("Calculating…")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 60)
-                    }
+        VStack(alignment: .leading, spacing: 20) {
+            if let sleep = health.sleep {
+                if sleep.end > sleep.start {
+                    Headline(sleep: sleep)
+                    Hypnogram(sleep: sleep)
+                    Breakdown(sleep: sleep)
+                } else {
+                    Text("Recovery is scored each morning from the night's sleep. Wear the strap to bed.")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("sleepEmpty")
                 }
-                .padding()
+            } else {
+                Text("Calculating…")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 60)
             }
-            .navigationTitle("Sleep")
-            .onAppear {
-                health.prepareDemoData()
-                health.reload()
-            }
-            .refreshable { health.reload() }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { health.reload() }
     }
 }
 
