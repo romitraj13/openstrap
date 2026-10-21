@@ -618,13 +618,37 @@ numbers with it:
   pushing the column off both sides. It is the only place in the app that asks for more width than it
   is given, which is what makes the UI test below catch a regression.
 
+The lab then still failed that test with the column in the right place, and the screenshots said the
+layout was right (`first_lit_col` 61 px = the 20 pt padding, both edge columns dark). The second
+defect was in `GlowCard`: a SwiftUI `Image` is an accessibility element by default, so the blurred
+core's own frame — the card plus its 8% margin, times the drift's scale — joined the card's
+accessibility frame and every ancestor's. A 362 pt section reported 437–452 pt depending on where the
+drift was when the query ran. Two changes in the component fix it, and both are what the card should
+have done anyway:
+
+- The three pre-rendered layers (base, core, overlay) are decoration and are
+  `.accessibilityHidden(true)`; only a card's `content` is readable.
+- `GlowRenderer.core` crops the blurred core to the card (`GlowCard.swift:534`). The card clips its
+  layers to its own shape, so only the middle of the padded image was ever visible: the crop is the
+  same pixels, and the layer's layout frame is now the card's, so nothing above it can inherit an
+  oversized frame. The margin, the blur radius, the drift's scale/offset/opacity are unchanged.
+
 `testDesignLab` asserts, for every section identifier the lab sets (`lab.title`, `lab.type`,
 `lab.colours`, `lab.cards`, `lab.motions`, `lab.dotmatrix`, `lab.icons`, `lab.charts`, `lab.gauges`,
 `lab.hypnogram`, `lab.parts`, `lab.quiet`, `lab.navbar`, `lab.calendar`), that
-`element.frame.minX >= 0` and `element.frame.maxX <= app.windows.firstMatch.frame.maxX`, before it
-starts scrolling. On fd5e09d's lab those sections are 411 pt wide starting at -4.5 pt, so the test
-fails there and passes after the fix; the failure message prints the offending frame and the window's.
-The same test also writes the eight screenfuls card U1 shipped (`U1-designlab-1` … `8`) from the same
-captures as `U2-designlab-1` … `15`, because U1's eight are this lab at the same scroll offsets and the
-committed U1 set still showed the clipped column.
+`element.frame.minX >= 0` and `element.frame.maxX <= app.windows.firstMatch.frame.maxX`. On fd5e09d's
+lab the sections are 411 pt wide starting at -4.5 pt, so the test fails there and passes after the
+fix; the failure message prints the offending frame and the window's.
+
+The assertion runs at the first screenful that shows a section, not at launch: XCUITest's frame for an
+element thousands of points down a scroll view is rounded, scaled and does not move with the scroll
+(it reported 440 pt for a 362 pt section), so only what the window shows can be trusted. Every section
+still unchecked is asked about on every screenful, and the walk drags most of a screen per capture —
+held at the end so momentum cannot carry it past a section — until the last section has been seen.
+That also fixed the screenshot walk: U2's fourteen `swipeUp`s moved about 400 pt each, so the set
+stopped at the charts, roughly 6,000 pt into a lab about 10,000 pt tall (its "reached the calendar"
+check was `exists`, which is true for anything in the accessibility tree). The new set covers the
+whole lab, and the eight screenfuls card U1 shipped (`U1-designlab-1` … `8`) are written from the same
+captures as `U2-designlab-1` … `N`, because U1's eight are the top of this lab and the committed U1 set
+still showed the clipped column.
 

@@ -52,14 +52,15 @@ final class OpenStrapUITests: XCTestCase {
     ///
     /// The frame check follows the scroll instead of reading the whole tree at launch: XCUITest
     /// reports a rounded, scaled frame for an element that is thousands of points down a scroll
-    /// view (F2 saw 440 pt for a 362 pt section, off the third-of-a-point layout grid), and only
-    /// what the window shows is trustworthy. Each section is asserted at the first screenful that
-    /// shows it, and the last check proves the walk reached all of them.
+    /// view (F2 saw 440 pt for a 362 pt section, off the third-of-a-point layout grid) and that
+    /// frame does not move with the scroll, so only what the window shows is trustworthy. Every
+    /// section still unchecked is asked about on every screenful, which is what makes a section
+    /// impossible to skip.
     ///
-    /// The scroll is a fixed number of swipes rather than "swipe until the last section is hittable":
-    /// with 5 tab bars, 46 icons and two calendar sheets in one tree, a hit-test snapshot taken
-    /// mid-scroll can outlast XCUITest's query timeout (it did, in run 39569063780). One existence
-    /// check at the end is enough to prove the lab reached its last section.
+    /// The walk is a drag of most of a screen per capture, until the last section has been seen,
+    /// rather than a fixed count of `swipeUp`s: `swipeUp` moves this lab about 400 pt, and the lab
+    /// is about 9,000 pt tall, so fourteen swipes stopped at the charts (run 39589370097) even
+    /// though the calendar's title was already in the tree.
     func testDesignLab() {
         let app = XCUIApplication()
         app.launchArguments = ["-designLab"]
@@ -78,22 +79,15 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(window.waitForExistence(timeout: 60), "The app never drew a window")
         let windowFrame = window.frame
 
-        // How many sections, from the top, have been on screen and asserted.
-        var checked = 0
+        /// The sections already proven to sit inside the window.
+        var checked = Set<String>()
         func checkSectionsOnScreen() {
-            while checked < Self.labSections.count {
-                let identifier = Self.labSections[checked]
+            for identifier in Self.labSections where !checked.contains(identifier) {
                 let element = app.descendants(matching: .any)[identifier]
-                guard element.exists else { return }
+                guard element.exists else { continue }
                 let frame = element.frame
-                if frame.minY >= windowFrame.maxY {
-                    return // still below the window
-                }
-                if frame.maxY <= windowFrame.minY {
-                    XCTFail("\(identifier) went past the window without being checked")
-                    return
-                }
-                checked += 1
+                guard frame.minY < windowFrame.maxY, frame.maxY > windowFrame.minY else { continue }
+                checked.insert(identifier)
                 print("F2 \(identifier) frame=\(frame) window=\(windowFrame)")
                 XCTAssertGreaterThanOrEqual(
                     frame.minX, 0,
@@ -113,33 +107,45 @@ final class OpenStrapUITests: XCTestCase {
             shots += 1
             let screenshot = app.screenshot()
             attach(screenshot, "U2-designlab-\(shots)")
-            // U1's eight screenfuls are the same lab at the same scroll offsets, so the committed
-            // U1 set is refreshed from the same captures instead of keeping the clipped layout F2
-            // removed.
+            // U1's eight screenfuls are the same lab, so the committed U1 set is refreshed from the
+            // same captures instead of keeping the clipped layout F2 removed.
             if shots <= Self.u1Screenfuls {
                 attach(screenshot, "U1-designlab-\(shots)")
             }
         }
+
+        /// One screenful: a slow drag from near the bottom of the window to just under half way up,
+        /// held at the end. Holding is what stops the scroll view carrying on with momentum, so each
+        /// capture is one drag's distance further down and no section can slip between two captures.
+        func scrollOneScreenful() {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.88))
+                .press(
+                    forDuration: 0.1,
+                    thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28)),
+                    withVelocity: .slow,
+                    thenHoldForDuration: 0.4
+                )
+        }
+
         capture()
         checkSectionsOnScreen()
 
-        for _ in 0..<14 {
-            app.swipeUp()
+        var screenfuls = 1
+        while checked.count < Self.labSections.count && screenfuls < 26 {
+            scrollOneScreenful()
             // The glow layers are rendered off the main thread on first appearance.
             Thread.sleep(forTimeInterval: 0.5)
             capture()
             checkSectionsOnScreen()
+            screenfuls += 1
         }
 
-        XCTAssertTrue(
-            app.staticTexts["lab.calendar.title"].exists,
-            "The design lab never reached the calendar section"
+        XCTAssertEqual(
+            checked.count, Self.labSections.count,
+            "the walk never showed \(Self.labSections.filter { !checked.contains($0) }), "
+                + "so their frames are unchecked"
         )
         XCTAssertGreaterThan(shots, 1, "The lab fits on one screen, so nothing scrolled")
-        XCTAssertEqual(
-            checked, Self.labSections.count,
-            "the walk never showed \(Self.labSections.dropFirst(checked)), so their frames are unchecked"
-        )
     }
 
     /// Every identifier the lab puts on a section (`DesignLabView.section`), in layout order, plus
