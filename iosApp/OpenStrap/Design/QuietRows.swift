@@ -167,7 +167,7 @@ struct LinkRow<Trailing: View>: View {
     }
 }
 
-extension LinkRow where Trailing == EmptyView {
+extension LinkRow where Trailing == RowCaret {
     /// A row that opens something: its own caret is the trailing mark.
     init(_ icon: PhosphorIcon, _ title: String, _ subtitle: String?, onClick: (() -> Void)? = nil) {
         self.init(icon, title, subtitle, onClick: onClick) { RowCaret() }
