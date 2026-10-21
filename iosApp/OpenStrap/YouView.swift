@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenStrapShared
 
 /*
  * The "You" tab, ported from `app/src/main/kotlin/org/openstrap/app/ui/device/YouScreen.kt`:

@@ -1,4 +1,5 @@
 import SwiftUI
+import OpenStrapShared
 
 /*
  * Steps, sleep and active hours to aim for each day, ported from

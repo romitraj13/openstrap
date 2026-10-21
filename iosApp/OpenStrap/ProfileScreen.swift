@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import OpenStrapShared
 
 /*
  * Age, sex, weight and height, ported from
