@@ -216,11 +216,10 @@ struct GlowCard<Content: View>: View {
             let key = GlowLayerCache.Key(style: style, width: size.width, height: size.height, scale: displayScale)
             ZStack(alignment: .topLeading) {
                 if let layers {
-                    // The pre-rendered layers are decoration and an `Image` is an accessibility
-                    // element by default: left visible, the core's padded frame (the card plus its
-                    // 8% margin, scaled by the drift) becomes part of the card's accessibility
-                    // frame and pushes every ancestor's frame wider than the card's own (card F2:
-                    // a 362 pt card section reported 437 pt). Only `content` is readable.
+                    // The pre-rendered layers are decoration, and an `Image` is an accessibility
+                    // element by default: left visible they join the card's accessibility frame
+                    // (and so every ancestor's) instead of leaving the card's content as the only
+                    // thing a screen reader can reach. Only `content` is readable.
                     Image(uiImage: layers.base)
                         .resizable()
                         .frame(width: size.width, height: size.height)
@@ -256,20 +255,16 @@ struct GlowCard<Content: View>: View {
 
     /// The pre-blurred core, moved by the motion through layer properties only.
     private func core(_ layers: GlowLayers, size: CGSize) -> some View {
-        let margin = layers.coreMargin
-        return TimelineView(.animation(minimumInterval: nil, paused: paused)) { timeline in
+        TimelineView(.animation(minimumInterval: nil, paused: paused)) { timeline in
             let second = elapsed(at: timeline.date)
             let motion = drift.at(second, motion: style.motion)
-            ZStack {
-                Image(uiImage: layers.core)
-                    .resizable()
-                    .frame(width: size.width + margin * 2, height: size.height + margin * 2)
-            }
-            .frame(width: size.width, height: size.height)
-            .scaleEffect(motion.scale, anchor: UnitPoint(x: style.coreX, y: style.coreY))
-            .offset(x: motion.dx * size.width, y: motion.dy * size.height)
-            .opacity(min(max(style.coreOpacity * motion.fade, 0), 1))
-            .allowsHitTesting(false)
+            Image(uiImage: layers.core)
+                .resizable()
+                .frame(width: size.width, height: size.height)
+                .scaleEffect(motion.scale, anchor: UnitPoint(x: style.coreX, y: style.coreY))
+                .offset(x: motion.dx * size.width, y: motion.dy * size.height)
+                .opacity(min(max(style.coreOpacity * motion.fade, 0), 1))
+                .allowsHitTesting(false)
         }
     }
 
@@ -299,12 +294,12 @@ struct GlowCard<Content: View>: View {
 // MARK: - Layers and their cache
 
 /// A card's pre-rendered layers: the fill and rim light, the blurred core, and the grain and
-/// hairline overlay. `coreMargin` is how far the core image reaches past the card on every side.
+/// hairline overlay. The core is stored cropped to the card: the padding it is blurred into is only
+/// what the fade needs, and it must not become layout (see `GlowRenderer.core`).
 struct GlowLayers: @unchecked Sendable {
     let base: UIImage
     let core: UIImage
     let overlay: UIImage
-    let coreMargin: CGFloat
 }
 
 /// Rendered glow layers, shared by every card with the same look and size. Rendering blurs is the
@@ -374,8 +369,7 @@ enum GlowRenderer {
         return GlowLayers(
             base: base(style: style, palette: palette, size: size, scale: scale),
             core: core(style: style, palette: palette, size: size, scale: scale),
-            overlay: overlay(style: style, size: size, scale: scale),
-            coreMargin: max(size.width, size.height) * 0.08
+            overlay: overlay(style: style, size: size, scale: scale)
         )
     }
 
@@ -533,7 +527,26 @@ enum GlowRenderer {
             cg.setFillColor(UIColor(palette.core.color).cgColor)
             cg.fillPath()
         }
-        return gaussianBlur(image, sigma: max(style.coreBlur - 0.5, 0))
+        // The card clips its layers to its own shape, so only the middle of the padded image is ever
+        // seen. Cropping it here is what keeps the layer's layout frame the card's: an oversized
+        // frame joined the accessibility frame of the card and of every view above it, so a 362 pt
+        // section reported 437 pt and failed card F2's frame check for a defect it did not have.
+        let blurred = gaussianBlur(image, sigma: max(style.coreBlur - 0.5, 0))
+        return crop(blurred, to: CGRect(x: margin, y: margin, width: size.width, height: size.height))
+    }
+
+    /// `UIImage.cropped(to:)`, in points, whole pixels only, keeping the scale and the orientation.
+    private static func crop(_ image: UIImage, to rect: CGRect) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let scale = image.scale
+        let pixels = CGRect(
+            x: rect.origin.x * scale,
+            y: rect.origin.y * scale,
+            width: rect.width * scale,
+            height: rect.height * scale
+        ).integral
+        guard let cropped = cg.cropping(to: pixels) else { return image }
+        return UIImage(cgImage: cropped, scale: scale, orientation: .up)
     }
 
     private static func shape(_ shape: CoreShape, rect: CGRect, radius: CGFloat) -> CGPath {
