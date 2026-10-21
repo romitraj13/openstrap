@@ -196,6 +196,12 @@ struct GlowCard<Content: View>: View {
     /// Compose's `LocalCardPadding`: the card's own inset. A card built without one takes the
     /// environment's (GlowLayout.cardPadding, narrowed by `GlowScreenList`), as Compose's does.
     let contentPadding: EdgeInsets?
+    /// Compose measures a card from its content, which is what `true` does here: the content decides
+    /// the height and the glow is drawn behind it. `false` keeps the older behaviour, where the card
+    /// fills whatever height its parent gives it — which is only ever right when the caller imposes
+    /// one (the Design lab's `frame(height: 160)`). A card in a `VStack` with no height gets none, so
+    /// card U5's first Today build drew every card as a 30 pt bar with its text clipped away.
+    let sizesToContent: Bool
     private let content: () -> Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -210,23 +216,64 @@ struct GlowCard<Content: View>: View {
     @State private var pauseStarted: Date?
 
     /// The same padding on every side, for a card outside the glow layout (the Design lab).
-    init(_ style: GlowStyle, contentPadding: CGFloat, @ViewBuilder content: @escaping () -> Content) {
+    init(
+        _ style: GlowStyle,
+        contentPadding: CGFloat,
+        sizesToContent: Bool = false,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
         self.style = style
         self.contentPadding = EdgeInsets(top: contentPadding, leading: contentPadding, bottom: contentPadding, trailing: contentPadding)
+        self.sizesToContent = sizesToContent
         self.content = content
     }
 
     /// A card with Compose's own inset: `LocalCardPadding`, which `GlowScreenList` narrows on a
     /// narrow or two-column screen (GlowLayout.kt:96-132).
-    init(_ style: GlowStyle, @ViewBuilder content: @escaping () -> Content) {
+    init(_ style: GlowStyle, sizesToContent: Bool = false, @ViewBuilder content: @escaping () -> Content) {
         self.style = style
         self.contentPadding = nil
+        self.sizesToContent = sizesToContent
         self.content = content
     }
 
     private var paused: Bool { reduceMotion || scrollPaused }
 
     var body: some View {
+        Group {
+            if sizesToContent {
+                // Compose's shape: the content measures the card, and the glow is drawn behind it.
+                content()
+                    .padding(contentPadding ?? cardPadding)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .background { backdrop() }
+            } else {
+                GeometryReader { proxy in
+                    let size = proxy.size
+                    ZStack(alignment: .topLeading) {
+                        backdrop()
+                        content()
+                            .padding(contentPadding ?? cardPadding)
+                            .frame(width: size.width, height: size.height, alignment: .topLeading)
+                    }
+                    .frame(width: size.width, height: size.height)
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: style.radius, style: .continuous))
+        .onChange(of: paused) { _, isPaused in
+            if isPaused {
+                pauseStarted = Date()
+            } else if let startedAt = pauseStarted {
+                pausedTotal += Date().timeIntervalSince(startedAt)
+                pauseStarted = nil
+            }
+        }
+    }
+
+    /// Everything drawn under the content: the pre-blurred layers, the moving core and the film.
+    @ViewBuilder
+    private func backdrop() -> some View {
         GeometryReader { proxy in
             let size = proxy.size
             let key = GlowLayerCache.Key(style: style, width: size.width, height: size.height, scale: displayScale)
@@ -242,9 +289,6 @@ struct GlowCard<Content: View>: View {
                         .accessibilityHidden(true)
                     core(layers, size: size)
                         .accessibilityHidden(true)
-                    content()
-                        .padding(contentPadding ?? cardPadding)
-                        .frame(width: size.width, height: size.height, alignment: .topLeading)
                     Image(uiImage: layers.overlay)
                         .resizable()
                         .frame(width: size.width, height: size.height)
@@ -256,16 +300,7 @@ struct GlowCard<Content: View>: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .clipShape(RoundedRectangle(cornerRadius: style.radius, style: .continuous))
             .task(id: key) { await load(key) }
-        }
-        .onChange(of: paused) { _, isPaused in
-            if isPaused {
-                pauseStarted = Date()
-            } else if let startedAt = pauseStarted {
-                pausedTotal += Date().timeIntervalSince(startedAt)
-                pauseStarted = nil
-            }
         }
     }
 

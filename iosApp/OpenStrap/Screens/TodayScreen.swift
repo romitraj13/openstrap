@@ -284,7 +284,7 @@ private struct OverviewCard: View {
     }
 
     var body: some View {
-        GlowCard(style) {
+        GlowCard(style, sizesToContent: true) {
             VStack(alignment: .leading, spacing: 0) {
                 GlowHeader(overview.lead.label) {
                     Change(score: overview.lead, withNote: true)
@@ -653,7 +653,7 @@ private struct HeartCard: View {
     }
 
     var body: some View {
-        GlowCard(style) {
+        GlowCard(style, sizesToContent: true) {
             VStack(alignment: .leading, spacing: 0) {
                 // A live reading needs no label (the beating glow says it). An older one says
                 // "Latest" only when there's no Live switch.
@@ -723,7 +723,7 @@ private struct ActivityCard: View {
     }
 
     var body: some View {
-        GlowCard(style) {
+        GlowCard(style, sizesToContent: true) {
             VStack(alignment: .leading, spacing: 0) {
                 GlowHeader("Activity", chevron: true)
                 GlowHeroNumber(
@@ -759,7 +759,7 @@ private struct SleepCard: View {
     private var session: SleepSession? { day.sleep }
 
     var body: some View {
-        GlowCard(GlowStyle.sleep) {
+        GlowCard(GlowStyle.sleep, sizesToContent: true) {
             VStack(alignment: .leading, spacing: 0) {
                 GlowHeader(
                     "Sleep",

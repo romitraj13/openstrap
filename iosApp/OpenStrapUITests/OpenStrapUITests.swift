@@ -283,7 +283,7 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["What changed"].waitForExistence(timeout: 120),
             "Today never drew its What changed panel from the seeded month"
         )
-        walk(app, prefix: "U5-today", milestones: ["What changed", "Heart rate", "steps", "asleep"], screenfuls: 4)
+        walk(app, prefix: "U5-today", milestones: ["What changed", "Heart rate", "steps", "asleep"], screenfuls: 5)
 
         // The tile chooser, from the top of the screen.
         scrollToTop(app)
@@ -336,7 +336,7 @@ final class OpenStrapUITests: XCTestCase {
             morning.staticTexts["Morning check-in"].waitForExistence(timeout: 120),
             "Today never drew the morning check-in"
         )
-        walk(morning, prefix: "U5-todaymorning", milestones: ["Morning check-in", "What changed", "Heart rate", "steps"], screenfuls: 4)
+        walk(morning, prefix: "U5-todaymorning", milestones: ["Morning check-in", "What changed", "Heart rate", "steps"], screenfuls: 5)
         morning.terminate()
 
         // Monday: the week's recap, under the top card.
