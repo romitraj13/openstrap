@@ -250,16 +250,19 @@ final class OpenStrapUITests: XCTestCase {
             guard line.waitForExistence(timeout: 30) else {
                 return XCTFail("Heart rate was never in Today's tree")
             }
-            print("U5 attempt \(attempt): heart=\(line.frame) window=\(app.windows.firstMatch.frame) hittable=\(line.isHittable)")
+            print("U5 attempt \(attempt): heart=\(line.frame) top=\(app.staticTexts["app.wordmark"].frame) hittable=\(line.isHittable)")
             line.tap()
             if detail.waitForExistence(timeout: 5) {
                 print("U5 attempt \(attempt): opened \(detail.label)")
                 XCTAssertEqual(detail.label, "Heart rate", "the heart card opened a different detail")
                 return
             }
-            // A tap that landed on the floating bar switched tabs. Today is the first tab, and the
-            // pushed-away card may also have been another metric, so come back and try again.
-            if app.buttons["Today"].exists && app.buttons["Today"].isHittable {
+            // A tap that landed on the floating bar switched tabs; Today is the first tab. This is
+            // only done when Today really went away: tapping the tab unconditionally resets the
+            // scroll, which is what kept the line at the same y in every attempt of the fourth run.
+            let onToday = app.staticTexts["What changed"].exists
+            print("U5 attempt \(attempt): still on Today = \(onToday)")
+            if !onToday, app.buttons["Today"].exists, app.buttons["Today"].isHittable {
                 app.buttons["Today"].tap()
                 _ = app.staticTexts["What changed"].waitForExistence(timeout: 15)
             }
