@@ -628,10 +628,10 @@ have done anyway:
 
 - The three pre-rendered layers (base, core, overlay) are decoration and are
   `.accessibilityHidden(true)`; only a card's `content` is readable.
-- `GlowRenderer.core` crops the blurred core to the card (`GlowCard.swift:534`). The card clips its
-  layers to its own shape, so only the middle of the padded image was ever visible: the crop is the
-  same pixels, and the layer's layout frame is now the card's, so nothing above it can inherit an
-  oversized frame. The margin, the blur radius, the drift's scale/offset/opacity are unchanged.
+- `GlowRenderer.core` crops the blurred core to the card. The card clips its layers to its own shape,
+  so only the middle of the padded image was ever visible: the crop is the same pixels, and the
+  layer's layout frame is now the card's, so nothing above it can inherit an oversized frame. The
+  margin, the blur radius, the drift's scale/offset/opacity are unchanged.
 
 `testDesignLab` asserts, for every section identifier the lab sets (`lab.title`, `lab.type`,
 `lab.colours`, `lab.cards`, `lab.motions`, `lab.dotmatrix`, `lab.icons`, `lab.charts`, `lab.gauges`,
