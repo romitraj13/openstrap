@@ -455,11 +455,121 @@ nothing else to port.
 | `Modifier.scrub(key, onScrub)`: horizontal drag or press-and-hold (66-81) | `GlowScrub`, a simultaneous drag so the list still scrolls (GlowCharts.swift:161) | ported: long-press is dropped, the sideways drag does the same job in SwiftUI |
 | `smoothPath(pts)`, monotone cubic (Fritsch–Carlson) (288-319) | `GlowGeometry.smoothCubics` + `glowSmoothPath` / `glowAddCubics` (GlowGeometry.kt:278, GlowCharts.swift:895) | ported |
 | `niceStep(raw)` (321-324) | — | not ported: only `LineChart` calls it, and the glow charts draw three fixed guides |
-| `ChartPoint`, `ChartSegment`, `LineChart` (44-286) | — | not ported: the older screens' chart; card U2 is the glow language's own charts |
+| `ChartPoint`, `ChartSegment`, `LineChart` (44-286) | `ChartPoint` (ChartPoints.kt:11) | `ChartPoint` ported as data (card U3); `ChartSegment` and `LineChart` not ported: the older screens' chart, and card U2 is the glow language's own charts |
 | `withUnit(value, unit)` (84-88) | — | not ported: the glow charts print their own readouts and no glow card calls it |
 | `hourLabel(epoch)` (47) | — | not ported: the glow charts take their axis labels as strings from the screen |
-| `TrendPoint`, `StageSpan` (327-330) | — | not ported: `GlowDay` and `GlowStage` replace them in the glow language |
+| `TrendPoint`, `StageSpan` (327-330) | `TrendPoint`, `StageSpan` (ChartPoints.kt:14,17) | ported for the data: card U3 copies both (with `ChartPoint`) into `shared/` because `DayUiState` holds them. The glow `GlowDay`/`GlowStage` still replace them as *drawing* types. |
 | `ProgressRing(progress, color, size, stroke)` (334-345) | — | not ported: the glow screens draw `GlowArcGauge` instead; nothing in the listed files calls it |
+
+## Card U3 — the state the screens read (Kotlin only)
+
+U3 ports no Swift: it copies the state the Android screens are built from into `shared/`, so the
+iPhone screens read the same objects instead of re-deriving them. The middle column therefore names
+the shared Kotlin, with the card that will draw it in brackets; the Status column says whether the
+thing exists yet or why not.
+
+### `app/src/main/kotlin/org/openstrap/app/ui/dashboard/DayViewModel.kt`
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `SLEEP_NIGHTS = 14` (43) | `SLEEP_NIGHTS` (DayState.kt:27) | ported |
+| `Baselines` — restingHr, hrv, spo2, stress, skinTemperature, breathRate (46-53) | `Baselines` (DayState.kt:30) | ported |
+| `DayUiState` — date, steps, minuteSteps, hourlySteps, activeHours (55-61) | `DayUiState` (DayState.kt:39) | ported |
+| `DayUiState` — heartRate, latestHeartRate, restingHeartRate, restingEstimated, restingTrend, hrvTrend (62-68) | `DayUiState` (DayState.kt:39) | ported |
+| `DayUiState` — sleep, previousSleepScore, naps, napStages, napBreakdowns, sleepStages, sleepBreakdown (70-78) | `DayUiState` (DayState.kt:39); naps as lists (ScreenAccessors.kt:34,37) | ported |
+| `DayUiState` — spo2, stress, hrv, skinTemperature, breathRate (79-83) | `DayUiState` (DayState.kt:39) | ported |
+| `DayUiState` — pai, baselines (84-85) | `DayUiState` (DayState.kt:39) | ported |
+| `DayUiState` — sleepSpo2, hrvSdnn, osaResult, osaEvents (86-93) | `DayUiState` (DayState.kt:39) | ported |
+| `DayUiState` — dailyMaxHeartRate, distanceMeters, activeCalories, alerts (94-101) | `DayUiState` (DayState.kt:39) | ported |
+| `DayUiState` — nights, sleepHeartRate (102-105) | `DayUiState` (DayState.kt:39); `nightList()` (ScreenAccessors.kt:44) | ported |
+| `DayUiState` — dayStart, dayEnd, `asleepSeconds` (106-109) | `DayUiState` (DayState.kt:39) | ported |
+| `SleepNight` (343-352) | `SleepNight` (DayState.kt:97) | ported |
+| `stateFor(date)`: the activity, heart-rate and vitals combines (156-157, 259-305) | `DayStateLoader.load` (DayStateLoader.kt:47) | ported |
+| `stateFor`: main sleep, naps and their stages (158-170) | `DayStateLoader.load` (DayStateLoader.kt:56-70) | ported |
+| `stateFor`: skin temperature, breathing, PAI (171-173) | `DayStateLoader.load` (DayStateLoader.kt:72-74) | ported |
+| `stateFor`: the week's resting-HR and HRV trends (174-191) | `DayStateLoader.load` (DayStateLoader.kt:76-95) | ported |
+| `stateFor`: baselines over the seven days before (192-206) | `DayStateLoader.load` (DayStateLoader.kt:97-108) | ported |
+| `stateFor`: sleep SpO2, SDNN, apnea, max HR, extended activity, alerts (208-225) | `DayStateLoader.load` (DayStateLoader.kt:110-124) | ported |
+| `stateFor`: the fourteen nights and the night's heart rate (227-251) | `DayStateLoader.load` (DayStateLoader.kt:126-149) | ported |
+| `stateFor`: the strap's live step total (254-257) | `load(date, todaySteps)` (DayStateLoader.kt:47) | ported: the flow became the argument Swift passes from `StrapEngine` |
+| `daysWithData` (125-126) | `DayStateLoader.daysWithData` (DayStateLoader.kt:225) | ported |
+| `recovery` (133-148), including `Log.w("OpenStrap", "recovery failed", e)` | `DayStateLoader.recovery` (DayStateLoader.kt:198) | ported: the log became a constructor callback |
+| `MIN_MINUTES_FOR_ESTIMATE = 6 * 60` (310) | `MIN_MINUTES_FOR_ESTIMATE` (DayStateLoader.kt:230) | ported |
+| `SLEEP_STAGE_ROWS` (312-317) | — | not ported: it is the hypnogram's lane order, and `GlowSleep` is Swift's (card U7) |
+| `previousDay` / `nextDay` / `select` (120-122) | — | not ported: the selected date is Swift's `RootView` state (card U4) |
+| `SleepParts`, `MoreParts` private carries (321-340) | `load`'s locals, `MoreParts` (DayStateLoader.kt:250) | ported |
+
+### `app/src/main/kotlin/org/openstrap/app/ui/workout/WorkoutsViewModel.kt`
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `fallbackMaxHr`, the app's max-HR rule read once per profile (32-36) | `WorkoutsLoader.fallbackMaxHr` (WorkoutsLoader.kt:33) | ported |
+| `workouts` list, newest first (39-43) | `WorkoutsLoader.workouts` (WorkoutsLoader.kt:43) | ported |
+| `effects`, the sport-effect records (46-47) | `WorkoutsLoader.effects` (WorkoutsLoader.kt:62) | ported |
+| `open`, the analysed workout with its stream (51-56) | `WorkoutsLoader.workout(start)` (WorkoutsLoader.kt:53) | ported |
+| `open(start)` selection (49, 58) | — | not ported: which workout is open is Swift's navigation state (card U9) |
+
+### `app/src/main/kotlin/org/openstrap/app/ui/dashboard/Routes.kt`
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Metric.HeartRate("Heart rate", "bpm", 0)` (10) | `Metric.HeartRate` (Metric.kt:15) | ported |
+| `Metric.RestingHr("Resting heart rate", "bpm", 0)` (11) | `Metric.RestingHr` (Metric.kt:15) | ported |
+| `Metric.Hrv("Heart-rate variability", "ms", 0)` (12) | `Metric.Hrv` (Metric.kt:15) | ported |
+| `Metric.Spo2("Blood oxygen", "%", 0)` (13) | `Metric.Spo2` (Metric.kt:15) | ported |
+| `Metric.Stress("Stress", "", 0)` (14) | `Metric.Stress` (Metric.kt:15) | ported |
+| `Metric.SkinTemperature("Skin temperature", "°C", 1)` (15) | `Metric.SkinTemperature` (Metric.kt:15) | ported |
+| `Metric.Breathing("Breathing rate", "br/min", 0)` (16) | `Metric.Breathing` (Metric.kt:15) | ported |
+| `Metric.Steps("Steps", "steps", 0)` (17) | `Metric.Steps` (Metric.kt:15) | ported |
+| `Metric.format` — `%,d` for steps, `%.<decimals>f` otherwise (20) | `Metric.format` (Metric.kt:26) | ported |
+| `LocalGoals` (24) | — | not ported: a `CompositionLocal` has no iOS equivalent; `ScreenQueries.goals()` reads the same values (ScreenQueries.kt:110) |
+| `Detail.OfMetric` / `Detail.Workout` / `Detail.AllWorkouts` (28-31) | — | not ported: the details are SwiftUI navigation destinations (cards U4, U9) |
+| `Detail.StackSaver`, `key`, `restore` — the "m:Hrv\|w:1792227300" string (35-54) | — | not ported: it exists to survive Android process death, which the Swift navigation stack does not use |
+
+### `app/src/main/kotlin/org/openstrap/app/ui/dashboard/MetricInfo.kt`
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Range` — Day, Week, Month, Year with 1, 7, 30, 365 days (13) | `Range` (Metric.kt:47) | ported |
+| `DailyHistory` typealias (16) | — | not ported: a function type over a `Flow`; `ScreenQueries.history` replaces it (ScreenQueries.kt:82) |
+| `colorOf` (18-25) | `Metric.color` → `MetricColor` (Metric.kt:33,36); Swift picks from `Theme.swift` | ported |
+| `RELATED[Metric.HeartRate]` — RestingHr, Hrv, Stress (28) | `RELATED` (Metric.kt:50); `relatedMetrics()` (ScreenAccessors.kt:50) | ported |
+| `RELATED[Metric.RestingHr]` — Hrv, HeartRate, SkinTemperature (29) | `RELATED` (Metric.kt:50) | ported |
+| `RELATED[Metric.Hrv]` — RestingHr, Stress, Breathing (30) | `RELATED` (Metric.kt:50) | ported |
+| `RELATED[Metric.Spo2]` — Breathing, RestingHr (31) | `RELATED` (Metric.kt:50) | ported |
+| `RELATED[Metric.Stress]` — Hrv, HeartRate (32) | `RELATED` (Metric.kt:50) | ported |
+| `RELATED[Metric.SkinTemperature]` — RestingHr, Breathing (33) | `RELATED` (Metric.kt:50) | ported |
+| `RELATED[Metric.Breathing]` — Spo2, SkinTemperature, Hrv (34) | `RELATED` (Metric.kt:50) | ported |
+| `RELATED[Metric.Steps]` — HeartRate (35) | `RELATED` (Metric.kt:50) | ported |
+| `ABOUT[Metric.HeartRate]` — "How fast your heart beats, measured all day by the strap." / "Movement, stress, caffeine and heat raise it; rest and sleep bring it down." (40-41) | `ABOUT` (Metric.kt:62); `aboutMetric()` (ScreenAccessors.kt:53) | ported |
+| `ABOUT[Metric.RestingHr]` — "Your heart rate at its calmest, …" / "It rises after hard training, late meals, alcohol, poor sleep or when your body is fighting something off, and falls as fitness builds." (44-45) | `ABOUT` (Metric.kt:62) | ported |
+| `ABOUT[Metric.Hrv]` — "Heart-rate variability: how much the time between beats varies. …" / "Good sleep and rest raise it. Stress, hard training and alcohol lower it. Compare it with your own normal, not other people's." (48-49) | `ABOUT` (Metric.kt:62) | ported |
+| `ABOUT[Metric.Spo2]` — "Blood oxygen: how much of your blood's capacity is carrying oxygen. Most people sit at 95–100%." / "Altitude and breathing pauses in sleep can lower it. A loose strap can also give low readings." (52-53) | `ABOUT` (Metric.kt:62) | ported |
+| `ABOUT[Metric.Stress]` — "The strap's 0–100 stress level, …" / "Pressure, caffeine and too little sleep raise it; calm breathing, rest and time outdoors bring it down." (56-57) | `ABOUT` (Metric.kt:62) | ported |
+| `ABOUT[Metric.SkinTemperature]` — "The temperature of your skin under the strap. …" / "It moves with alcohol, a warm room, hard training, the menstrual cycle, or when your body is fighting something off." (60-61) | `ABOUT` (Metric.kt:62) | ported |
+| `ABOUT[Metric.Breathing]` — "How many breaths you take a minute while asleep. …" / "It can rise above your normal after a hard training day, in a warm, stuffy room, or when your body is fighting something off." (64-65) | `ABOUT` (Metric.kt:62) | ported |
+| `ABOUT[Metric.Steps]` — "Steps counted by the strap through the day." / "Short walks spread across the day add up; most people aim for 7,000–10,000." (68-69) | `ABOUT` (Metric.kt:62) | ported |
+
+### `app/src/main/kotlin/org/openstrap/app/MainActivity.kt` lines 140-260 (how the screens are fed)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `DayViewModel(...)`, one shared day (146) | `ScreenQueries.day(date:)` (ScreenQueries.kt:67); the shared date is `RootView`'s (card U4) | ported |
+| `workoutsVm.workouts` (160) | `ScreenQueries.workouts` (ScreenQueries.kt:95) | ported |
+| `workoutsVm.open`, `workoutsVm.effects` (161-162) | `ScreenQueries.workout(start:)` (ScreenQueries.kt:100); effects via `WorkoutsLoader.effects` | ported |
+| `history = { m, from, to -> container.health.daily(m, from, to) }` (169) | `ScreenQueries.history(metric:range:date:)` (ScreenQueries.kt:82) | ported |
+| `goals` (173) | `ScreenQueries.goals` (ScreenQueries.kt:110) | ported |
+| `recovery` (181) | `ScreenQueries.recovery(date:)` (ScreenQueries.kt:72) | ported |
+| `profile` (182) | `ScreenQueries.profile` (ScreenQueries.kt:106) | ported |
+| `day` (183) | `ScreenQueries.day` (ScreenQueries.kt:67) | ported |
+| `checkIn` (185) | `ScreenQueries.checkIn(date:)` (ScreenQueries.kt:115) | ported |
+| `daysWithData` (186) | `ScreenQueries.daysWithData` (ScreenQueries.kt:88) | ported |
+| `editGoals` → `settings.goals` (172-173) | `ScreenQueries.saveGoals` (ScreenQueries.kt:112) | ported |
+| `saveProfile` (ProfileScreen) | `ScreenQueries.saveProfile` (ScreenQueries.kt:108) | ported |
+| `saveCheckIn` (check-in card) | `ScreenQueries.saveCheckIn` (ScreenQueries.kt:120) | ported |
+| `repo.changes().debounce(800)` behind `recovery` (131-148) | `ScreenQueries.changes` (ScreenQueries.kt:132) | ported |
+| `todayTileNames`, `todayTiles` (174-180) | — | not ported: which metrics Today's "What changed" shows; no card asks for the picker yet |
+| `strapReadiness` (184) | — | not ported: the strap's own readiness for calibration; no screen shows it yet |
 
 ## Not in this card
 

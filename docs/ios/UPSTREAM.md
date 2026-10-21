@@ -495,6 +495,100 @@ Two things were decided for iOS and are recorded here rather than hidden:
   finished arc, because standing instruction 7 allows only offset, scale and opacity to animate. The
   same rule leaves `DotHeader`'s caret turn instant and `GlowSwitch`'s track colour un-animated.
 
+## Card U3 (shared screen state)
+
+Every file this card copied, as the required `source path @ 19f2865 -> destination path`:
+
+```
+app/src/main/kotlin/org/openstrap/app/ui/dashboard/DayViewModel.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/ui/dashboard/DayState.kt
+app/src/main/kotlin/org/openstrap/app/ui/dashboard/DayViewModel.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/ui/dashboard/DayStateLoader.kt
+app/src/main/kotlin/org/openstrap/app/ui/workout/WorkoutsViewModel.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/ui/workout/WorkoutsLoader.kt
+app/src/main/kotlin/org/openstrap/app/ui/dashboard/Routes.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/ui/dashboard/Metric.kt
+app/src/main/kotlin/org/openstrap/app/ui/dashboard/MetricInfo.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/ui/dashboard/Metric.kt
+app/src/main/kotlin/org/openstrap/app/ui/components/Charts.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/ui/components/ChartPoints.kt
+app/src/main/kotlin/org/openstrap/app/data/settings/SettingsStore.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/app/data/settings/SettingsRepository.kt
+app/src/main/kotlin/org/openstrap/app/MainActivity.kt @ 19f2865 -> shared/src/commonMain/kotlin/org/openstrap/shared/screens/ScreenQueries.kt
+```
+
+What changed in each copy, and why:
+
+- **`DayViewModel.kt` → `DayState.kt` + `DayStateLoader.kt`.** The file is two things: the state
+  classes (lines 42-110 and 342-352) and the loading logic (112-319). Both are copied, into two
+  files so Swift can hold the state type without pulling in the reader. `Baselines`, `DayUiState`,
+  `SleepNight` and `SLEEP_NIGHTS` keep the same package and every field; `java.time.LocalDate`
+  became `kotlinx.datetime.LocalDate` and `LocalDate.now()` became
+  `Clock.System.todayIn(TimeZone.currentSystemDefault())`. The `@OptIn` flows became plain
+  suspending calls: each `combine(...)` arm is read once with `Flow.first()` from the same
+  `HealthRepository` function the ViewModel used, so the expressions that filter, average and map
+  are the ViewModel's own lines, in its order. What the flows gave for free had to be written out:
+  the `sleep` flatMapLatest body became sequential reads of the same windows, the `nights` combine
+  became one read per table, and `strapSteps` became the `todaySteps` argument Swift passes from
+  `StrapEngine`. `Log.w("OpenStrap", "recovery failed", e)` became the constructor's `log`
+  callback. `previousDay`/`nextDay`/`select` are not copied: the selected date is Swift's
+  (`RootView`, card U4). `SLEEP_STAGE_ROWS` (312-317) is not copied: it orders the hypnogram lanes
+  and is consumed by `GlowSleep`, which is Swift's (card U7); the stage codes themselves are on
+  `SleepStage` in `shared/` already.
+- **`WorkoutsViewModel.kt` → `WorkoutsLoader.kt`.** Same list read (`ORDER BY start DESC`), the same
+  `Workouts.analyse(w, listOfNotNull(lastByWorkout[w.start]), effects, maxHr)` for a row and
+  `Workouts.analyse(w, hr, effects, maxHr)` for the open one, and the same
+  `RecoveryEngine(dao).maxHeartRate(profile).roundToInt()` fallback. The `stateIn` sharing that made
+  the 90-day max-HR read run once per profile change became a one-entry cache keyed by the profile.
+  `openStart` is not copied: which workout is open is Swift's navigation state.
+- **`Routes.kt` → `Metric.kt`.** The `Metric` enum and its `format` are copied verbatim except
+  `Math.round(v)` → `round(v).toLong()` and `"%,d".format(…)` → `shared/`'s `String.format`, which
+  prints `Locale.ROOT` the way the Android call did. `LocalGoals` (24) is not copied: a
+  `CompositionLocal` has no equivalent, and `ScreenQueries.goals()` reads the same `SettingsStore`
+  values. `Detail` and `Detail.StackSaver` (27-55) are not copied: the per-tab detail stack is
+  SwiftUI navigation (card U4), and its string form has no reader outside Android's saved state.
+- **`MetricInfo.kt` → `Metric.kt`.** `Range` (13), `colorOf` (18-25), `RELATED` (27-36) and `ABOUT`
+  (38-71) are copied with the same text, character for character. Compose `Color` became the
+  `MetricColor` enum (Swift maps it to `Theme.swift`), `colorOf` became the `Metric.color`
+  property, and `Range`, `RELATED` and `ABOUT` are public rather than `internal` because Swift
+  calls them. `DailyHistory` (16) is not copied: it is a function type over a `Flow`, which is
+  exactly what `ScreenQueries.history` replaces.
+- **`Charts.kt` → `ChartPoints.kt`.** Three data classes only — `ChartPoint` (44), `TrendPoint`
+  (327), `StageSpan` (330) — because `DayUiState` holds them and they are plain data. The Compose
+  drawing in that file stays Swift's, as card U2 recorded.
+- **`SettingsStore.kt` → `SettingsRepository.kt`.** Two additions to the C4 copy: `goals()` /
+  `saveGoals()` (SettingsStore 160-178) and `saveProfile()` (143-158), with the same keys
+  (`goal_steps`, `goal_sleep_minutes`, `goal_active_hours`, `profile_*`) and the same rule that a
+  null field is removed rather than written. `profile()` already existed. `todayTiles`,
+  `forgetDevice` and the Zepp account are not copied: no card asks for them yet.
+- **`MainActivity.kt` → `ScreenQueries.kt`.** Lines 140-260 are not UI: they are the list of reads
+  and writes the screens are fed with (`dayVm.state`, `dayVm.recovery`, `dayVm.daysWithData`,
+  `health.checkIn`, `health.daily` as `history`, `settings.goals`, `workoutsVm.workouts`, `.open`,
+  `.effects`, `profile`, `editGoals`). `ScreenQueries` is the one object Swift calls, with one
+  method per item on that list, ISO dates in and out and every answer on the main thread.
+  `HealthRepository.changes()` keeps the 800 ms debounce that `DayViewModel.recovery` puts on it,
+  because a sync writes hundreds of rows.
+
+Android has no test for any of these files (`app/src/test/` holds `data/`, `export/` and `zepp/`
+only), so the 33 tests are new: `MetricTest` (7, commonTest), `DayStateLoaderTest` (9),
+`WorkoutsLoaderTest` (6), `ScreenSettingsTest` (2) and `ScreenQueriesTest` (9). They check the
+values against the functions that compute them (`Summaries`, `RecoveryEngine`, `Workouts`,
+`SampleData`) rather than against written-down numbers, so the two cannot drift.
+
+`:shared:jvmTest` 218 -> **251 tests, 0 failures, 1 skipped**. `iosSimulatorArm64Test` 290 -> **302**:
+the 7 `MetricTest` cases run there too (they are in `commonTest`) and `ScreenAccessorsTest` adds 5.
+This box cannot run the iOS target, so 302 is what CI will report; `compileTestKotlinIosSimulatorArm64`
+is clean here.
+
+Authored for iOS in this card, with no upstream source:
+
+| File | Why it is new |
+|---|---|
+| `shared/src/commonMain/kotlin/org/openstrap/shared/screens/ScreenQueries.kt` | The screens' reads and writes as plain callbacks on the main thread, plus `CheckInAnswer` and the `changes()` subscription. Nothing is computed here: it wires the two loaders and the settings repository. |
+| `shared/src/iosMain/kotlin/org/openstrap/shared/screens/ScreenAccessors.kt` | The maps and shapes that cross into Swift badly (`Map<Long, …>`, `Map<Int, Long>`, `Map<Metric, …>`) read back as lists and plain numbers. |
+| `shared/src/iosTest/kotlin/org/openstrap/shared/screens/ScreenAccessorsTest.kt` | The 5 tests for them (CI runs this target). |
+| `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/{DayStateLoader,WorkoutsLoader,ScreenSettings,ScreenQueries}Test.kt` | The 26 JVM tests over a real database seeded with the copied sample month. |
+
+One difference the tests have to live with: on this Linux box SQLite's `date(…, 'unixepoch',
+'localtime')` resolves in UTC while `kotlinx-datetime` reads `TZ` (`Asia/Calcutta`), so the copied
+`HealthRepository.daily` groups a day's rows by a date one earlier than the Kotlin side calls it —
+only for the row that sits exactly on a midnight. On iOS and on the UTC CI runner the two agree.
+The tests take their expected dates from the same read instead of writing the count down.
+
+
 ## Card F2 (the Design lab's column was wider than the screen)
 
 Found in product review V1: every section of the lab was shifted about 24 pt left, so the first letter
