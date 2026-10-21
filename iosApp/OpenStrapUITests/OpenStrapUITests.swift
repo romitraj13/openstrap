@@ -235,36 +235,40 @@ final class OpenStrapUITests: XCTestCase {
         row.tap()
     }
 
-    /// Tap a line of text, dragging the list first so the line is really on screen and clear of the
-    /// floating bar.
+    /// Open the heart card's detail, which is a card in the middle of Today's list.
     ///
-    /// `staticTexts[...].tap()` resolves the element and taps the coordinates it would occupy. A line
-    /// below the fold taps whatever card is at those points, and a line under the bar is still "in the
-    /// window" and hittable — in card U5's first two runs "Heart rate" was one of those, and the tap
-    /// opened Sleep from the bar (and once from the overview card's Sleep score). So the band is the
-    /// window between the top of the screen and the bar's own top edge, which F4 publishes as
-    /// `navBar.top`.
-    private func tapText(_ app: XCUIApplication, _ label: String) {
-        let element = app.staticTexts[label]
-        XCTAssertTrue(element.waitForExistence(timeout: 30), "\(label) never appeared")
-        let window = app.windows.firstMatch.frame
-        let bar = app.descendants(matching: .any)["navBar.top"]
-        let ceiling = bar.exists ? bar.frame.minY : window.maxY - 120
-        let floor = window.minY + 8
-        var drags = 0
-        while drags < 20 {
-            let frame = element.frame
-            if frame.minY >= floor && frame.maxY <= ceiling - 8 && element.isHittable { break }
-            if frame.minY >= ceiling - 40 {
-                drag(app, from: 0.75, to: 0.35)
-            } else {
-                drag(app, from: 0.35, to: 0.75)
+    /// Card U5's three red runs all failed here, and the hierarchy says why: the tap opened Sleep
+    /// each time. A SwiftUI stack's off-screen children report frames that do not follow the scroll
+    /// (card F2's note in this file), so a frame inside the window is not proof the line is there —
+    /// and tapping a line under the floating bar taps the bar. So this stops trusting frames and
+    /// checks what actually opened, scrolling half a screen and trying again, which is the only
+    /// signal that cannot be stale.
+    private func openHeartDetail(_ app: XCUIApplication) {
+        let detail = app.staticTexts["today.detail"]
+        for attempt in 0..<8 {
+            let line = app.staticTexts["Heart rate"]
+            guard line.waitForExistence(timeout: 30) else {
+                return XCTFail("Heart rate was never in Today's tree")
             }
-            Thread.sleep(forTimeInterval: 0.25)
-            drags += 1
+            print("U5 attempt \(attempt): heart=\(line.frame) window=\(app.windows.firstMatch.frame) hittable=\(line.isHittable)")
+            line.tap()
+            if detail.waitForExistence(timeout: 5) {
+                print("U5 attempt \(attempt): opened \(detail.label)")
+                XCTAssertEqual(detail.label, "Heart rate", "the heart card opened a different detail")
+                return
+            }
+            // A tap that landed on the floating bar switched tabs. Today is the first tab, and the
+            // pushed-away card may also have been another metric, so come back and try again.
+            if app.buttons["Today"].exists && app.buttons["Today"].isHittable {
+                app.buttons["Today"].tap()
+                _ = app.staticTexts["What changed"].waitForExistence(timeout: 15)
+            }
+            drag(app, from: 0.72, to: 0.40)
+            Thread.sleep(forTimeInterval: 0.3)
         }
-        XCTAssertTrue(element.isHittable, "\(label) never came into the clear part of the screen")
-        element.tap()
+        attach(app, "U5-detail-missing")
+        print("U5 after tapping Heart rate:\n\(app.debugDescription)")
+        XCTFail("Tapping the heart card pushed no detail")
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.
@@ -309,16 +313,9 @@ final class OpenStrapUITests: XCTestCase {
         app.buttons["tiles.cancel"].tap()
         XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 30), "Cancel never closed the tile chooser")
 
-        // A metric tap pushes the detail route card U9 fills in. The line is below the fold at the
-        // top of Today, so bring it on screen first: tapping an off-screen element taps the
-        // coordinates it would have had, which in `U5-today`'s first run landed on the overview
-        // card's Sleep bar and opened Sleep instead.
-        tapText(app, "Heart rate")
-        if !app.staticTexts["today.detail"].waitForExistence(timeout: 30) {
-            attach(app, "U5-detail-missing")
-            print("U5 after tapping Heart rate:\n\(app.debugDescription)")
-            XCTFail("Tapping the heart card pushed no detail")
-        }
+        // A metric tap pushes the detail route card U9 fills in. See `openHeartDetail`: the line's own
+        // frame cannot be trusted here, so it scrolls and checks what opened.
+        openHeartDetail(app)
         attach(app, "U5-detail-1")
         // Back to Today. The pushed card wears the stack's own bar; if the tab's hidden toolbar takes
         // it with it, restart instead of guessing at a button that is not there.
