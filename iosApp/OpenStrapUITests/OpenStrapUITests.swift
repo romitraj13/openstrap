@@ -50,6 +50,12 @@ final class OpenStrapUITests: XCTestCase {
     /// scroll view centred it, so both edges were cut. A section frame outside the window is that
     /// bug, whether or not a screenshot happens to show it.
     ///
+    /// The frame check follows the scroll instead of reading the whole tree at launch: XCUITest
+    /// reports a rounded, scaled frame for an element that is thousands of points down a scroll
+    /// view (F2 saw 440 pt for a 362 pt section, off the third-of-a-point layout grid), and only
+    /// what the window shows is trustworthy. Each section is asserted at the first screenful that
+    /// shows it, and the last check proves the walk reached all of them.
+    ///
     /// The scroll is a fixed number of swipes rather than "swipe until the last section is hittable":
     /// with 5 tab bars, 46 icons and two calendar sheets in one tree, a hit-test snapshot taken
     /// mid-scroll can outlast XCUITest's query timeout (it did, in run 39569063780). One existence
@@ -63,23 +69,38 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["lab.title"].waitForExistence(timeout: 120),
             "The design lab did not open for -designLab"
         )
-
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 60), "The app never drew a window")
-        for identifier in Self.labSections {
-            let element = app.descendants(matching: .any)[identifier]
-            XCTAssertTrue(element.waitForExistence(timeout: 30), "The lab has no section \(identifier)")
-            let frame = element.frame
-            XCTAssertGreaterThanOrEqual(
-                frame.minX, 0,
-                "\(identifier) starts at x=\(frame.minX), off the left of the window \(window.frame) "
-                    + "(section frame \(frame))"
-            )
-            XCTAssertLessThanOrEqual(
-                frame.maxX, window.frame.maxX,
-                "\(identifier) ends at x=\(frame.maxX), off the right of the window \(window.frame) "
-                    + "(section frame \(frame))"
-            )
+        let windowFrame = window.frame
+
+        // How many sections, from the top, have been on screen and asserted.
+        var checked = 0
+        func checkSectionsOnScreen() {
+            while checked < Self.labSections.count {
+                let identifier = Self.labSections[checked]
+                let element = app.descendants(matching: .any)[identifier]
+                guard element.exists else { return }
+                let frame = element.frame
+                if frame.minY >= windowFrame.maxY {
+                    return // still below the window
+                }
+                if frame.maxY <= windowFrame.minY {
+                    XCTFail("\(identifier) went past the window without being checked")
+                    return
+                }
+                checked += 1
+                print("F2 \(identifier) frame=\(frame) window=\(windowFrame)")
+                XCTAssertGreaterThanOrEqual(
+                    frame.minX, 0,
+                    "\(identifier) starts at x=\(frame.minX), off the left of the window \(windowFrame) "
+                        + "(section frame \(frame))"
+                )
+                XCTAssertLessThanOrEqual(
+                    frame.maxX, windowFrame.maxX,
+                    "\(identifier) ends at x=\(frame.maxX), off the right of the window \(windowFrame) "
+                        + "(section frame \(frame))"
+                )
+            }
         }
 
         var shots = 0
@@ -95,12 +116,14 @@ final class OpenStrapUITests: XCTestCase {
             }
         }
         capture()
+        checkSectionsOnScreen()
 
         for _ in 0..<14 {
             app.swipeUp()
             // The glow layers are rendered off the main thread on first appearance.
             Thread.sleep(forTimeInterval: 0.5)
             capture()
+            checkSectionsOnScreen()
         }
 
         XCTAssertTrue(
@@ -108,6 +131,10 @@ final class OpenStrapUITests: XCTestCase {
             "The design lab never reached the calendar section"
         )
         XCTAssertGreaterThan(shots, 1, "The lab fits on one screen, so nothing scrolled")
+        XCTAssertEqual(
+            checked, Self.labSections.count,
+            "the walk never showed \(Self.labSections.dropFirst(checked)), so their frames are unchecked"
+        )
     }
 
     /// Every identifier the lab puts on a section (`DesignLabView.section`), in layout order, plus
