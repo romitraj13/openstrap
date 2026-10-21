@@ -153,6 +153,8 @@ extension EnvironmentValues {
 }
 
 private struct GlowScrollPhasePause: ViewModifier {
+    /// Hold the glow still whatever the scroll phase — the Design lab's UI test asks for this.
+    var always: Bool
     @State private var scrolling = false
 
     @ViewBuilder
@@ -162,18 +164,20 @@ private struct GlowScrollPhasePause: ViewModifier {
                 .onScrollPhaseChange { _, phase in
                     scrolling = phase.isScrolling
                 }
-                .environment(\.glowPaused, scrolling)
+                .environment(\.glowPaused, scrolling || always)
         } else {
             content
+                .environment(\.glowPaused, always)
         }
     }
 }
 
 extension View {
     /// Hold every glow core still while this scroll view moves (iOS 18 and later: `onScrollPhaseChange`
-    /// does not exist before it). The cores get every frame back for the scroll itself.
-    func glowScrollPhasePause() -> some View {
-        modifier(GlowScrollPhasePause())
+    /// does not exist before it). The cores get every frame back for the scroll itself. `always` holds
+    /// them still for the whole life of the view.
+    func glowScrollPhasePause(always: Bool = false) -> some View {
+        modifier(GlowScrollPhasePause(always: always))
     }
 }
 

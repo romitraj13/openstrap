@@ -12,6 +12,14 @@ struct DesignLabView: View {
         ProcessInfo.processInfo.arguments.contains("-designLab")
     }
 
+    /// Set by the UI test (`-designLabStill`): the glow cores hold still. A lab whose cards animate
+    /// for ever never goes quiescent, and XCUITest waits for quiescence before every query and swipe
+    /// — one of those waits outlasting XCUITest's 30 s query timeout is what failed runs 39587579214
+    /// and 39594198894. Holding still also makes the screenshots the same picture every run.
+    static var still: Bool {
+        ProcessInfo.processInfo.arguments.contains("-designLabStill")
+    }
+
     // The switches' state lives here so the lab can show both of them.
     @State private var switchOn = true
     @State private var switchOff = false
@@ -41,7 +49,7 @@ struct DesignLabView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .glowScrollPhasePause()
+        .glowScrollPhasePause(always: Self.still)
         .background(ThemeColors.background)
         .accessibilityIdentifier("lab.scroll")
     }

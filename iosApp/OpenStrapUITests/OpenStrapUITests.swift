@@ -63,7 +63,9 @@ final class OpenStrapUITests: XCTestCase {
     /// though the calendar's title was already in the tree.
     func testDesignLab() {
         let app = XCUIApplication()
-        app.launchArguments = ["-designLab"]
+        // `-designLabStill` holds the glow cores still: a lab that animates for ever never goes
+        // quiescent, and that is what makes an XCUITest query wait out its 30 s timeout.
+        app.launchArguments = ["-designLab", "-designLabStill"]
         app.launch()
 
         XCTAssertTrue(
@@ -72,7 +74,7 @@ final class OpenStrapUITests: XCTestCase {
         )
         // The glow layers are rendered once on first appearance, one card at a time (the renderer
         // holds a lock), and a dozen Core Image blurs keep the accessibility server busy enough to
-        // blow XCUITest's 30 s query timeout (run 39587579214). Let the lab settle before asking it
+        // blow XCUITest's query timeout (run 39587579214). Let the lab settle before asking it
         // anything.
         Thread.sleep(forTimeInterval: 5)
         let window = app.windows.firstMatch
