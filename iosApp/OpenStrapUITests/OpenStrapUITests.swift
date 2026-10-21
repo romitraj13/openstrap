@@ -235,45 +235,25 @@ final class OpenStrapUITests: XCTestCase {
         row.tap()
     }
 
-    /// Open the heart card's detail, which is a card in the middle of Today's list.
+    /// Open a metric's detail from a What changed tile.
     ///
-    /// Card U5's three red runs all failed here, and the hierarchy says why: the tap opened Sleep
-    /// each time. A SwiftUI stack's off-screen children report frames that do not follow the scroll
-    /// (card F2's note in this file), so a frame inside the window is not proof the line is there —
-    /// and tapping a line under the floating bar taps the bar. So this stops trusting frames and
-    /// checks what actually opened, scrolling half a screen and trying again, which is the only
-    /// signal that cannot be stale.
-    private func openHeartDetail(_ app: XCUIApplication) {
+    /// The tile is on screen at the top of Today, so its frame is real — which is the whole point.
+    /// Card U5's five red runs were one lesson: a SwiftUI stack's off-screen children report frames
+    /// clamped into the viewport (card F2's note in this file), so "tap Heart rate" tapped the
+    /// overview card's Sleep row every time, whatever the test did about scrolling. The tile is the
+    /// same `TodayRoute.metric` push the heart card makes.
+    private func openTileDetail(_ app: XCUIApplication, _ label: String, opens title: String) {
+        let tile = app.staticTexts[label]
+        XCTAssertTrue(tile.waitForExistence(timeout: 30), "the \(label) tile never appeared")
+        tile.tap()
         let detail = app.staticTexts["today.detail"]
-        for attempt in 0..<6 {
-            // Move the list a screenful first. The card is below the fold, and `drag()`'s fast flick
-            // does not move this scroll view; `swipeUp()` is what card U4's row taps use.
-            app.swipeUp()
-            Thread.sleep(forTimeInterval: 0.4)
-            let line = app.staticTexts["Heart rate"]
-            guard line.waitForExistence(timeout: 15) else {
-                return XCTFail("Heart rate was never in Today's tree")
-            }
-            print("U5 attempt \(attempt): heart=\(line.frame) top=\(app.staticTexts["app.wordmark"].frame) hittable=\(line.isHittable)")
-            line.tap()
-            if detail.waitForExistence(timeout: 4) {
-                print("U5 attempt \(attempt): opened \(detail.label)")
-                XCTAssertEqual(detail.label, "Heart rate", "the heart card opened a different detail")
-                return
-            }
-            // A tap that landed on the floating bar switched tabs; Today is the first tab. This is
-            // only done when Today really went away: tapping the tab unconditionally resets the
-            // scroll, which is what kept the line at the same y in every attempt of the fourth run.
-            let onToday = app.staticTexts["What changed"].exists
-            print("U5 attempt \(attempt): still on Today = \(onToday)")
-            if !onToday, app.buttons["Today"].exists, app.buttons["Today"].isHittable {
-                app.buttons["Today"].tap()
-                _ = app.staticTexts["What changed"].waitForExistence(timeout: 15)
-            }
+        if !detail.waitForExistence(timeout: 30) {
+            attach(app, "U5-detail-missing")
+            print("U5 after tapping \(label):\n\(app.debugDescription)")
+            XCTFail("Tapping the \(label) tile pushed no detail")
+            return
         }
-        attach(app, "U5-detail-missing")
-        print("U5 after tapping Heart rate:\n\(app.debugDescription)")
-        XCTFail("Tapping the heart card pushed no detail")
+        XCTAssertEqual(detail.label, title, "the detail that opened is not the tile's metric")
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.
@@ -318,9 +298,9 @@ final class OpenStrapUITests: XCTestCase {
         app.buttons["tiles.cancel"].tap()
         XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 30), "Cancel never closed the tile chooser")
 
-        // A metric tap pushes the detail route card U9 fills in. See `openHeartDetail`: the line's own
-        // frame cannot be trusted here, so it scrolls and checks what opened.
-        openHeartDetail(app)
+        // A metric tap pushes the detail route card U9 fills in, from a What changed tile: the tile
+        // is on screen, so its frame is real (see `openTileDetail`).
+        openTileDetail(app, "Resting HR", opens: "Resting heart rate")
         attach(app, "U5-detail-1")
         // Back to Today. The pushed card wears the stack's own bar; if the tab's hidden toolbar takes
         // it with it, restart instead of guessing at a button that is not there.
