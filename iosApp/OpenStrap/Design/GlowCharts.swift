@@ -444,7 +444,7 @@ struct GlowDotBars: View {
         let pitchX = CGFloat(GlowGeometry.shared.dotBarPitchX(width: Float(size.width), count: Int32(values.count)))
         let pitchY = CGFloat(GlowGeometry.shared.dotBarPitchY(h: Float(h), rows: Int32(rows)))
         let r = CGFloat(GlowGeometry.shared.dotBarRadius(pitchX: Float(pitchX), pitchY: Float(pitchY)))
-        let maxValue = GlowGeometry.shared.dotBarMax(values.max() ?? 0)
+        let maxValue = GlowGeometry.shared.dotBarMax(maxValue: values.max() ?? 0)
         let picked = touchX.flatMap { describe == nil ? nil : Int($0 / pitchX) }
             .map { min(max($0, 0), values.count - 1) }
 
