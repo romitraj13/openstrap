@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 final class OpenStrapUITests: XCTestCase {
@@ -72,11 +73,18 @@ final class OpenStrapUITests: XCTestCase {
         // hub's own rows carry the same words.
         app.buttons["You"].tap()
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
+        // Card F4: the hub's last row is the Licences row; scrolled to the end it must sit above
+        // the floating bar, and the screenshot is taken there.
+        assertClearsNavBar(app, lastRow: "you.licences", screen: "You")
         attach(app, "U4-you-1")
+        scrollToTop(app, until: app.buttons["you.profile"])
 
         tap(app, "you.profile")
         XCTAssertTrue(app.buttons["profile.back"].waitForExistence(timeout: 30), "Your profile never opened")
+        // The panel's last field is the one to reach at the end; Save is in the header above it.
+        assertClearsNavBar(app, lastRow: "profile.sleepNeed", screen: "Your profile")
         attach(app, "U4-profile-1")
+        scrollToTop(app, until: app.buttons["profile.back"])
         app.buttons["profile.back"].tap()
         XCTAssertTrue(app.buttons["you.profile"].waitForExistence(timeout: 30), "Back from Your profile never returned to You")
 
@@ -93,22 +101,99 @@ final class OpenStrapUITests: XCTestCase {
 
         tap(app, "you.strap")
         XCTAssertTrue(app.buttons["strap.back"].waitForExistence(timeout: 30), "Your strap never opened")
+        // The Diagnostics row is the last thing on the screen, and the row U4's screenshot showed
+        // under the bar.
+        assertClearsNavBar(app, lastRow: "diagnosticsLink", screen: "Your strap")
         attach(app, "U4-strap-1")
+        scrollToTop(app, until: app.buttons["strap.back"])
         app.buttons["strap.back"].tap()
         XCTAssertTrue(app.buttons["you.strap"].waitForExistence(timeout: 30), "Back from Your strap never returned to You")
 
         tap(app, "you.diagnostics")
         XCTAssertTrue(app.navigationBars["Diagnostics"].waitForExistence(timeout: 30), "Diagnostics never opened")
+        // The log is the last thing here, and it can be thousands of points long.
+        assertClearsNavBar(app, lastRow: "logText", screen: "Diagnostics")
         attach(app, "U4-diagnostics-1")
         app.navigationBars["Diagnostics"].buttons.firstMatch.tap()
         XCTAssertTrue(app.buttons["you.diagnostics"].waitForExistence(timeout: 30), "Back from Diagnostics never returned to You")
 
         tap(app, "you.licences")
         XCTAssertTrue(app.buttons["licences.back"].waitForExistence(timeout: 30), "The licence texts never opened")
+        // The last licence text is the last row of the screen.
+        assertClearsNavBar(app, lastRow: "licence.OFL-MuseoModerno", screen: "Licences")
         attach(app, "U4-licences-1")
+        scrollToTop(app, until: app.buttons["licences.back"])
         app.buttons["licences.back"].tap()
 
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "Back from Licences never returned to You")
+    }
+
+    /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
+    /// of it. `navBar.top` is the bar's own top edge (`FloatingNavBar`), so the bound is the bar's
+    /// real frame and not a number copied into the test.
+    private func assertClearsNavBar(_ app: XCUIApplication, lastRow identifier: String, screen: String) {
+        let bar = app.descendants(matching: .any)["navBar.top"]
+        guard bar.waitForExistence(timeout: 30) else {
+            print("F4 \(screen): there is no navBar.top. Tree:\n\(app.debugDescription)")
+            XCTFail("\(screen): the floating bar never reported its top edge")
+            return
+        }
+        let row = app.descendants(matching: .any)[identifier]
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(screen): \(identifier) never appeared")
+        scrollToEnd(app, until: row)
+        let barTop = bar.frame.minY
+        let rowBottom = row.frame.maxY
+        print("F4 \(screen): \(identifier) maxY=\(rowBottom) barTop=\(barTop) window=\(app.windows.firstMatch.frame)")
+        XCTAssertLessThanOrEqual(
+            rowBottom, barTop,
+            "\(screen): \(identifier) ends at \(rowBottom), under the floating bar whose top is "
+                + "\(barTop), so the last row cannot be scrolled clear of it"
+        )
+    }
+
+    /// Drags to the end of a scrolling screen: a held drag moves about half a screen, so the walk
+    /// repeats until the row being watched stops moving up (twice, so a single stale frame cannot
+    /// end the walk early). A row thousands of points down the list reports a frame that does not
+    /// move with the scroll (card F2's note), so only a row the window shows is trusted to say the
+    /// list has reached its end.
+    private func scrollToEnd(_ app: XCUIApplication, until row: XCUIElement) {
+        let window = app.windows.firstMatch.frame
+        var previous = row.frame.maxY
+        var still = 0
+        for _ in 0..<80 {
+            drag(app, from: 0.78, to: 0.22)
+            Thread.sleep(forTimeInterval: 0.25)
+            let frame = row.frame
+            let onScreen = frame.minY < window.maxY && frame.maxY > window.minY
+            still = onScreen && frame.maxY >= previous - 1 ? still + 1 : 0
+            previous = frame.maxY
+            if still == 2 { return }
+        }
+    }
+
+    /// Back to the top of a screen whose header scrolls with it (Your profile, Licences): the back
+    /// button is only reachable once the list is back at its start.
+    private func scrollToTop(_ app: XCUIApplication, until element: XCUIElement) {
+        var drags = 0
+        while !element.isHittable && drags < 60 {
+            drag(app, from: 0.28, to: 0.78)
+            Thread.sleep(forTimeInterval: 0.15)
+            drags += 1
+        }
+        XCTAssertTrue(element.isHittable, "the screen never scrolled back to its top")
+    }
+
+    /// One held drag, from `from` to `to` of the window's height. It starts above the floating bar
+    /// (its top edge is about 0.85 of the window) so the bar never takes the gesture, and holds at
+    /// the end so momentum does not carry the scroll further than the drag.
+    private func drag(_ app: XCUIApplication, from: CGFloat, to: CGFloat) {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+            .press(
+                forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                withVelocity: .fast,
+                thenHoldForDuration: 0.05
+            )
     }
 
     /// Taps a row once it can actually take the tap. A popped `NavigationStack` keeps the old

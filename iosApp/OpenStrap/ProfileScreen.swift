@@ -186,7 +186,8 @@ struct ProfileScreen: View {
                 unit: "h",
                 text: $sleepNeed,
                 decimal: true,
-                error: fields.sleepNeedError
+                error: fields.sleepNeedError,
+                identifier: "profile.sleepNeed"
             )
         }
     }
@@ -281,6 +282,8 @@ struct NumberField: View {
     var error = false
     /// Compose's `take(n)` on the typed text; 5 unless the field caps it lower.
     var limit = 5
+    /// The text field's own identifier, for the UI test that checks the end of the panel (card F4).
+    var identifier: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -295,6 +298,7 @@ struct NumberField: View {
                     .keyboardType(decimal ? .decimalPad : .numberPad)
                     .appTextStyle(AppTypography.bodyLarge)
                     .foregroundStyle(glowInk)
+                    .modifier(FieldIdentifier(identifier))
                     .onChange(of: text) { _, value in
                         let filtered = Self.filter(value, decimal: decimal, limit: limit)
                         if filtered != value { text = filtered }
@@ -318,6 +322,25 @@ struct NumberField: View {
     /// (`v.filter { ... }.take(5)`, ProfileScreen.kt:230).
     static func filter(_ value: String, decimal: Bool, limit: Int) -> String {
         String(value.filter { $0.isNumber || (decimal && ($0 == "." || $0 == ",")) }.prefix(limit))
+    }
+}
+
+/// `.accessibilityIdentifier` only when the caller named the field, so no field ever carries an
+/// empty identifier (card F4 needs one name on the last field of the panel).
+private struct FieldIdentifier: ViewModifier {
+    private let identifier: String?
+
+    init(_ identifier: String?) {
+        self.identifier = identifier
+    }
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let identifier {
+            content.accessibilityIdentifier(identifier)
+        } else {
+            content
+        }
     }
 }
 

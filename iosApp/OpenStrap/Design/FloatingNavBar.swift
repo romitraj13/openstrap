@@ -103,6 +103,17 @@ struct FloatingNavBar: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+        // Card F4: the bar's top edge, as one 1 pt accessibility element, so a UI test can assert
+        // that a scrolled row comes fully clear of the bar. A leaf of its own: an identifier on the
+        // bar's container would land on every cell instead (the U4 note on containers).
+        .overlay(alignment: .top) {
+            Color.clear
+                .frame(height: 1)
+                .allowsHitTesting(false)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Floating tab bar")
+                .accessibilityIdentifier("navBar.top")
+        }
     }
 }
 
