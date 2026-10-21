@@ -47,7 +47,6 @@ struct LicencesView: View {
         }
         .background(ThemeColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .accessibilityIdentifier("screen.licences")
     }
 
     private static func text(named name: String) -> String {

@@ -79,7 +79,6 @@ struct ProfileScreen: View {
         } message: {
             Text("Your profile changes haven't been saved.")
         }
-        .accessibilityIdentifier("screen.profile")
     }
 
     private var header: some View {

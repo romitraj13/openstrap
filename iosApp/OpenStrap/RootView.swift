@@ -176,7 +176,6 @@ struct DayTab<Content: View>: View {
                 health.reload()
                 health.reloadDaysWithData()
             }
-            .accessibilityIdentifier("screen.\(tab.label.lowercased())")
         }
     }
 
@@ -245,6 +244,5 @@ struct InterimRecoveryPanel: View {
                     .foregroundStyle(glowInk.opacity(0.7))
             }
         }
-        .accessibilityIdentifier("interim.\(title.lowercased())")
     }
 }

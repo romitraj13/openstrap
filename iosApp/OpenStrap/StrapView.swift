@@ -46,7 +46,6 @@ struct StrapView: View {
                     "This doesn't unbind the strap from your Zepp account."
             )
         }
-        .accessibilityIdentifier("screen.strap")
     }
 
     private var header: some View {

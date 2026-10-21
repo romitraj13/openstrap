@@ -97,7 +97,6 @@ struct GoalsSheet: View {
         )
         .padding(12)
         .onAppear(perform: hydrate)
-        .accessibilityIdentifier("sheet.goals")
     }
 
     private func hydrate() {
