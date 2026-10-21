@@ -722,3 +722,27 @@ same file names are two build commands for one path (run 39609938000).
   and the card names one Apple Health row.
 - `DeviceScreen.kt`'s scan-and-pair flow, `Disconnect`, alarms and firmware rows: the card keeps the
   existing pairing logic and only restyles it, and iOS has no scan API in this card.
+
+### What the CI runs found
+
+Six iOS runs before the one that compiled: the first two failed before any Swift error was
+reachable, the rest are recorded here because each is a trap the next card should not step in.
+
+- `39609938000` — "Multiple commands produce …/MIT-Phosphor.txt". XcodeGen copies every resource to
+  the bundle root; U1 already put the three licence texts in `Design/Licenses/`, so a second folder
+  with the same names was a second build command for one path. Fixed by reading U1's files.
+- `39611818685` — three Swift errors: `Boolean` where Swift means `Bool`; `RecoverySnapshot` used
+  without `import OpenStrapShared`; and `ProfileFields` missing because Kotlin/Native does not
+  export a class whose only constructor is internal (its constructor is public now).
+- `39615535475` — `extension LinkRow where Trailing == EmptyView` returned a `RowCaret`, which
+  cannot type-check; the constraint is `Trailing == RowCaret`.
+- `39614149641` — `ProfileScreen`, `YouView` and `GoalsSheet` named Kotlin types without
+  `import OpenStrapShared`; the compiler reported only the first unresolved name.
+- `39621907688` — the goals sheet opened with every element inside it identified as `sheet.goals`.
+  A `.accessibilityIdentifier` on a container is applied to all of its descendants, replacing the
+  identifiers they set themselves, so the Cancel button's `goals.cancel` did not exist. No screen
+  sets an identifier on a container any more; they sit on the elements a test addresses.
+- `39624290757` and the retry — `testDesignLab` (card F2's test) failed with "Failed to get
+  matching snapshots: Timed out while evaluating UI query" on `lab.title`, the same flake F2
+  recorded; `testEveryTabAndYouScreen` passed in 66.9 s and `testPairScreenAppears` in 10.9 s in
+  both runs.
