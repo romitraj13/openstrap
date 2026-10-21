@@ -1,11 +1,17 @@
 package org.openstrap.shared.device
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import org.openstrap.app.ble.StrapUuids
 import org.openstrap.protocol.ByteWriter
 import org.openstrap.protocol.StrapLink
@@ -203,7 +209,14 @@ internal class SimulatedStrap(private val authKey: ByteArray) : StrapLink {
  * A [BleDriver] that puts [SimulatedStrap] behind a [BleBridge]: writes go to the strap, its
  * notifications come back as GATT notifications, reads answer from a table. One strap coroutine at a
  * time, like CoreBluetooth's serial queue.
+ *
+ * Ending a driver matters as much as driving it: [stopForwarding] and [quiesce] let a test finish
+ * with nothing of the engine's still running, and [close] cancels the driver's own scope, so no work
+ * from one test can run during the next one. [holdAnswers] parks a channel-data write (the reader's
+ * ACK) inside the bridge on purpose, so a test can close the engine with an operation provably
+ * in flight.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
     /** The strap's history-data and history-control characteristics, as `HistorySync` names them. */
     private val HISTORY_DATA = "00000005-0000-3512-2118-0009af100700"
@@ -211,6 +224,25 @@ internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
 
     lateinit var bridge: BleBridge
     val calls = mutableListOf<String>()
+
+    /** Writes still running on [scope]; 0 means the strap has nothing left to answer. */
+    private val inFlight = AtomicInt(0)
+
+    /** How many writes are still running; a test can assert this is 0 after teardown. */
+    val writesInFlight: Int get() = inFlight.load()
+
+    /** Set by [quiesce]: later writes answer at once instead of touching the strap. */
+    @Volatile private var answering = true
+
+    /**
+     * While set, a write to the channel-data characteristic stops before answering, leaving the
+     * caller parked in `BleBridge.op` with an operation pending. [quiesce] releases it.
+     */
+    @Volatile var holdAnswers = false
+
+    /** Completed the first time a write is held, so a test can wait for that window. */
+    val heldWrite = CompletableDeferred<Unit>()
+    private val releaseHeld = CompletableDeferred<Unit>()
 
     /** Characteristic UUIDs the app would have discovered. */
     val discovered = listOf(
@@ -251,19 +283,62 @@ internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
         strap.historyNotifications.subscriptionCount.first { it > 0 }
     }
 
+    /**
+     * Stops the three notification forwarders and waits for them, so the engine's reader can no
+     * longer be handed a chunk while it is being closed.
+     */
+    suspend fun stopForwarding() {
+        forwarders.forEach { it.cancel() }
+        forwarders.forEach { it.join() }
+    }
+
+    /**
+     * Ends the driver's traffic: later writes answer without touching the strap, a [holdAnswers]
+     * write is released, and the driver's thread is waited out until nothing is in flight.
+     */
+    suspend fun quiesce() {
+        answering = false
+        holdAnswers = false
+        releaseHeld.complete(Unit)
+        if (!scope.isActive) return
+        repeat(4) {
+            // The driver's dispatcher is single-threaded: a no-op queued after the writes waits for
+            // them, and the counter catches a write that was suspended while the no-op ran.
+            val idle = CompletableDeferred<Unit>()
+            scope.launch { idle.complete(Unit) }
+            idle.await()
+            if (inFlight.load() == 0) return
+        }
+    }
+
     override fun write(requestId: Long, characteristic: String, data: ByteArray, withResponse: Boolean) {
         calls += "write $characteristic ${data.size} $withResponse"
-        scope.launch {
-            when (characteristic) {
-                StrapUuids.CHANNEL_CONTROL -> strap.writeControl(data)
-                StrapUuids.CHANNEL_DATA -> strap.writeData(data)
-                StrapUuids.HR_CONTROL -> Unit
-                else -> {
-                    bridge.onFailed(requestId, "unexpected write to $characteristic")
-                    return@launch
-                }
-            }
+        // Quiescing: answer at once. Nothing is left suspended in BleBridge.op, so a later
+        // onDisconnected cannot fail an operation the engine is still waiting on.
+        if (!answering) {
             bridge.onComplete(requestId)
+            return
+        }
+        scope.launch {
+            inFlight.fetchAndAdd(1)
+            try {
+                if (holdAnswers && characteristic == StrapUuids.CHANNEL_DATA) {
+                    heldWrite.complete(Unit)
+                    releaseHeld.await()
+                }
+                when (characteristic) {
+                    StrapUuids.CHANNEL_CONTROL -> strap.writeControl(data)
+                    StrapUuids.CHANNEL_DATA -> strap.writeData(data)
+                    StrapUuids.HR_CONTROL -> Unit
+                    else -> {
+                        bridge.onFailed(requestId, "unexpected write to $characteristic")
+                        return@launch
+                    }
+                }
+                bridge.onComplete(requestId)
+            } finally {
+                inFlight.fetchAndAdd(-1)
+            }
         }
     }
 
@@ -279,7 +354,10 @@ internal class FakeStrapDriver(private val strap: SimulatedStrap) : BleDriver {
         bridge.onComplete(requestId)
     }
 
+    /** Ends the driver for good: release anything held, stop the forwarders and cancel the scope. */
     fun close() {
+        releaseHeld.complete(Unit)
         forwarders.forEach { it.cancel() }
+        scope.cancel()
     }
 }

@@ -6,9 +6,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.data.db.SyncLog
-import org.openstrap.protocol.hexToBytes
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -30,38 +28,37 @@ class SyncLogReadTest {
     /** A whole minute, an hour ago: inside the strap's clock and inside the sync's lookback. */
     private val first = (Clock.System.now().epochSeconds - 3600) / 60 * 60
 
+    /** Every harness this test opened; a failed assertion skips its close(), so tearDown closes it. */
+    private val harnesses = DeviceHarnesses()
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @BeforeTest
     fun installMain() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @AfterTest
-    fun removeMain() = Dispatchers.resetMain()
-
-    private class Harness(listener: RecordingListener, keyHex: String, first: Long, minutes: Int) {
-        val strap = SimulatedStrap(keyHex.hexToBytes())
-        val driver = FakeStrapDriver(strap)
-        val engine = StrapEngine(driver, listener, OpenStrapIosDatabase.IN_MEMORY)
-        val gdsp = SimulatedGdspStrap(first, minutes)
-
-        init {
-            driver.bridge = engine.bridge
-            strap.gdsp = gdsp
-        }
-
-        fun close() {
-            engine.close()
-            driver.close()
+    fun tearDown() {
+        try {
+            // Closing a harness is a suspend function: it waits for the engine's work to finish.
+            runTest { harnesses.closeAll() }
+        } finally {
+            Dispatchers.resetMain()
         }
     }
 
+    private fun harness(listener: RecordingListener) =
+        harnesses.track(HistoryHarness(listener, key, first, minutes))
+
     /** Connects and waits for the auto sync that follows `ready`. */
-    private suspend fun connected(listener: RecordingListener): Harness {
-        val h = Harness(listener, key, first, minutes)
+    private suspend fun connected(listener: RecordingListener): DeviceHarness {
+        val h = harness(listener)
         h.driver.ready()
         h.engine.linkUp(h.driver.discovered, key)
         listener.ready.await()
         listener.nextSync("done")
+        // The auto sync's own coroutine releases its lock just after it posts `done`; wait it out so
+        // a test that asks for a manual sync next is not racing it.
+        h.engine.drained()
         return h
     }
 
@@ -75,7 +72,7 @@ class SyncLogReadTest {
     @Test
     fun anEngineThatHasNotSyncedHasNoRows() = runTest {
         val listener = RecordingListener()
-        val h = Harness(listener, key, first, minutes)
+        val h = harness(listener)
         assertTrue(h.engine.recent(50).isEmpty())
         h.close()
     }
@@ -85,8 +82,7 @@ class SyncLogReadTest {
         val listener = RecordingListener()
         val h = connected(listener)
         h.engine.appVisible = true
-        h.engine.syncNow()
-        listener.nextSync("done")
+        h.syncNow(listener)
 
         val rows = h.engine.recent(50)
         assertEquals(2, rows.size)
@@ -102,8 +98,7 @@ class SyncLogReadTest {
     fun recentSyncsStopsAtTheLimit() = runTest {
         val listener = RecordingListener()
         val h = connected(listener)
-        h.engine.syncNow()
-        listener.nextSync("done")
+        h.syncNow(listener)
 
         val newest = h.engine.recent(1)
         assertEquals(1, newest.size)

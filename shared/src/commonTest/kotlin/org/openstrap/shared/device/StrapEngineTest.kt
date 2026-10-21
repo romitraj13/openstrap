@@ -8,7 +8,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.device.PairingErrors
 import org.openstrap.protocol.auth.AuthException
 import org.openstrap.protocol.hexToBytes
@@ -83,29 +82,28 @@ class StrapEngineTest {
     /** The fake key the protocol tests use. */
     private val key = "3c4a6f0e9b1d22e7a8c5f01b6d9e4a77"
 
+    /** Every harness this test opened; a failed assertion skips its close(), so tearDown closes it. */
+    private val harnesses = DeviceHarnesses()
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @BeforeTest
     fun installMain() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @AfterTest
-    fun removeMain() = Dispatchers.resetMain()
-
-    private class Harness(listener: RecordingListener, keyHex: String) {
-        val strap = SimulatedStrap(keyHex.hexToBytes())
-        val driver = FakeStrapDriver(strap)
-        val engine = StrapEngine(driver, listener, OpenStrapIosDatabase.IN_MEMORY)
-
-        init { driver.bridge = engine.bridge }
-
-        fun close() {
-            engine.close()
-            driver.close()
+    fun tearDown() {
+        try {
+            // Closing a harness is a suspend function: it waits for the engine's work to finish.
+            runTest { harnesses.closeAll() }
+        } finally {
+            Dispatchers.resetMain()
         }
     }
 
-    private suspend fun readyHarness(listener: RecordingListener): Harness {
-        val h = Harness(listener, key)
+    private fun harness(listener: RecordingListener) = harnesses.track(DeviceHarness(listener, key))
+
+    private suspend fun readyHarness(listener: RecordingListener): DeviceHarness {
+        val h = harness(listener)
         h.driver.ready()
         h.engine.linkUp(h.driver.discovered, key)
         listener.ready.await()
@@ -116,7 +114,7 @@ class StrapEngineTest {
     @Test
     fun linkUpAuthenticatesAndReportsFirmwareBatteryAndProfile() = runTest {
         val listener = RecordingListener()
-        val h = Harness(listener, key)
+        val h = harness(listener)
         // A profile set before connecting goes out after auth, as StrapManager.watchProfile does.
         h.engine.profile = UserProfile(
             birthYear = 1990, birthMonth = 1, birthDay = 1,
@@ -149,7 +147,7 @@ class StrapEngineTest {
         // Upper case with separators and a 0x prefix, as a paste from Zepp's screen may look.
         val pasted = "0x3C:4A:6F:0E:9B:1D:22:E7:A8:C5:F0:1B:6D:9E:4A:77"
         val listener = RecordingListener()
-        val h = Harness(listener, pasted)
+        val h = harness(listener)
         h.driver.ready()
         h.engine.linkUp(h.driver.discovered, pasted)
         listener.ready.await()
@@ -160,7 +158,7 @@ class StrapEngineTest {
     @Test
     fun theAuthKeyNeverAppearsInTheLog() = runTest {
         val listener = RecordingListener()
-        val h = Harness(listener, key)
+        val h = harness(listener)
         h.driver.ready()
         h.engine.linkUp(h.driver.discovered, key)
         listener.ready.await()
@@ -174,7 +172,7 @@ class StrapEngineTest {
     @Test
     fun aWrongKeyReportsThePairingMessage() = runTest {
         val listener = RecordingListener()
-        val h = Harness(listener, key)
+        val h = harness(listener)
         h.driver.ready()
         h.engine.linkUp(h.driver.discovered, "00000000000000000000000000000000")
 
@@ -207,5 +205,35 @@ class StrapEngineTest {
         h.engine.linkDown("peripheral did disconnect")
         assertEquals("peripheral did disconnect", listener.disconnected.await())
         h.close()
+    }
+
+    /**
+     * Nothing the engine started may still be running once its close() has returned.
+     *
+     * The session reader ACKs every chunk the strap sends, and `StrapEngine.close()` drops the link
+     * first, so a reader parked in `BleBridge.op` at that moment throws `GattException("Not
+     * connected")` on the engine's background worker, where nothing catches it. On iOS that kills
+     * the test binary, so the failure is reported against whichever test is running then — which is
+     * how a test that never connects a strap came to fail with this exception.
+     *
+     * To make the window certain instead of a race, the ACK for the strap's first heart-rate push is
+     * held by the fake driver until the harness releases it.
+     */
+    @Test
+    fun closeLeavesNoOperationInFlight() = runTest {
+        val listener = RecordingListener()
+        val h = harness(listener)
+        h.driver.ready()
+        h.engine.linkUp(h.driver.discovered, key)
+        listener.ready.await()
+
+        h.driver.holdAnswers = true
+        h.engine.setLiveHeartRate(true)
+        h.driver.heldWrite.await()
+
+        h.close()
+
+        assertTrue(listener.states.none { it.first == "failed" }, "${listener.states}")
+        assertEquals(0, h.driver.writesInFlight, "background work outlived close()")
     }
 }

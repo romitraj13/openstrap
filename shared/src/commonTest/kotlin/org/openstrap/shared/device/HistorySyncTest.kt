@@ -6,9 +6,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.TimeZone
-import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.data.settings.SettingsRepository
-import org.openstrap.protocol.hexToBytes
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -37,39 +35,35 @@ class HistorySyncTest {
     private val first = (Clock.System.now().epochSeconds - 3600) / 60 * 60
     private val end = first + minutes * 60L
 
+    /** Every harness this test opened; a failed assertion skips its close(), so tearDown closes it. */
+    private val harnesses = DeviceHarnesses()
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @BeforeTest
     fun installMain() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @AfterTest
-    fun removeMain() = Dispatchers.resetMain()
-
-    private class Harness(listener: RecordingListener, keyHex: String, first: Long, minutes: Int) {
-        val strap = SimulatedStrap(keyHex.hexToBytes())
-        val driver = FakeStrapDriver(strap)
-        val engine = StrapEngine(driver, listener, OpenStrapIosDatabase.IN_MEMORY)
-        val gdsp = SimulatedGdspStrap(first, minutes)
-
-        init {
-            driver.bridge = engine.bridge
-            strap.gdsp = gdsp
-        }
-
-        fun close() {
-            engine.close()
-            driver.close()
+    fun tearDown() {
+        try {
+            // Closing a harness is a suspend function: it waits for the engine's work to finish.
+            runTest { harnesses.closeAll() }
+        } finally {
+            Dispatchers.resetMain()
         }
     }
 
     /** Connects and waits for the auto sync that follows `ready`; returns the harness and listener. */
-    private suspend fun connected(): Pair<Harness, RecordingListener> {
+    private suspend fun connected(): Pair<HistoryHarness, RecordingListener> {
         val listener = RecordingListener()
-        val h = Harness(listener, key, first, minutes)
+        val h = harnesses.track(HistoryHarness(listener, key, first, minutes))
         h.driver.ready()
         h.engine.linkUp(h.driver.discovered, key)
         listener.ready.await()
         listener.nextSync("done")
+        // The auto sync's own coroutine releases its lock just after it posts `done`; wait it out so
+        // a test that asks for a manual sync next is not racing it.
+        h.engine.drained()
         return h to listener
     }
 
@@ -91,8 +85,7 @@ class HistorySyncTest {
 
         // A manual sync starts from the cursor the first one left: the strap has nothing newer, so
         // the table is untouched.
-        h.engine.syncNow()
-        listener.nextSync("done")
+        h.syncNow(listener)
         assertEquals(minutes, h.engine.db.healthDao().activityOnce(first, end - 1).size)
         // Every START asked for activity; the first sync took two (the window, then the empty reply
         // that ends the type) and the manual one asked from the cursor, not from the lookback.
@@ -123,8 +116,7 @@ class HistorySyncTest {
         assertTrue(row.end >= row.start)
 
         h.engine.appVisible = true
-        h.engine.syncNow()
-        listener.nextSync("done")
+        h.syncNow(listener)
         val after = h.engine.db.syncLogDao().all()
         assertEquals(2, after.size)
         assertEquals("manual", after.last().trigger)
