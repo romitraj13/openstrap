@@ -42,6 +42,11 @@ final class HealthModel: ObservableObject {
     @Published private(set) var checkIn: Int?
     /// The strap's own Readiness score for the selected day, when it reported one.
     @Published private(set) var strapReadiness: Int?
+    /// The whole of the strap's Readiness row for the selected day: Recovery's "Strap's estimate"
+    /// and the comparison in How it works read its parts, not just the score.
+    @Published private(set) var strapReadinessRow: StrapReadinessRow?
+    /// The month behind each of Recovery's six body signals (`ScreenQueries.signalHistories`).
+    @Published private(set) var signalHistories = RecoveryGlow.shared.noSignalHistories()
     /// A month of daily steps ending yesterday, for Monday's recap (`ScreenQueries.monthHistory`).
     @Published private(set) var recapSteps: [DayStat] = []
     /// The statistics What changed shows, in `TODAY_TILES`' order (Android's `todayTiles`).
@@ -139,8 +144,33 @@ final class HealthModel: ObservableObject {
         screens.strapReadiness(date: date) { [weak self] row in
             guard let self, self.date == date else { return }
             self.strapReadiness = row?.score?.intValue
+            self.strapReadinessRow = row
         }
         reloadTodayTiles()
+        // Recovery reads the same strap row, so its screen gets it without a second read when it has
+        // been opened (see `reloadRecovery`).
+        if recoveryOpened { reloadRecovery() }
+    }
+
+    // MARK: - Recovery's own reads (card U6)
+
+    /// True once the Recovery tab has been drawn: its signal histories and strap row are read only
+    /// then, as Today's own reads wait for Today (card U5).
+    private var recoveryOpened = false
+
+    /// The two reads Recovery adds to the day: the strap's whole Readiness row and a month of each
+    /// body signal (`rememberSignals`, GlowRecoveryScreen.kt:360-384).
+    func reloadRecovery() {
+        recoveryOpened = true
+        let date = self.date
+        screens.strapReadiness(date: date) { [weak self] row in
+            guard let self, self.date == date else { return }
+            self.strapReadinessRow = row
+        }
+        screens.signalHistories(date: date) { [weak self] histories in
+            guard let self, self.date == date else { return }
+            self.signalHistories = histories
+        }
     }
 
     /// Answers - or clears, with nil - the selected day's check-in (`CheckIn.save`, GlowCheckIn.kt).

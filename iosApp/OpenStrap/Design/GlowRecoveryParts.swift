@@ -93,3 +93,48 @@ struct Fact: View {
         }
     }
 }
+
+/// Seven days as dots joined by a faint line; missing days are gaps.
+/// (`Sparkline`, GlowRecoveryScreen.kt:434) The last day is drawn at full colour, the rest softer.
+struct Sparkline: View {
+    var values: [Float?]
+    var color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let known = values.compactMap { $0 }
+            guard let lo = known.min(), let hi = known.max() else { return }
+            // A flat week would divide by zero: one unit of range keeps the dots on the line.
+            let top = hi - lo < 0.001 ? lo + 1 : hi
+            let r: CGFloat = 2
+            let span = CGFloat(max(values.count - 1, 1))
+            func at(_ index: Int, _ value: Float) -> CGPoint {
+                let x = r + CGFloat(index) * (size.width - 2 * r) / span
+                let y = size.height - r - CGFloat((value - lo) / (top - lo)) * (size.height - 2 * r)
+                return CGPoint(x: x, y: y)
+            }
+            for (index, value) in values.enumerated() {
+                guard let value, index + 1 < values.count, let next = values[index + 1] else { continue }
+                context.stroke(
+                    Path { path in
+                        path.move(to: at(index, value))
+                        path.addLine(to: at(index + 1, next))
+                    },
+                    with: .color(color.opacity(0.45)),
+                    style: StrokeStyle(lineWidth: 1.2, lineCap: .round)
+                )
+            }
+            for (index, value) in values.enumerated() {
+                guard let value else { continue }
+                let centre = at(index, value)
+                context.fill(
+                    Path(ellipseIn: CGRect(x: centre.x - r, y: centre.y - r, width: r * 2, height: r * 2)),
+                    with: .color(index == values.count - 1 ? color : color.opacity(0.7))
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 22)
+        .accessibilityHidden(true)
+    }
+}

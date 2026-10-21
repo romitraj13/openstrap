@@ -256,6 +256,70 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertEqual(detail.label, title, "the detail that opened is not the tile's metric")
     }
 
+    /// Card U6: the Recovery tab, every section in Compose's order, the folded panels opened, and the
+    /// learning state from the first days of the seeded month (too few nights behind them to score).
+    /// Screenshots: `U6-recovery-1..n` from the top down, then `U6-recoverylearning-1..n`.
+    func testRecovery() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded month"
+        )
+        app.buttons["Recovery"].tap()
+        XCTAssertTrue(
+            app.staticTexts["recovery.title"].waitForExistence(timeout: 60),
+            "The Recovery tab never drew its score card"
+        )
+
+        // Every section `GlowRecoveryScreen.kt:76-95` draws, in its order. A section that never
+        // rendered at all fails here rather than quietly missing from the screenshots.
+        let sections = ["Recovery", "What drove it", "Charge", "Where your charge went", "Body signals", "How it works"]
+        let missing = sections.filter { !app.staticTexts[$0].exists }
+        XCTAssertTrue(missing.isEmpty, "Recovery never drew: \(missing)")
+        walk(app, prefix: "U6-recovery", milestones: sections, screenfuls: 5)
+
+        // "How it works" is folded away: the last block of the screen is its header, so the walk
+        // above ends on it. Tapping it opens Compose's two paragraphs.
+        app.staticTexts["How it works"].tap()
+        let chargeParagraph = "Charge is a running battery: sleep and calm rest fill it, movement, stress "
+            + "and simply being awake drain it."
+        XCTAssertTrue(
+            app.staticTexts[chargeParagraph].waitForExistence(timeout: 30),
+            "Tapping How it works opened nothing"
+        )
+        attach(app, "U6-recovery-6")
+
+        // Back at the top, the contributors unfold from "Top 3 of N" to the whole list.
+        scrollToTop(app)
+        app.staticTexts["What drove it"].tap()
+        Thread.sleep(forTimeInterval: 0.5)
+        attach(app, "U6-recovery-7")
+
+        // The learning state: the first days of the seeded month have fewer than the seven nights a
+        // score needs, so the card says what it is waiting for (GlowRecoveryScreen.kt:135-137).
+        scrollToTop(app)
+        let learning = "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate."
+        let body = app.staticTexts["recovery.body"]
+        let previous = app.buttons["date.previous"]
+        XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
+        var found = false
+        for _ in 0..<30 {
+            if body.exists && body.label == learning {
+                found = true
+                break
+            }
+            previous.tap()
+            Thread.sleep(forTimeInterval: 0.7)
+        }
+        XCTAssertTrue(found, "No day in the seeded month drew the learning state's sentence")
+        if found {
+            walk(app, prefix: "U6-recoverylearning", milestones: ["Recovery", "Charge", "Body signals"], screenfuls: 3)
+        }
+    }
+
     /// A medium sheet has no close button: drag it down, as a finger would.
     private func dismissSheet(_ app: XCUIApplication) {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))

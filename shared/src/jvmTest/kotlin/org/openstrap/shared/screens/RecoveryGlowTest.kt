@@ -315,7 +315,8 @@ class RecoveryGlowTest {
 
     @Test
     fun aChargePointReadsAsItsValueAndClock() {
-        assertEquals("62 · 07:30", RecoveryGlow.chargeReadout(epoch(0), 7 * 4 + 2, 62.4f))
+        // The zone is pinned: the day starts at midnight UTC, so 07:30 is 07:30 whatever the phone's.
+        assertEquals("62 · 07:30", RecoveryGlow.chargeReadout(epoch(0), 7 * 4 + 2, 62.4f, utc))
     }
 
     // ---- Where your charge went (GlowRecoveryScreen.kt:237-254) ---------------------------------
@@ -620,6 +621,36 @@ class RecoveryGlowTest {
     }
 
     // ---- History's window (the tile's normal is the 30 days Compose asks for) -------------------
+
+    @Test
+    fun theResultShownIsTheSelectedDays() {
+        val state = stateWith()
+        assertEquals(day, RecoveryGlow.forDay(state, recovery = result())?.date)
+        // A slower answer for a day the user has left is not the day the screen is showing.
+        val stale = RecoveryResult(
+            date = day.minusDays(1), readiness = readiness(), charge = charge(),
+            readinessTrend = emptyList(), load = 0f, chronicLoad = null, restingHr = 55f, maxHr = 190f,
+            maxHrFromAge = true, stressThreshold = Recovery.StressThreshold(60, null, 2),
+        )
+        assertNull(RecoveryGlow.forDay(state, recovery = stale))
+        assertNull(RecoveryGlow.forDay(state, recovery = null))
+    }
+
+    @Test
+    fun theBodySignalPanelIsTitledAsBodySignalsCopyWordsIt() {
+        val model = RecoveryGlow.bodySignals(bodyDay(org.openstrap.app.data.BodySignals.State.Watch))
+        assertEquals("Body signals off baseline", model.title)
+    }
+
+    @Test
+    fun theEmptyHistoriesAreSixEmptyMonths() {
+        val empty = RecoveryGlow.noSignalHistories()
+        assertTrue(
+            listOf(
+                empty.restingHr, empty.hrv, empty.skinTemperature, empty.breathing, empty.spo2, empty.stress,
+            ).all { it.isEmpty() },
+        )
+    }
 
     @Test
     fun theNormalIsTheThirtyDayWindowComposeReads() {

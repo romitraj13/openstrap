@@ -83,7 +83,7 @@ struct RootView: View {
                     }
                 case .recovery:
                     DayTab(tab: .recovery, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        InterimRecoveryPanel(title: "Recovery", recovery: health.recovery)
+                        RecoveryScreen(health: health)
                     }
                 case .sleep:
                     DayTab(tab: .sleep, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
@@ -221,8 +221,7 @@ struct YouTab: View {
     }
 }
 
-/// The Recovery and Activity tabs until cards U6 and U8 build them: the recovery data the app
-/// already has, in a quiet panel.
+/// The Activity tab until card U8 builds it: the recovery data the app already has, in a quiet panel.
 struct InterimRecoveryPanel: View {
     var title: String
     var recovery: RecoverySnapshot?

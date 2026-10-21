@@ -148,6 +148,7 @@ data class SignalsModel(val tiles: List<BodySignalTile>, val note: String?)
 
 /** The body-signal alert, when the night is off baseline (`BodySignalsPanel`, GlowRecoveryScreen.kt:175-187). */
 data class BodySignalsModel(
+    val title: String,
     val alert: Boolean,
     /** "Watching", or null for an alert (:178). */
     val trailing: String?,
@@ -180,6 +181,20 @@ val CHARGE_HOURS = listOf("00", "06", "12", "18", "24")
 const val CONTRIBUTORS_FOLDED = 3
 
 object RecoveryGlow {
+
+    /**
+     * The Recovery result for the day the screen is showing: Compose's
+     * `recovery?.takeIf { it.date == state.date }` (GlowRecoveryScreen.kt:78), null while the day's
+     * answer is still in flight or belongs to another day.
+     */
+    fun forDay(state: DayUiState, recovery: RecoveryResult?): RecoveryResult? =
+        recovery?.takeIf { it.date == state.date }
+
+    /**
+     * The six empty months, before the day's first read lands. Swift names this rather than the
+     * data class's defaults, which Kotlin/Native does not export.
+     */
+    fun noSignalHistories(): SignalHistories = SignalHistories()
 
     // ---- RecoveryCard (GlowRecoveryScreen.kt:105-168) --------------------------------------------
 
@@ -510,6 +525,7 @@ object RecoveryGlow {
             "One signal is outside your usual range. OpenStrap is keeping an eye on it."
         }
         return BodySignalsModel(
+            title = BodySignalsCopy.TITLE,
             alert = alert,
             trailing = if (alert) null else "Watching",
             text = "$signals. $tail",

@@ -197,7 +197,9 @@ class TodayQueriesTest {
         assertEquals(30, histories.restingHr.size, "the sample month's resting HR")
         assertEquals(30, histories.hrv.size, "the sample month's HRV")
         assertEquals(30, histories.spo2.size, "the sample month's blood oxygen")
-        assertEquals(30, histories.stress.size, "the sample month's stress")
+        // Stress is only sampled while awake, so the day the seed was written on has as many days as
+        // it has had; the month behind it is the window either way.
+        assertTrue(histories.stress.size in 29..30, "the sample month's stress: ${histories.stress.size} days")
         assertTrue(histories.skinTemperature.isEmpty(), "the sample month writes no skin temperature")
         assertTrue(histories.breathing.isEmpty(), "the sample month writes no breathing rate")
 

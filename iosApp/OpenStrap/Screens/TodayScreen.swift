@@ -242,10 +242,10 @@ struct TodayScreen: View {
         switch route {
         case .metric(let name):
             let metric = TodayGlow.shared.metric(name: name)
-            TodayDetailPlaceholder(title: metric?.title ?? name, note: metric?.unit ?? "")
+            MetricDetailPlaceholder(title: metric?.title ?? name, note: metric?.unit ?? "")
         case .workout(let start):
             let workout = health.workoutList.first { $0.workout.start == start }
-            TodayDetailPlaceholder(title: workout?.sportName ?? "", note: "")
+            MetricDetailPlaceholder(title: workout?.sportName ?? "", note: "")
         }
     }
 }
@@ -924,8 +924,9 @@ private struct CheckBox: View {
 // MARK: - The pushed detail, until card U9
 
 /// Where a metric or workout tap lands until card U9 builds the detail screens: the thing's own
-/// name, and nothing invented. `TodayRoute` stays as the route U9 fills in.
-private struct TodayDetailPlaceholder: View {
+/// name, and nothing invented. `TodayRoute` stays as the route U9 fills in. Card U6's Recovery tab
+/// pushes the same route for its body-signal tiles, so this is shared, not private.
+struct MetricDetailPlaceholder: View {
     var title: String
     var note: String
 
