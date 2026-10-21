@@ -200,29 +200,29 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 |---|---|---|
 | `LocalGlowPaused` (82) | `EnvironmentValues.glowPaused` (GlowCard.swift:149), provided by `glowScrollPhasePause()` (175) | ported |
 | `LocalGlowPagePaused` (89) | not ported: iOS has no tab pager keeping adjacent pages alive (the tab bar draws one screen at a time) | not ported: nothing to pause |
-| `GlowCard(style, modifier, onClick, contentPadding, content)` (92) | `GlowCard` (GlowCard.swift:190), `init(_:contentPadding:content:)` (205) | ported: `onClick` is not in U1 — no card is tappable yet (U2/U3 bring the screens' taps) |
-| `shape = RoundedCornerShape(style.radius)` (99) | `RoundedRectangle(cornerRadius: style.radius, style: .continuous)` (236) | ported |
-| `palette = remember(style) { GlowPalette(style) }` (100) | `GlowPalette(style)` inside the renderer (GlowCard.swift:365) | ported |
-| `slab = lerp(palette.mid, Black, 0.55f)` (101) | not ported: no preset has `depth > 0`, so no slab is ever drawn — the field exists (GlowStyle.swift:65) and is unused | not ported: `depth` is 0 in every style the app uses |
+| `GlowCard(style, modifier, onClick, contentPadding, content)` (92) | `GlowCard` (GlowCard.swift:194), `init(_:contentPadding:content:)` (211) | ported: `onClick` is not in U1 — no card is tappable yet (U2/U3 bring the screens' taps) |
+| `shape = RoundedCornerShape(style.radius)` (99) | `GlowCard.shape` (GlowCard.swift:232) | ported |
+| `palette = remember(style) { GlowPalette(style) }` (100) | `GlowPalette(style)` inside the renderer (GlowCard.swift:482) | ported |
+| `slab = lerp(palette.mid, Black, 0.55f)` (101) | `GlowPalette.slab` (GlowCard.swift:393) | ported (card F6): Compose's `lerp` mixes in Oklab, so this does too |
 | per-card `grainSeed` (103) | `GlowStyle.grainSeed` (GlowStyle.swift:73) | ported, from the style rather than a per-instance random so the rendered layers stay cacheable by style and size |
 | `CoreDrift(Random)` (104) | `CoreDrift(seed:)` + `GlowRandom` (GlowCard.swift:22, 119) | ported |
-| `animate` from `ANIMATOR_DURATION_SCALE` (108) | `@Environment(\.accessibilityReduceMotion)` (GlowCard.swift:195) | ported: iOS's equivalent switch |
-| time only advances while unpaused (114-127) | `TimelineView(.animation(paused:))` + `elapsed(at:)` (GlowCard.swift:250, 270) | ported |
-| cache key `(style.copy(motion = Still), size, density)` (131) | `GlowLayerCache.Key(style:width:height:scale:)` (GlowCard.swift:305) | ported |
-| `produceState` / render off the main thread (132-137) | `load(_:)` + `Task.detached` (GlowCard.swift:279) | ported |
-| slab `drawBehind` for `depth` (144-147) | not ported with the slab above | not ported: `depth` is 0 |
-| `clip(shape)` (149) | `.clipShape` (GlowCard.swift:236) | ported |
-| `drawBitmap(b.base)` (156-159) | `Image(uiImage: layers.base)` (GlowCard.swift:219) | ported |
-| `CoreLayer` (163, 173-191) | `core(_:size:)` (GlowCard.swift:250) | ported: translation, scale, transform origin, alpha |
-| `Box(Modifier.padding(contentPadding), content)` (165) | `content().padding(contentPadding)` (GlowCard.swift:223) | ported |
-| overlay: grain + hairlines (167, 196-210) | `overlay(...)` (GlowCard.swift:541) | ported |
-| `GlowBitmaps` (213) | `GlowLayers` (GlowCard.swift:295) | ported |
-| `GlowCache` LRU, 10 entries (224-241) | `GlowLayerCache`, 10 entries (GlowCard.swift:304) | ported |
-| `render()` at half resolution (244-297) | `GlowRenderer.render` (GlowCard.swift:362), core at `scale * 0.5` (514) | ported |
-| `halfResBitmap(scale 0.5, margin)` (300-313) | `GlowRenderer.format(scale:)` + `core` margin (GlowCard.swift:379, 501) | ported |
-| `fillShader`: rim melt, 12 eased steps, reach 0.4, `LightFrom.All` flat (320-332) | `GlowRenderer.fill` (GlowCard.swift:429) | ported |
-| `insetShadow(size, radius, dy, blur, spread, color)` (338-351) | `GlowRenderer.insetShadow` (GlowCard.swift:466) | ported: same even-odd path, `blur / 2` as the sigma |
-| `blurFilter(sigma)` (354-355) | `GlowRenderer.gaussianBlur` (GlowCard.swift:635) | ported with Core Image; the effective sigma is `blur - 0.5` as in the mask filter |
+| `animate` from `ANIMATOR_DURATION_SCALE` (108) | `@Environment(\.accessibilityReduceMotion)` (GlowCard.swift:301) | ported: iOS's equivalent switch |
+| time only advances while unpaused (114-127) | `TimelineView(.animation(paused:))` + `elapsed(at:)` (GlowCard.swift:350, 365) | ported |
+| cache key `(style.copy(motion = Still), size, density)` (131) | `GlowLayerCache.Key(style:width:height:scale:)` (GlowCard.swift:416) | ported (card F6): the key also carries the look's resolved sRGB colour, so two looks at one size are two entries |
+| `produceState` / render off the main thread (132-137) | `load()` + `Task.detached` (GlowCard.swift:374) | ported (card F6: the layers' view takes the key as its identity, so a look that changes loads its own layers instead of drawing the previous look's) |
+| slab `drawBehind` for `depth` (144-147) | `GlowCard.slab` (GlowCard.swift:268), as the card's background | ported (card F6): a copy of the card offset down by `depth` (`6.dp` on Today's overview, GlowTodayScreen.kt:240), behind the card and outside its clip. Compose's `drawBehind` gives it no say in the layout, so this adds no height either: the 6 pt band shows in the gap under the card |
+| `clip(shape)` (149) | `.clipShape(shape)` (GlowCard.swift:257) | ported |
+| `drawBitmap(b.base)` (156-159) | `Image(uiImage: layers.base)` (GlowCard.swift:320) | ported |
+| `CoreLayer` (163, 173-191) | `core(_:)` (GlowCard.swift:349) | ported: translation, scale, transform origin, alpha |
+| `Box(Modifier.padding(contentPadding), content)` (165) | `content().padding(contentPadding)` (GlowCard.swift:240) | ported |
+| overlay: grain + hairlines (167, 196-210) | `overlay(...)` (GlowCard.swift:679) | ported |
+| `GlowBitmaps` (213) | `GlowLayers` (GlowCard.swift:401) | ported |
+| `GlowCache` LRU, 10 entries (224-241) | `GlowLayerCache`, 10 entries (GlowCard.swift:409) | ported |
+| `render()` at half resolution (244-297) | `GlowRenderer.render` (GlowCard.swift:482), core at `scale * 0.5` (633) | ported |
+| `halfResBitmap(scale 0.5, margin)` (300-313) | `GlowRenderer.format(scale:)` + `core` margin (GlowCard.swift:498, 620) | ported |
+| `fillShader`: rim melt, 12 eased steps, reach 0.4, `LightFrom.All` flat (320-332) | `GlowRenderer.fill` (GlowCard.swift:548) | ported |
+| `insetShadow(size, radius, dy, blur, spread, color)` (338-351) | `GlowRenderer.insetShadow` (GlowCard.swift:585) | ported: same even-odd path, `blur / 2` as the sigma |
+| `blurFilter(sigma)` (354-355) | `GlowRenderer.gaussianBlur` (GlowCard.swift:773) | ported with Core Image; the effective sigma is `blur - 0.5` as in the mask filter |
 | `Drift(dx, dy, scale, fade)` (359) | `GlowDrift` (GlowCard.swift:10) | ported |
 | `CoreDrift` (365-411) | `CoreDrift` (GlowCard.swift:22) | ported: same 10-24 s waves, same 0.035/0.03 amounts, same per-card offset |
 | `wander(t, amount)` (401-406) | `CoreDrift.wander` (GlowCard.swift:79) | ported |
@@ -798,7 +798,7 @@ reaches, so iOS stacks them (`TodayScreen.swift:110`) exactly as Compose's phone
 | `"Strap's estimate"`, `"Strap's estimate, N/7 nights"`, `"Strap's estimate, no HRV yet"` (296-299) | the same | ported |
 | `Change(score, withNote)` — arrow, level dots, amount (304-317) | `Change` (TodayScreen.swift:333) | ported |
 | `ScoreBar` — label, caret, value, change, `GlowBar`, note (323-350) | `ScoreBar` (TodayScreen.swift:371) | ported |
-| `overviewColor(score, strain)` (357-363) | `MetricColors.overview(_:)` (Theme.swift:166); the thresholds are `TodayGlow.overviewTone` (TodayGlow.kt:236) | ported |
+| `overviewColor(score, strain)` (357-363) | `MetricColors.overview(_:)` (Theme.swift:170); the thresholds are `TodayGlow.overviewTone` (TodayGlow.kt:236) | ported (card F6): the switch is on the Kotlin enum, not on `tone.name` — `GlowCardTests.testEveryOverviewToneGetsTheAndroidColour` holds all five cases to Android's literals |
 | `GlowStyle.Bloom.copy(… coreShape Radial, breath 5/min, depth 6.dp)` (236-241) | `OverviewCard.style` (TodayScreen.swift:264) | ported |
 | `"Heart rate"` (374) | `HeartCard` (TodayScreen.swift:657) | ported |
 | `"Latest"` (375) | the same (`trailing:`) | ported |
@@ -959,7 +959,7 @@ ports there.
 
 | Compose element or string (file:line) | Swift (file:line) | Status |
 |---|---|---|
-| `overviewColor`'s four literals `0xFF6E7280`, `0xFFF2A33A`, `MetricColors.hrv`, `0xFFF0605A` (GlowTodayScreen.kt:357-363) | `MetricColors.overview(_:)` (Theme.swift:166) | ported |
+| `overviewColor`'s four literals `0xFF6E7280`, `0xFFF2A33A`, `MetricColors.hrv`, `0xFFF0605A` (GlowTodayScreen.kt:357-363) | `MetricColors.overview(_:)` (Theme.swift:170) | ported, and pinned case by case in `GlowCardTests.testEveryOverviewToneGetsTheAndroidColour` (card F6) |
 | What changed's accents — heart, hrv, spo2, temperature, stress, sleepLight (GlowTodayScreen.kt:416-424) | `MetricColors.signal(_:)` (Theme.swift:177) | ported |
 | the three score accents — chargeDeep, readinessDeep, SleepGlow's sleepDeep (GlowTodayScreen.kt:215-224) | `MetricColors.today(_:)` (Theme.swift:191) | ported |
 

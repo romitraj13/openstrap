@@ -204,16 +204,8 @@ struct GlowCard<Content: View>: View {
     let sizesToContent: Bool
     private let content: () -> Content
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.glowPaused) private var scrollPaused
     @Environment(\.displayScale) private var displayScale
     @Environment(\.glowCardPadding) private var cardPadding
-
-    @State private var layers: GlowLayers?
-    @State private var drift = CoreDrift(seed: UInt64.random(in: 0..<UInt64.max))
-    @State private var started = Date()
-    @State private var pausedTotal: TimeInterval = 0
-    @State private var pauseStarted: Date?
 
     /// The same padding on every side, for a card outside the glow layout (the Design lab).
     init(
@@ -237,7 +229,9 @@ struct GlowCard<Content: View>: View {
         self.content = content
     }
 
-    private var paused: Bool { reduceMotion || scrollPaused }
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: style.radius, style: .continuous)
+    }
 
     var body: some View {
         Group {
@@ -260,7 +254,87 @@ struct GlowCard<Content: View>: View {
                 }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: style.radius, style: .continuous))
+        .clipShape(shape)
+        // Outside the clip, so its band can be seen below the card — `drawBehind` draws under the
+        // card's clipped layers, not inside them.
+        .background { slab }
+    }
+
+    /// The slab's edge: a darker copy of the card showing under it, for a 3D look (`GlowCard.kt:101`,
+    /// `:144-147`). Compose draws it in `drawBehind`: behind the card, outside its clip, and with no
+    /// say in the layout. So it is a background here — same size, pushed down by `depth`, adding no
+    /// height — and its band shows in the gap under the card, exactly as it does on Android.
+    @ViewBuilder
+    private var slab: some View {
+        if style.depth > 0 {
+            shape
+                .fill(GlowPalette(style).slab.color)
+                .offset(y: style.depth)
+        }
+    }
+
+    /// Everything drawn under the content: the pre-blurred layers, the moving core and the film.
+    ///
+    /// The layers' view takes the cache key as its identity, so a new look is a new view: new state
+    /// and a new load, and what it draws is always the look on screen now. Card F6: without that, a
+    /// card kept the layers it first rendered — Today's overview drew the no-score grey over a coral
+    /// day, and the empty day drew the previous day's coral.
+    @ViewBuilder
+    private func backdrop() -> some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let key = GlowLayerCache.Key(style: style, width: size.width, height: size.height, scale: displayScale)
+            GlowBackdrop(key: key, size: size)
+                .id(key)
+        }
+    }
+}
+
+/// A card's pre-blurred layers and its moving core, drawn behind the card's content.
+///
+/// It is a view of its own so that `GlowCard` can hand it a cache key as its identity: see
+/// `GlowCard.backdrop()`. Everything it holds is per-look state, so a new look simply starts again.
+private struct GlowBackdrop: View {
+    let key: GlowLayerCache.Key
+    let size: CGSize
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.glowPaused) private var scrollPaused
+
+    @State private var layers: GlowLayers?
+    @State private var drift = CoreDrift(seed: UInt64.random(in: 0..<UInt64.max))
+    @State private var started = Date()
+    @State private var pausedTotal: TimeInterval = 0
+    @State private var pauseStarted: Date?
+
+    private var style: GlowStyle { key.style }
+    private var paused: Bool { reduceMotion || scrollPaused }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if let layers {
+                // The pre-rendered layers are decoration, and an `Image` is an accessibility
+                // element by default: left visible they join the card's accessibility frame
+                // (and so every ancestor's) instead of leaving the card's content as the only
+                // thing a screen reader can reach. Only `content` is readable.
+                Image(uiImage: layers.base)
+                    .resizable()
+                    .frame(width: size.width, height: size.height)
+                    .accessibilityHidden(true)
+                core(layers)
+                    .accessibilityHidden(true)
+                Image(uiImage: layers.overlay)
+                    .resizable()
+                    .frame(width: size.width, height: size.height)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            } else {
+                // Until the layers are ready, the plain mid colour.
+                GlowPalette(style).mid.color
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .task(id: key) { await load() }
         .onChange(of: paused) { _, isPaused in
             if isPaused {
                 pauseStarted = Date()
@@ -271,41 +345,8 @@ struct GlowCard<Content: View>: View {
         }
     }
 
-    /// Everything drawn under the content: the pre-blurred layers, the moving core and the film.
-    @ViewBuilder
-    private func backdrop() -> some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-            let key = GlowLayerCache.Key(style: style, width: size.width, height: size.height, scale: displayScale)
-            ZStack(alignment: .topLeading) {
-                if let layers {
-                    // The pre-rendered layers are decoration, and an `Image` is an accessibility
-                    // element by default: left visible they join the card's accessibility frame
-                    // (and so every ancestor's) instead of leaving the card's content as the only
-                    // thing a screen reader can reach. Only `content` is readable.
-                    Image(uiImage: layers.base)
-                        .resizable()
-                        .frame(width: size.width, height: size.height)
-                        .accessibilityHidden(true)
-                    core(layers, size: size)
-                        .accessibilityHidden(true)
-                    Image(uiImage: layers.overlay)
-                        .resizable()
-                        .frame(width: size.width, height: size.height)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                } else {
-                    // Until the layers are ready, the plain mid colour.
-                    GlowPalette(style).mid.color
-                }
-            }
-            .frame(width: size.width, height: size.height)
-            .task(id: key) { await load(key) }
-        }
-    }
-
     /// The pre-blurred core, moved by the motion through layer properties only.
-    private func core(_ layers: GlowLayers, size: CGSize) -> some View {
+    private func core(_ layers: GlowLayers) -> some View {
         TimelineView(.animation(minimumInterval: nil, paused: paused)) { timeline in
             let second = elapsed(at: timeline.date)
             let motion = drift.at(second, motion: style.motion)
@@ -330,7 +371,9 @@ struct GlowCard<Content: View>: View {
     }
 
     @MainActor
-    private func load(_ key: GlowLayerCache.Key) async {
+    private func load() async {
+        // A card is laid out at no size for a frame; nothing to render for that.
+        guard size.width >= 1, size.height >= 1 else { return }
         if let hit = GlowLayerCache.shared.peek(key) {
             layers = hit
             return
@@ -344,6 +387,14 @@ struct GlowCard<Content: View>: View {
 
 // MARK: - Layers and their cache
 
+extension GlowPalette {
+    /// The slab behind a card with `depth` (`GlowCard.kt:101`): `lerp(palette.mid, Color.Black, 0.55f)`,
+    /// a darker copy of the card's own body, so the edge reads as a slab's side rather than a shadow.
+    var slab: Swatch {
+        Swatch(rgb: mid.rgb.mixedOklab(to: SRGBColor(hex: 0x000000), by: 0.55))
+    }
+}
+
 /// A card's pre-rendered layers: the fill and rim light, the blurred core, and the grain and
 /// hairline overlay. The core is stored cropped to the card: the padding it is blurred into is only
 /// what the fade needs, and it must not become layout (see `GlowRenderer.core`).
@@ -356,11 +407,26 @@ struct GlowLayers: @unchecked Sendable {
 /// Rendered glow layers, shared by every card with the same look and size. Rendering blurs is the
 /// expensive part of a glow card; with the cache, a card scrolling back into view costs nothing.
 final class GlowLayerCache {
+    /// What makes one set of layers: the look, the size and the display scale.
+    ///
+    /// The look is compared through the sRGB colour it resolves to, not only through the SwiftUI
+    /// `Color` it carries. Two cards at one size whose colours differ must never share layers — a
+    /// key that said otherwise served a stale palette, which is card F6's grey overview card — and
+    /// what the palette draws is the resolved colour, so that is what belongs in the key.
     struct Key: Hashable {
         let style: GlowStyle
+        let colour: SRGBColor
         let width: CGFloat
         let height: CGFloat
         let scale: CGFloat
+
+        init(style: GlowStyle, width: CGFloat, height: CGFloat, scale: CGFloat) {
+            self.style = style
+            self.colour = SRGBColor(color: style.color)
+            self.width = width
+            self.height = height
+            self.scale = scale
+        }
     }
 
     static let shared = GlowLayerCache()

@@ -163,12 +163,16 @@ enum MetricColors {
     /// score is good, amber when it is middling or the strap is straining, coral when it is low,
     /// and the neutral grey when there is no score. The bands themselves are shared Kotlin
     /// (`TodayGlow.overviewTone`, GlowTodayScreen.kt:357); this is only the colour they name.
+    ///
+    /// The switch is on the Kotlin enum itself, not on `tone.name`: a name string that stops matching
+    /// falls through to the last case without a word, which is how a coral day could draw grey.
+    /// `default` is `None`, and any tone Android adds before this file learns it.
     static func overview(_ tone: OverviewTone) -> Color {
-        switch tone.name {
-        case "Strain": return Color(hex: 0xF2A33A)
-        case "Good": return hrv
-        case "Middling": return Color(hex: 0xF2A33A)
-        case "Low": return Color(hex: 0xF0605A)
+        switch tone {
+        case OverviewTone.strain: return Color(hex: 0xF2A33A)
+        case OverviewTone.good: return hrv
+        case OverviewTone.middling: return Color(hex: 0xF2A33A)
+        case OverviewTone.low: return Color(hex: 0xF0605A)
         default: return Color(hex: 0x6E7280)
         }
     }

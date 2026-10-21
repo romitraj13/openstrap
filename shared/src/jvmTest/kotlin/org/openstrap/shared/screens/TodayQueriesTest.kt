@@ -7,6 +7,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -16,13 +18,17 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.atStartOfDay
+import org.openstrap.app.data.atZone
 import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.data.db.StrapReadinessRow
 import org.openstrap.app.ui.dashboard.Metric
+import org.openstrap.app.ui.glow.OverviewTone
+import org.openstrap.app.ui.glow.TodayGlow
 import kotlin.time.Clock
 
 /**
@@ -128,6 +134,58 @@ class TodayQueriesTest {
     }
 
     private fun LocalDate.minusDays29(): LocalDate = LocalDate.fromEpochDays(toEpochDays() - 29)
+
+    @Test
+    fun `the demo months evening glows in the leading scores band, never the no-score grey`() =
+        kotlinx.coroutines.runBlocking {
+            // Exactly the app's evening state (`-demoData -todayEvening`, TodayScreen.swift:33-56):
+            // the seeded month, today, at 20:00. Card U5's screenshot U5-today-1.png is this screen.
+            // The seed's own numbers roll with the date, so the assertion is the rule the screenshot
+            // has to show — the card wears the leading score's band — not one day's number.
+            val queries = seeded()
+            val day = await<org.openstrap.app.ui.dashboard.DayUiState> { done -> queries.day(todayIso, done) }
+            val rec = await<org.openstrap.app.data.RecoveryResult?> { done -> queries.recovery(todayIso, done) }
+            val strap = await<StrapReadinessRow?> { done -> queries.strapReadiness(todayIso, done) }
+            val chargeLeads = TodayGlow.chargeLeads(
+                state = day,
+                todayIso = todayIso,
+                chargeLatest = rec?.charge?.latest,
+                nowEpoch = nowAt(20),
+                hour = 20,
+            )
+            val card = TodayGlow.overview(
+                chargeLatest = rec?.charge?.latest,
+                chargeAtWake = rec?.charge?.atWake,
+                readiness = rec?.readiness,
+                readinessBefore = TodayGlow.readinessBefore(rec),
+                strapScore = strap?.score,
+                sleepScore = day.sleep?.score,
+                previousSleepScore = day.previousSleepScore,
+                chargeLeads = chargeLeads,
+            )
+
+            val state = "chargeLeads=$chargeLeads lead=${card.lead.label} value=${card.lead.value} " +
+                "estimate=${card.lead.estimate} verdict=${card.verdict} tone=${card.tone}"
+            println("demo evening: $state")
+            assertTrue(chargeLeads, "the evening demo should lead with Charge: $state")
+            assertEquals("Charge", card.lead.label)
+            val value = assertNotNull(card.lead.value, "the leading Charge has a value: $state")
+            assertFalse(card.lead.estimate, "the leading Charge is not the straps estimate: $state")
+            // overviewColor (GlowTodayScreen.kt:356-363): 70+, 50-69, and under 50 are three bands,
+            // coral under 50. The no-score grey is only for a card with nothing to show.
+            val band = when {
+                value >= 70 -> OverviewTone.Good
+                value >= 50 -> OverviewTone.Middling
+                else -> OverviewTone.Low
+            }
+            assertNotEquals(OverviewTone.None, card.tone, "an evening with a score is never the grey card: $state")
+            assertEquals(band, card.tone, "the leading score's band is the card's glow: $state")
+            assertEquals(TodayGlow.overviewTone(value, strain = false), card.tone, "overviewTone agrees: $state")
+        }
+
+    /** [hour] o'clock today, local, in epoch seconds, as TodayFlags.now reads the clock. */
+    private fun nowAt(hour: Int): Long =
+        LocalDateTime(today.year, today.monthNumber, today.dayOfMonth, hour, 0).atZone(zone).epochSeconds
 
     @Test
     fun `the six signals' month is read for the day, one list each`() = kotlinx.coroutines.runBlocking {

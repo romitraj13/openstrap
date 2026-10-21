@@ -169,11 +169,22 @@ struct DesignLabView: View {
                 ForEach(GlowStyle.presets) { preset in
                     glowCard(preset.style, title: preset.name)
                 }
+                // The 6 pt slab edge Today's overview card wears (`GlowCard.kt:144-147`, card F6).
+                glowCard(depthStyle, title: "depth 6")
                 ForEach(chartStyles) { chart in
                     glowCard(chart.style, title: chart.name)
                 }
             }
         }
+    }
+
+    /// `Bloom` with the slab edge Today's overview card draws under itself (`depth = 6.dp`,
+    /// GlowTodayScreen.kt:240). Nothing else in the lab has a `depth`, so this is the one card that
+    /// shows what the field does.
+    private var depthStyle: GlowStyle {
+        var style = GlowStyle.bloom
+        style.depth = 6
+        return style
     }
 
     /// `chart(color:)` for the accents the screens draw charts with.
