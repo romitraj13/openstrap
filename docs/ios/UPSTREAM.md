@@ -393,3 +393,54 @@ Authored for iOS in this card, with no upstream source:
 | `shared/src/jvmTest/kotlin/org/openstrap/shared/health/HealthExportQueueTest.kt` | The 15 tests: the five type names, an empty database, the heart-rate merge and 30..230 filter, the cursor (newer-only, survives a new queue, never backwards, per type, batch limit), the step minute buckets and their boundary, the oxygen range, the resting-HR day, the clipped sleep stages, a night found by its session end, and that HRV, stress and skin temperature never appear. |
 | `iosApp/OpenStrap/HealthKitWriter.swift` | `HealthExportType`, `HealthSampleMapper` (pure builders), `HealthKitWriter` (write-only authorisation and `save`), `HealthExportSettings` (the switch, off when absent), and `HealthExportCoordinator` (pending, save, mark, next type, 500 samples a call). |
 | `iosApp/OpenStrapTests/HealthExportTests.swift` | The 11 XCTests that build each type through the mapper without saving and check type, unit, value, dates, the sync identifier and version, the device, and that the switch starts off. |
+
+## Card U1 (the glow design foundation)
+
+Copies into the iOS bundle, byte-identical to their sources (checked with `md5sum`):
+
+```
+app/src/main/res/font/funnel_display.ttf @ 19f2865 -> iosApp/OpenStrap/Design/Fonts/funnel_display.ttf
+app/src/main/res/font/funnel_sans.ttf @ 19f2865 -> iosApp/OpenStrap/Design/Fonts/funnel_sans.ttf
+app/src/main/res/font/museo_moderno.ttf @ 19f2865 -> iosApp/OpenStrap/Design/Fonts/museo_moderno.ttf
+licenses/OFL-Funnel.txt @ 19f2865 -> iosApp/OpenStrap/Design/Licenses/OFL-Funnel.txt
+licenses/OFL-MuseoModerno.txt @ 19f2865 -> iosApp/OpenStrap/Design/Licenses/OFL-MuseoModerno.txt
+licenses/MIT-Phosphor.txt @ 19f2865 -> iosApp/OpenStrap/Design/Licenses/MIT-Phosphor.txt
+```
+
+The three fonts are variable fonts: the default instance is Light (Thin for Museo Moderno) with an
+`wght` axis from 300 to 800 (100 to 900 for Museo Moderno). `UIAppFonts` in `iosApp/project.yml`
+registers the files; the weights Theme.kt instantiates are reached through the `wght` variation axis
+on the default face's descriptor, because `UIFont(name:)` only finds the default instance.
+`DesignTests.testVariableWeightsReachTheRenderer` measures Light against Bold so a weight that stops
+rendering fails the suite.
+
+The icon geometry moved from `PhosphorIcons.kt` to generated asset-catalogue SVGs, not a byte copy:
+
+```
+app/src/main/kotlin/org/openstrap/app/ui/theme/PhosphorIcons.kt @ 19f2865 -> iosApp/OpenStrap/Assets.xcassets/Phosphor/<Name>.imageset/<Name>.svg (46 icons, written by iosApp/scripts/gen_icons.py)
+```
+
+`gen_icons.py` parses every `icon("Name", …)` call (both the plain and the `autoMirror =` form) and
+writes `<Name>.svg` with the same `viewBox="0 0 256 256"` and single path, plus a `Contents.json`
+that renders it as a template image with vector preservation. Commit both the script and the
+generated sets; `gen_icons.py --check` fails if the catalogue and the Kotlin file disagree.
+
+No Kotlin was copied or written in U1: nothing in these Compose files computes a number, date or
+sentence (standing instruction 5), so `:shared:jvmTest` stays at **188 tests, 0 failures** and
+`iosSimulatorArm64Test` at **260**.
+
+XCTest after U1: `OpenStrapTests` 22 -> 28 (the 6 new `DesignTests`: the three font PostScript names
+load, the variable weights really differ, all 46 icons load as images, white stays readable on
+`mid`/`tone` for the three presets and all 17 accents, the battery colours, the charge scale).
+`OpenStrapUITests` 2 -> 3: `testDesignLab` launches with `-designLab`, scrolls the lab to the end and
+attaches `U1-designlab-1` … `U1-designlab-8`.
+
+Authored for iOS, with no upstream source:
+
+| File | Why it is new |
+|---|---|
+| `iosApp/OpenStrap/Design/Theme.swift`, `Typography.swift`, `GlowStyle.swift`, `GlowCard.swift`, `DotMatrixText.swift`, `PhosphorIcon.swift` | The ports of the Compose files above. |
+| `iosApp/OpenStrap/Design/DesignLabView.swift` | The debug design lab (`-designLab`); Android has no counterpart. |
+| `iosApp/scripts/gen_icons.py`, `iosApp/scripts/screens.py` | Icon generation and the screenshot download. |
+| `docs/ios/UI-PARITY.md` | The parity table, one section per ported Compose file. |
+

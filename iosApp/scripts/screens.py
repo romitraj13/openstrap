@@ -147,18 +147,14 @@ def main():
         leaf = Path(name).name
         if not leaf.lower().endswith(".png"):
             continue
-        target = manifest.get(leaf)
-        if target:
-            target = Path(target)
-            if target.suffix.lower() != ".png":
-                target = target.with_suffix(".png")
-            target = target.name
-        else:
-            match = SHOT.match(leaf)
-            if not match:
-                continue
-            target = match.group(1) + ".png"
-        if not SHOT.match(target):
+        # Both xcresulttool and the SCREENSHOT_DIR fallback name the file after the attachment,
+        # sometimes with `_<index>_<uuid>` appended; the part the card names is the prefix.
+        candidate = manifest.get(leaf) or leaf
+        match = SHOT.match(Path(candidate).stem)
+        if not match:
+            continue
+        target = match.group(1) + ".png"
+        if target in written:
             continue
         (OUTPUT / target).write_bytes(archive.read(name))
         written.append(target)
