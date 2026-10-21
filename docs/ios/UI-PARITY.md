@@ -291,8 +291,8 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `GlowLineChart` (103-190) | `GlowLineChart` (GlowCharts.swift:185) | ported |
 | `height = 120.dp` (107) | `height: CGFloat = 120` (GlowCharts.swift:188) | ported |
 | `axisH` 18 / `top` 10 / `inset` 7 (126-127, 132) | the same three constants (GlowCharts.swift:238-239, 254) | ported |
-| domain: yRange, else band and data, flat gains 1 (129-130) | `GlowGeometry.lineChartDomain` (GlowGeometry.kt:44) | ported |
-| `xOf` / `yOf` (133-134) | `GlowGeometry.lineChartX` / `lineChartY` (GlowGeometry.kt:70, 76) | ported |
+| domain: yRange, else band and data, flat gains 1 (129-130) | `GlowGeometry.lineChartDomain` (GlowGeometry.kt:51) | ported |
+| `xOf` / `yOf` (133-134) | `GlowGeometry.lineChartX` / `lineChartY` (GlowGeometry.kt:72, 76) | ported |
 | guides at 0, 0.5, 1 (136) | `for fraction in [0, 0.5, 1]` (GlowCharts.swift:266) | ported |
 | band fill 10%, two dotted edges 45% gap 4 (137-143) | the same (GlowCharts.swift:271-282) | ported |
 | runs of consecutive readings; a null starts a new run (146-149) | the same (GlowCharts.swift:285-295) | ported |
@@ -305,17 +305,17 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `GlowDotBars` (198-239) | `GlowDotBars` (GlowCharts.swift:400) | ported |
 | `height = 96.dp`, `rows = 10` (201-202) | the same defaults (GlowCharts.swift:402-403) | ported |
 | `highlight = values.indexOfLast { it > 0f }` (205) | the same default (GlowCharts.swift:425) | ported |
-| pitchX / pitchY / radius 32% / max ≥ 1 / lit rows (216-222) | `GlowGeometry.dotBarPitchX` … `dotBarLit` (GlowGeometry.kt:100-125) | ported |
+| pitchX / pitchY / radius 32% / max ≥ 1 / lit rows (216-222) | `GlowGeometry.dotBarPitchX` … `dotBarLit` (GlowGeometry.kt:113-140) | ported |
 | other columns dim to 35% while scrubbing (224) | `dim` (GlowCharts.swift:454) | ported |
 | unlit 10%, highlight accent, lit `0.55 + 0.45 * (row+1)/rows` (228-232) | the same (GlowCharts.swift:458-465) | ported |
-| column centre and row y from the bottom (225, 233) | `GlowGeometry.dotBarCenterX` / `dotBarDotY` (GlowGeometry.kt:117, 123) | ported |
+| column centre and row y from the bottom (225, 233) | `GlowGeometry.dotBarCenterX` / `dotBarDotY` (GlowGeometry.kt:134, 137) | ported |
 | touch readout at the column, anchored to the top (237) | `glowReadout` (GlowCharts.swift:476-481) | ported |
 | `GlowDay(label, value)` (244) | `GlowDay` (GlowCharts.swift:488) | ported |
 | `GlowTrend` (250-294) | `GlowTrend` (GlowCharts.swift:497) | ported |
 | `height = 130.dp` (254) | `height: CGFloat = 130` (GlowCharts.swift:499) | ported |
 | axisH 18, top 22, bottom inset 6 (260-261, 267) | the same (GlowCharts.swift:519-521, 527) | ported |
-| domain: 85% of the lowest, 1 of room at the top (265-266) | `GlowGeometry.trendDomain` (GlowGeometry.kt:137) | ported |
-| `yOf` with the label room (267) | `GlowGeometry.trendY` (GlowGeometry.kt:146) | ported |
+| domain: 85% of the lowest, 1 of room at the top (265-266) | `GlowGeometry.trendDomain` (GlowGeometry.kt:153) | ported |
+| `yOf` with the label room (267) | `GlowGeometry.trendY` (GlowGeometry.kt:163) | ported |
 | average line white 45% gap 4 (269) | the same (GlowCharts.swift:534-538) | ported |
 | day label, today in white, others muted (273) | the same (GlowCharts.swift:544-547) | ported |
 | null day: a 2.5 faint dot 3 above the axis (276) | the same (GlowCharts.swift:548-554) | ported |
@@ -324,8 +324,8 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | value printed 20 above, rounded (291) | `String(Int(value.rounded()))` 20 above (GlowCharts.swift:575-579) | ported |
 | `GlowArcGauge` (303-340) | `GlowArcGauge` (GlowCharts.swift:591) | ported |
 | `aspectRatio(1.9f)`, `widthIn(max = 440.dp)`, content at the bottom middle (312-315) | `aspectRatio(1.9)` + `frame(maxWidth: gaugeMaxWidth)` + `ZStack(alignment: .bottom)` (GlowCharts.swift:602-613) | ported |
-| `r = width/2 - 10`, centre 3 above the bottom edge (317-318) | `GlowGeometry.arcGaugeRadius` / `arcGaugeCentre` (GlowGeometry.kt:165, 170) | ported |
-| sweep `180 * progress.coerceIn(0, 1)` (321) | `GlowGeometry.arcGaugeSweep` (GlowGeometry.kt:173) | ported |
+| `r = width/2 - 10`, centre 3 above the bottom edge (317-318) | `GlowGeometry.arcGaugeRadius` / `arcGaugeCentre` (GlowGeometry.kt:177, 180) | ported |
+| sweep `180 * progress.coerceIn(0, 1)` (321) | `GlowGeometry.arcGaugeSweep` (GlowGeometry.kt:183) | ported |
 | remaining track: dotted 2, gap 7, 22% (322-325) | `glowDottedStroke` (GlowCharts.swift:623-626) | ported |
 | fill: 8 wide white 10% under a 3 wide line (327-332) | the same two strokes (GlowCharts.swift:629-643) | ported |
 | sweep gradient 55% at 0.5 → white at the end, starting at 3 o'clock (329-332) | `conicGradient` with stops 0.5 and (180+sweep)/360 (GlowCharts.swift:635-643) | ported |
@@ -334,17 +334,17 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `GlowHypnogram` (351-409) | `GlowHypnogram` (GlowCharts.swift:677) | ported |
 | `height = 130.dp` (356) | `height: CGFloat = 130` (GlowCharts.swift:681) | ported |
 | axisH 18, name column 46 wide (365-366) | the same (GlowCharts.swift:714-715) | ported |
-| `rowH = h / rows`, `pillH = rowH * 0.46`, lane centres (369-371) | `GlowGeometry.hypnogramRowH` / `hypnogramPillH` / `hypnogramRowY` (GlowGeometry.kt:197-203) | ported |
-| `xOf(f) = nameW + f * w` (372) | `GlowGeometry.hypnogramX` (GlowGeometry.kt:206) | ported |
+| `rowH = h / rows`, `pillH = rowH * 0.46`, lane centres (369-371) | `GlowGeometry.hypnogramRowH` / `hypnogramPillH` / `hypnogramRowY` (GlowGeometry.kt:203-209) | ported |
+| `xOf(f) = nameW + f * w` (372) | `GlowGeometry.hypnogramX` (GlowGeometry.kt:212) | ported |
 | a dotted lane per stage name, the name 7 above it (374-377) | the same (GlowCharts.swift:728-734) | ported |
 | connectors where consecutive stages change lane, 30% (378-383) | the same (GlowCharts.swift:736-749) | ported |
-| pill alpha `0.55 + 0.45 * row / (rows - 1)` (385) | `GlowGeometry.hypnogramPillAlpha` (GlowGeometry.kt:209) | ported |
-| pill: rounded by its half height, never thinner than its height (386-391) | `GlowGeometry.hypnogramPill` (GlowGeometry.kt:212) | ported |
+| pill alpha `0.55 + 0.45 * row / (rows - 1)` (385) | `GlowGeometry.hypnogramPillAlpha` (GlowGeometry.kt:218) | ported |
+| pill: rounded by its half height, never thinner than its height (386-391) | `GlowGeometry.hypnogramPill` (GlowGeometry.kt:222) | ported |
 | axis labels under the plot (393-398) | the same (GlowCharts.swift:766-772) | ported |
 | scrub: the stage under the finger, else the nearest, with the guide and readout (399-407) | the same (GlowCharts.swift:774-789) | ported |
 | `GlowHorizon(progress, color, modifier, height = 72.dp)` (419) | `GlowHorizon` (GlowCharts.swift:799) | ported |
-| sweep 84°, `start = 270 - 42`, chord `w - 28`, `r`, `sag`, top 14 (427-431) | `GlowGeometry.horizonRadius` / `horizonSag` / `horizonPoint` (GlowGeometry.kt:241-266) | ported |
-| `at(f)` on the arc (436-439) | `GlowGeometry.horizonPoint` (GlowGeometry.kt:258) | ported |
+| sweep 84°, `start = 270 - 42`, chord `w - 28`, `r`, `sag`, top 14 (427-431) | `GlowGeometry.horizonRadius` / `horizonSag` / `horizonPoint` (GlowGeometry.kt:246-262) | ported |
+| `at(f)` on the arc (436-439) | `GlowGeometry.horizonPoint` (GlowGeometry.kt:260) | ported |
 | dotted track 1.6, gap 6 (440-443) | `glowDottedStroke` (GlowCharts.swift:836-839) | ported |
 | five ticks at `r + 9` (444) | the same (GlowCharts.swift:841-849) | ported |
 | fill: 9 wide at 10% under 2.4 wide white (448-449) | the same (GlowCharts.swift:851-861) | ported |
@@ -442,7 +442,7 @@ nothing else to port.
 | `"Has data"` legend swatch, 12pt (111-117) | the same (DayCalendarSheet.swift:186-192) | ported |
 | `"Today"` legend dot, 6pt (118-121) | the same (DayCalendarSheet.swift:193-198) | ported |
 | `"Go to today"` when another day is selected (123) | the same (DayCalendarSheet.swift:200-213) | ported |
-| `MonthGrid`: `lead = (dow - first + 7) % 7`, `(cells + 6) / 7` weeks, 4 apart (130-155) | `GlowGeometry.calendarLead` / `calendarWeekCount` / `calendarDayNumber` (GlowGeometry.kt:326-338) | ported |
+| `MonthGrid`: `lead = (dow - first + 7) % 7`, `(cells + 6) / 7` weeks, 4 apart (130-155) | `GlowGeometry.calendarLead` / `calendarWeekCount` / `calendarDayNumber` (GlowGeometry.kt:325-338) | ported |
 | `DayCell`: 42 circle, selected fills white with black text, a day with data gets the container fill and a hairline, the rest are dimmed to 35% (158-192) | `DayCell` (DayCalendarSheet.swift:275) | ported |
 | today's 5pt red dot 5 above the cell's bottom (185-190) | the same (DayCalendarSheet.swift:303-308) | ported |
 | pickable when `date <= today && (date in available || date == today)` (148) | the same expression (DayCalendarSheet.swift:225-226) | ported |
@@ -452,7 +452,7 @@ nothing else to port.
 | Compose element or string (file:line) | Swift (file:line) | Status |
 |---|---|---|
 | `Modifier.scrub(key, onScrub)`: horizontal drag or press-and-hold (66-81) | `GlowScrub`, a simultaneous drag so the list still scrolls (GlowCharts.swift:161) | ported: long-press is dropped, the sideways drag does the same job in SwiftUI |
-| `smoothPath(pts)`, monotone cubic (Fritsch–Carlson) (288-319) | `GlowGeometry.smoothCubics` + `glowSmoothPath` / `glowAddCubics` (GlowGeometry.kt:274, GlowCharts.swift:895) | ported |
+| `smoothPath(pts)`, monotone cubic (Fritsch–Carlson) (288-319) | `GlowGeometry.smoothCubics` + `glowSmoothPath` / `glowAddCubics` (GlowGeometry.kt:278, GlowCharts.swift:895) | ported |
 | `niceStep(raw)` (321-324) | — | not ported: only `LineChart` calls it, and the glow charts draw three fixed guides |
 | `ChartPoint`, `ChartSegment`, `LineChart` (44-286) | — | not ported: the older screens' chart; card U2 is the glow language's own charts |
 | `withUnit(value, unit)` (84-88) | — | not ported: the glow charts print their own readouts and no glow card calls it |

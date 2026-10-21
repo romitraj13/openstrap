@@ -479,8 +479,12 @@ Fritsch–Carlson control points behind `smoothPath`, and the calendar's lead/we
 `./gradlew :shared:compileKotlinIosArm64` is clean, which is what the Swift side calls through.
 
 XCTest after U2: `OpenStrapTests` stays at 28 (no new unit tests: the numbers they would check live
-in `GlowGeometryTest`), `OpenStrapUITests` stays at 3, but `testDesignLab` now scrolls to
-`lab.calendar.title` and attaches `U2-designlab-1` … `U2-designlab-14`.
+in `GlowGeometryTest`), `OpenStrapUITests` stays at 3, but `testDesignLab` now walks the lab with 14
+swipes and attaches `U2-designlab-1` … `U2-designlab-15`. It scrolls a fixed number of times instead
+of asking whether the last section is hittable on every screenful: the lab's tree is now large
+enough (5 tab bars, 46 icons, two calendar sheets) that a mid-scroll hit-test snapshot can outlast
+XCUITest's query timeout, which is what failed run 39569063780 while the same code passed in
+39567532008.
 
 Two things were decided for iOS and are recorded here rather than hidden:
 

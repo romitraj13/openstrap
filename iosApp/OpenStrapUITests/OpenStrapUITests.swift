@@ -42,8 +42,13 @@ final class OpenStrapUITests: XCTestCase {
     }
 
     /// Card U2: the same lab, now with the glow charts, the gauges, the quiet panels, the tab bar and
-    /// the calendar sheet at the end. Scrolls to the last section and attaches a screenshot per
-    /// screenful, named `U2-designlab-1` … `U2-designlab-N`.
+    /// the calendar sheet at the end. Scrolls the whole lab and attaches a screenshot per screenful,
+    /// named `U2-designlab-1` … `U2-designlab-N`.
+    ///
+    /// The scroll is a fixed number of swipes rather than "swipe until the last section is hittable":
+    /// with 5 tab bars, 46 icons and two calendar sheets in one tree, a hit-test snapshot taken
+    /// mid-scroll can outlast XCUITest's query timeout (it did, in run 39569063780). One existence
+    /// check at the end is enough to prove the lab reached its last section.
     func testDesignLab() {
         let app = XCUIApplication()
         app.launchArguments = ["-designLab"]
@@ -60,17 +65,17 @@ final class OpenStrapUITests: XCTestCase {
         }
         capture()
 
-        let end = app.staticTexts["lab.calendar.title"]
-        var swipes = 0
-        while !(end.exists && end.isHittable) && swipes < 40 {
+        for _ in 0..<14 {
             app.swipeUp()
-            swipes += 1
             // The glow layers are rendered off the main thread on first appearance.
-            Thread.sleep(forTimeInterval: 0.6)
+            Thread.sleep(forTimeInterval: 0.5)
             capture()
         }
 
-        XCTAssertTrue(end.exists, "The design lab never reached the calendar section")
+        XCTAssertTrue(
+            app.staticTexts["lab.calendar.title"].exists,
+            "The design lab never reached the calendar section"
+        )
         XCTAssertGreaterThan(shots, 1, "The lab fits on one screen, so nothing scrolled")
     }
 
