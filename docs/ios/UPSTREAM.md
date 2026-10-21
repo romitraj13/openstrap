@@ -444,3 +444,11 @@ Authored for iOS, with no upstream source:
 | `iosApp/scripts/gen_icons.py`, `iosApp/scripts/screens.py` | Icon generation and the screenshot download. |
 | `docs/ios/UI-PARITY.md` | The parity table, one section per ported Compose file. |
 
+One flake seen while landing U1, not caused by it and not fixed here (no Kotlin changed in this
+card): `:shared:iosSimulatorArm64Test` failed once on
+`org.openstrap.shared.device.SyncLogReadTest.anEngineThatHasNotSyncedHasNoRows` with an
+`org.openstrap.shared.ble.GattException` rather than an assertion. The test never connects a strap,
+so the exception comes from another engine's background work surfacing while it runs; the previous
+commit ran the same iOS tests green with no Kotlin change in between. Worth a card of its own if it
+recurs.
+
