@@ -40,18 +40,27 @@ final class HealthModel: ObservableObject {
 
     private let queries: HealthQueries
     /// The U3 object the screens' new state comes from: the calendar, the profile and the goals.
-    private let screens: ScreenQueries
+    /// Opened on first use, so a launch that never shows You (the design lab, a fresh install on
+    /// Pair) does not pay for a second connection and its schema check.
+    private var screensStorage: ScreenQueries?
+    private var screens: ScreenQueries {
+        if let open = screensStorage { return open }
+        let open = ScreenQueries(databasePath: path)
+        screensStorage = open
+        return open
+    }
+    private let path: String
     private var seeded = false
 
     init(databasePath: String) {
         date = HealthModel.isoToday()
+        path = databasePath
         queries = HealthQueries(databasePath: databasePath)
-        screens = ScreenQueries(databasePath: databasePath)
     }
 
     deinit {
         queries.close()
-        screens.close()
+        screensStorage?.close()
     }
 
     /// Seeds the sample month once when the app was launched with `-demoData` in a debug build.
