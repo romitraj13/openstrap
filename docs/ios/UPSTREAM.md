@@ -647,8 +647,18 @@ still unchecked is asked about on every screenful, and the walk drags most of a 
 held at the end so momentum cannot carry it past a section — until the last section has been seen.
 That also fixed the screenshot walk: U2's fourteen `swipeUp`s moved about 400 pt each, so the set
 stopped at the charts, roughly 6,000 pt into a lab about 10,000 pt tall (its "reached the calendar"
-check was `exists`, which is true for anything in the accessibility tree). The new set covers the
-whole lab, and the eight screenfuls card U1 shipped (`U1-designlab-1` … `8`) are written from the same
-captures as `U2-designlab-1` … `N`, because U1's eight are the top of this lab and the committed U1 set
-still showed the clipped column.
+check was `exists`, which is true for anything in the accessibility tree). The new set is
+`U2-designlab-1` … `U2-designlab-19` and covers the whole lab, and the eight screenfuls card U1
+shipped (`U1-designlab-1` … `8`) are written from the same captures, because U1's eight are the top of
+this lab and the committed U1 set still showed the clipped column.
+
+The test launches the lab with `-designLabStill`, which holds the glow cores still
+(`glowScrollPhasePause(always:)`, default off, so the real screens do not change). A lab whose thirteen
+cards animate for ever never goes quiescent, and XCUITest waits for quiescence before every query and
+swipe: two runs died on that 30 s timeout at different points in code that had just passed. Holding
+still also makes the screenshots the same picture every run.
+
+One flake outside this card: the retry run of the same tree failed `:shared:iosSimulatorArm64Test`
+on `StrapEngineTest.theAuthKeyNeverAppearsInTheLog` with a `GattException`, and the empty rerun of the
+same tree passed all 302 tests. That test is in the BLE code this card does not touch.
 
