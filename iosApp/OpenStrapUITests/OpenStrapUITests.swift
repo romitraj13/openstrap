@@ -235,30 +235,35 @@ final class OpenStrapUITests: XCTestCase {
         row.tap()
     }
 
-    /// Tap a line of text, dragging the list first so the line is really on screen.
+    /// Tap a line of text, dragging the list first so the line is really on screen and clear of the
+    /// floating bar.
     ///
-    /// `staticTexts[...].tap()` resolves the element and taps the coordinates it would occupy, so an
-    /// off-screen match taps whatever card is at those points (card U5: "Heart rate" opened Sleep from
-    /// the overview card instead). The direction follows the frame, so a line above the viewport is
-    /// reached too.
+    /// `staticTexts[...].tap()` resolves the element and taps the coordinates it would occupy. A line
+    /// below the fold taps whatever card is at those points, and a line under the bar is still "in the
+    /// window" and hittable — in card U5's first two runs "Heart rate" was one of those, and the tap
+    /// opened Sleep from the bar (and once from the overview card's Sleep score). So the band is the
+    /// window between the top of the screen and the bar's own top edge, which F4 publishes as
+    /// `navBar.top`.
     private func tapText(_ app: XCUIApplication, _ label: String) {
         let element = app.staticTexts[label]
         XCTAssertTrue(element.waitForExistence(timeout: 30), "\(label) never appeared")
         let window = app.windows.firstMatch.frame
+        let bar = app.descendants(matching: .any)["navBar.top"]
+        let ceiling = bar.exists ? bar.frame.minY : window.maxY - 120
+        let floor = window.minY + 8
         var drags = 0
         while drags < 20 {
             let frame = element.frame
-            let inside = frame.minY >= window.minY && frame.maxY <= window.maxY
-            if inside && element.isHittable { break }
-            if frame.minY > window.midY {
-                drag(app, from: 0.78, to: 0.22)
+            if frame.minY >= floor && frame.maxY <= ceiling - 8 && element.isHittable { break }
+            if frame.minY >= ceiling - 40 {
+                drag(app, from: 0.75, to: 0.35)
             } else {
-                drag(app, from: 0.22, to: 0.78)
+                drag(app, from: 0.35, to: 0.75)
             }
             Thread.sleep(forTimeInterval: 0.25)
             drags += 1
         }
-        XCTAssertTrue(element.isHittable, "\(label) never came on screen")
+        XCTAssertTrue(element.isHittable, "\(label) never came into the clear part of the screen")
         element.tap()
     }
 
@@ -315,8 +320,15 @@ final class OpenStrapUITests: XCTestCase {
             XCTFail("Tapping the heart card pushed no detail")
         }
         attach(app, "U5-detail-1")
-        app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 30), "Back never returned to Today")
+        // Back to Today. The pushed card wears the stack's own bar; if the tab's hidden toolbar takes
+        // it with it, restart instead of guessing at a button that is not there.
+        if app.navigationBars.buttons.count > 0 {
+            app.navigationBars.buttons.firstMatch.tap()
+        } else {
+            app.terminate()
+            app.launch()
+        }
+        XCTAssertTrue(app.staticTexts["What changed"].waitForExistence(timeout: 60), "Back never returned to Today")
 
         // A day with no data at all: far enough back that the seeded month has run out.
         scrollToTop(app)
