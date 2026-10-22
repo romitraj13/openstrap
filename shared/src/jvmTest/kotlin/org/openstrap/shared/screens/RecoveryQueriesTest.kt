@@ -83,38 +83,38 @@ class RecoveryQueriesTest {
     private fun iso(date: LocalDate): String = date.toString()
 
     @Test
-    fun `a day near the start of the seeded month draws the learning state's sentence`() {
+    fun `the learning state covers the first days of the seeded month, and the UI test can reach it`() {
         kotlinx.coroutines.runBlocking {
             val queries = seeded()
             val learning =
                 "OpenStrap scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
 
-            // The UI test's loop: walk back from today until the card shows that sentence.
-            var found: Pair<Int, String>? = null
-            for (back in 0..29) {
-                val date = LocalDate.fromEpochDays(today.toEpochDays() - back)
-                val day = await<DayUiState> { done -> queries.day(iso(date), done) }
-                val rec = await<RecoveryResult?> { done -> queries.recovery(iso(date), done) }
-                val shown = RecoveryGlow.forDay(day, rec) ?: continue
-                if (shown.readiness.score != null) continue
-                val sentence = RecoveryGlow.noScoreBody(shown.readiness)
-                if (sentence == learning) {
-                    found = back to sentence
-                    break
-                }
+            // The days the Recovery card calls the learning state, newest first.
+            fun dayBack(back: Int): LocalDate = LocalDate.fromEpochDays(today.toEpochDays() - back)
+            fun card(back: Int): org.openstrap.app.ui.glow.RecoveryCardModel? {
+                val day = await<DayUiState> { done -> queries.day(iso(dayBack(back)), done) }
+                val rec = await<RecoveryResult?> { done -> queries.recovery(iso(dayBack(back)), done) }
+                val shown = RecoveryGlow.forDay(day, rec) ?: return null
+                return RecoveryGlow.card(shown, null)
             }
 
-            val (back, sentence) = assertNotNull(found, "no day in the seeded month drew the learning state's sentence")
-            assertEquals(learning, sentence)
-            // It is near the start, so the UI test's thirty previous-day taps reach it.
-            assertTrue(back in 1..29, "the learning day is $back days back")
-            println("U6 learning state: $back days back (${LocalDate.fromEpochDays(today.toEpochDays() - back)})")
+            val learningDays = (1..29).filter { card(it)?.learning == true }
+            println("U6 learning days back: $learningDays")
 
-            // And the days it walks past first have a score, so the card is the scored one there.
-            val yesterday = await<DayUiState> { done -> queries.day(iso(LocalDate.fromEpochDays(today.toEpochDays() - 1)), done) }
-            val yRec = await<RecoveryResult?> { done -> queries.recovery(iso(LocalDate.fromEpochDays(today.toEpochDays() - 1)), done) }
-            val yCard = RecoveryGlow.card(RecoveryGlow.forDay(yesterday, yRec)!!, null)
-            assertNotNull(yCard.score, "yesterday has no Recovery score, so the walk would start on the learning state")
+            // The UI test taps the header's previous-day button 26 times; two swallowed taps of slack
+            // either side must still land on a learning day.
+            assertTrue(learningDays.isNotEmpty(), "no day in the seeded month is the learning state")
+            assertTrue(
+                (24..28).all { it in learningDays },
+                "26 taps lands on days 24..28, and these are not all learning days: $learningDays",
+            )
+            // Its sentence is the one the card shows, word for word.
+            val first = card(learningDays.last())!!
+            assertTrue(first.learning)
+            assertEquals(learning, first.body)
+            // And the day the walk starts on is a scored one, not the learning state.
+            assertEquals(false, card(1)?.learning)
+            assertNotNull(card(1)?.score, "yesterday has no Recovery score, so the walk would start on the learning state")
         }
     }
 }

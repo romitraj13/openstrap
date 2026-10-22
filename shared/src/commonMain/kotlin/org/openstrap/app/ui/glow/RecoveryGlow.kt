@@ -64,6 +64,11 @@ data class RecoveryCardModel(
     val trailing: String?,
     /** The sentence under the title, when there is no score (:129-140). */
     val body: String?,
+    /**
+     * True when [body] is the "once it has 7 good nights" sentence — the withheld state, before
+     * enough nights. The UI test finds the state by this rather than by matching the sentence.
+     */
+    val learning: Boolean,
     /** "Sleep 64 · 6h 52m asleep", from the sleep contributor (:141). */
     val sleepNote: String?,
     /** The strap's own score, labelled "Strap's estimate" (:145); null when it isn't shown. */
@@ -216,6 +221,7 @@ object RecoveryGlow {
         return RecoveryCardModel(
             trailing = trailing(ready, r.readinessTrend),
             body = if (score == null) noScoreBody(ready) else null,
+            learning = score == null && ready.withheld && ready.phase == Recovery.Phase.Withheld,
             sleepNote = if (score == null) sleep?.let { "Sleep ${it.score} · ${it.detail}" } else null,
             strapValue = if (score == null && ready.showStrapEstimate) strapScore?.toString() else null,
             strapNote = if (score == null && ready.showStrapEstimate && strapParts.isNotEmpty()) {

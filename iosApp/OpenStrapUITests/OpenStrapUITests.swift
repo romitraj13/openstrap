@@ -306,28 +306,26 @@ final class OpenStrapUITests: XCTestCase {
 
         // The learning state: the first days of the seeded month have fewer than the seven nights a
         // score needs, so the card says what it is waiting for (GlowRecoveryScreen.kt:135-137).
+        //
+        // Three runs (39696188876, 39699291782, 39702319788) died here asking XCUITest to read a
+        // list of elements step by step: a query for an element that is not there raises "Failed to
+        // get matching snapshot" rather than answering empty, and enumerating `app.staticTexts`
+        // while a day's card re-renders can go stale mid-list. So the walk is a fixed count and one
+        // wait: `RecoveryQueriesTest` pins that the learning state starts 23 days back in this
+        // seeded month and runs to its 29th day, and 26 taps lands inside that window even if two
+        // taps are swallowed by a re-render.
         scrollToTop(app)
-        let learning = "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate."
         let previous = app.buttons["date.previous"]
         XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
-        var found = false
-        for _ in 0..<30 {
-            // XCTest raises when a query matches nothing ("Failed to get matching snapshot"), and the
-            // first day is a scored one, so there is no `recovery.body` to look for: the check reads
-            // every static text on the screen instead (runs 39696188876 and 39699291782 both died
-            // on the query, not on the state). Kotlin's `RecoveryQueriesTest` pins that the sentence
-            // is 23 days back in this month, inside these thirty taps.
-            if app.staticTexts.allElementsBoundByIndex.contains(where: { $0.label == learning }) {
-                found = true
-                break
-            }
+        for _ in 0..<26 {
             previous.tap()
-            Thread.sleep(forTimeInterval: 0.7)
+            Thread.sleep(forTimeInterval: 0.5)
         }
-        XCTAssertTrue(found, "No day in the seeded month drew the learning state's sentence")
-        if found {
-            walk(app, prefix: "U6-recoverylearning", milestones: ["Recovery", "Charge", "Body signals"], screenfuls: 3)
-        }
+        XCTAssertTrue(
+            app.staticTexts["recovery.learning"].firstMatch.waitForExistence(timeout: 60),
+            "Twenty-six days back is not drawing the learning state's sentence"
+        )
+        walk(app, prefix: "U6-recoverylearning", milestones: ["Recovery", "Charge", "Body signals"], screenfuls: 3)
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.

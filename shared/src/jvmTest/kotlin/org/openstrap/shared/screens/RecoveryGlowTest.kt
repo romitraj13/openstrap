@@ -199,6 +199,18 @@ class RecoveryGlowTest {
     }
 
     @Test
+    fun onlyTheWithheldStateCallsItselfLearning() {
+        // Before enough nights: the learning state the UI test walks back to.
+        val learning = RecoveryGlow.card(result(readiness(score = null, nights = 4, withheld = true)), null)
+        assertTrue(learning.learning)
+        // A scored day is not learning, whatever its phase.
+        assertTrue(!RecoveryGlow.card(result(readiness(score = 72, nights = 9)), null).learning)
+        // No sleep at all, and a night whose readings failed: neither is the learning state.
+        assertTrue(!RecoveryGlow.card(result(readiness(score = null, withheld = false)), null).learning)
+        assertTrue(!RecoveryGlow.card(result(readiness(score = null, nights = 20, withheld = true)), null).learning)
+    }
+
+    @Test
     fun theSleepContributorIsNotedUnderTheSentence() {
         val contributors = listOf(Recovery.Contributor(Recovery.Factor.Sleep, 64, "6h 52m asleep"))
         val card = RecoveryGlow.card(result(readiness(score = null, withheld = false, contributors = contributors)), null)

@@ -182,7 +182,9 @@ private struct RecoveryScoreCard: View {
                     Text(model.body ?? "")
                         .appTextStyle(AppTypography.bodyMedium)
                         .foregroundStyle(.white.opacity(0.85))
-                        .accessibilityIdentifier("recovery.body")
+                        // The learning state has an id of its own, so a test can find the state
+                        // without matching the sentence's words.
+                        .accessibilityIdentifier(model.learning ? "recovery.learning" : "recovery.body")
                     if let sleep = model.sleepNote {
                         QuietNote(text: sleep)
                     }
