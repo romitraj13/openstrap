@@ -72,10 +72,66 @@
 - B: the fixes (clearance, clock accessor, plural rule, docs) → green.
 - C: every screenshot from B's green run, one commit.
 
-## Red (commit A)
+## Red (commit A, 16f36e8, run 39822446565)
 
-(paste the run id and the F4 lines here)
+`python3 .scratch/joblog.py 39822446565 .scratch/red-full.txt` (the whole failed job log; `ci.py logs`
+keeps only the last 150 lines, which is the artifact upload). The extended walk failed on all three
+screens, for the reason the card gives:
 
-## Green (commit B)
+    F4 Workout detail: workout.footnote maxY=789.9666666666666 barTop=754.0 window=(0.0, 0.0, 402.0, 874.0)
+    F4 All workouts: workouts.last maxY=780.0000000000005 barTop=754.0 window=(0.0, 0.0, 402.0, 874.0)
+    error: OpenStrapUITests.swift:674: testWorkout : XCTAssertTrue failed - the floating tab bar still covers the last row of:
+    F4 Metric detail: metric.detail.related.Stress maxY=777.9666666666667 barTop=754.0 window=(0.0, 0.0, 402.0, 874.0)
+    error: OpenStrapUITests.swift:707: testMetricDetail : failed - Metric detail: metric.detail.related.Stress ends at 777.9666666666667, under the floating bar whose top is 754.0, so the last row cannot be scrolled clear of it
 
-(paste)
+The workout detail's footnote ended **36 pt** under the bar (789.97 against 754.0), the list's last
+row 26 pt and the metric detail's last Related row 24 pt.
+
+The two assertions for the other defects fired in the same run, before their walks got that far
+(`continueAfterFailure = false` stops a test at the first failure, and both come first):
+
+    error: OpenStrapUITests.swift:115: testEveryTabAndYouScreen : XCTAssertTrue failed - the date navigator does not read TODAY on the pinned demo day
+    error: OpenStrapUITests.swift:39: testRename : XCTAssertTrue failed - the date navigator does not read TODAY on the pinned demo day
+
+The plural rule could not fail in that run: the You row's label is only read after the header
+assertion, so the run stopped first. The committed R1-you.png / U4-you-1.png read "1 lines" because
+`YouView` printed `"\(controller.logLines.count) lines"` and `StrapController.init` appends exactly
+one line (`append("database \(path): \(summary)")`).
+
+## Green (commit B, b3d1ea5, run 39826877022)
+
+`python3 iosApp/scripts/ci.py wait b3d1ea5` → `ALL GREEN`. The same three measurements, now clear of
+the bar:
+
+    F4 Workout detail: workout.footnote maxY=677.9666666666665 barTop=754.0 window=(0.0, 0.0, 402.0, 874.0)
+    F4 All workouts: workouts.last maxY=668.0000000000005 barTop=754.0 window=(0.0, 0.0, 402.0, 874.0)
+    F4 Metric detail: metric.detail.related.Stress maxY=665.9666666666667 barTop=754.0 window=(0.0, 0.0, 402.0, 874.0)
+    F4 You: you.licences maxY=693.0 barTop=754.0 … (F4's own screens unchanged)
+    Test Case '-[OpenStrapUITests.OpenStrapUITests testWorkout]' passed (84.351 seconds).
+    Test Case '-[OpenStrapUITests.OpenStrapUITests testMetricDetail]' passed (268.645 seconds).
+    Test Case '-[OpenStrapUITests.OpenStrapUITests testEveryTabAndYouScreen]' passed (232.176 seconds).
+    Test Case '-[OpenStrapUITests.OpenStrapUITests testRename]' passed (45.067 seconds).
+    ** TEST SUCCEEDED **
+
+The workout detail gained 112 pt of clearance (789.97 → 677.97, i.e. `barClearance`), the list
+112 pt, the metric detail 112 pt. The header assertion (`staticTexts["TODAY"]`) and the count
+assertions (`1 line`) are inside the three tests that passed, so the demo header and the You row /
+Diagnostics heading are machine-checked, not eyeballed.
+
+The new unit tests ran on the same run:
+
+    Test Case '-[OpenStrapTests.ScreenNowTests testTheLogCountIsSingularForOneLine]' passed
+    Test Case '-[OpenStrapTests.ScreenNowTests testThePinnedDemoDayReadsToday]' passed
+    Test Case '-[OpenStrapTests.ScreenNowTests testWithoutDemoDataTheClockIsThePhones]' passed
+         Executed 43 tests, with 0 failures (0 unexpected)
+
+And the Kotlin side, locally (`source .ios-env.sh && ./gradlew :shared:jvmTest --tests
+org.openstrap.shared.screens.DemoDayTest`): `BUILD SUCCESSFUL`, 4 tests, 0 failures, including
+`the demo day's zone id names the zone the seed writes in`.
+
+## Screenshots (commit C)
+
+`python3 iosApp/scripts/screens.py b3d1ea53d755cda0f6369da296e5d13108880df0` → 105 screenshots from
+run 39826877022. Every U4–U9 and R1 file is in that list (U4 11, U5 16, U6 10, U7 8, U8 13, U9 11,
+R1 4), so V2 reviews one set from one run. Two U2 lab files (U2-designlab-25/26) are not produced by
+the current tests any more; they are U2's, not this card's, and are left alone.
