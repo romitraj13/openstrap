@@ -515,18 +515,19 @@ final class OpenStrapUITests: XCTestCase {
         app.launch()
 
         var failures: [String] = []
-        // The four dated tabs, in the bar's order, each with a mark only that tab's own screen
-        // draws: a tab that never drew fails here instead of being measured as an empty list.
+        // The four dated tabs, each with a mark only that tab's own screen draws: a tab that never
+        // drew fails here instead of being measured as an empty list. Today is walked last on
+        // purpose: it is the launch screen, and its workouts card is drawn from an analysis that
+        // lands after the first paint, so walking it first measures a list that is still growing
+        // (runs 39849833708 and 39864487525 read its last row 26 pt lower on each pass).
         let tabs: [(name: String, drawn: String)] = [
-            ("Today", "What changed"),
             ("Recovery", "recovery.title"),
             ("Sleep", "sleep.title"),
             ("Activity", "Steps"),
+            ("Today", "What changed"),
         ]
-        for (index, tab) in tabs.enumerated() {
-            if index > 0 {
-                app.buttons[tab.name].tap()
-            }
+        for tab in tabs {
+            app.buttons[tab.name].tap()
             // The steps card renders its blurred layers behind a lock on first appearance, and the
             // first query after the switch is the one that waits for it (card F5, run 39737184826).
             if tab.name == "Activity" {
@@ -536,6 +537,9 @@ final class OpenStrapUITests: XCTestCase {
                 app.staticTexts[tab.drawn].firstMatch.waitForExistence(timeout: 120),
                 "The \(tab.name) tab never drew \(tab.drawn)"
             )
+            // One more moment for the cards' first render to finish before the walk starts asking
+            // for frames (card F5's rule for the first query after a tab switch).
+            Thread.sleep(forTimeInterval: 1)
             if let problem = clearsNavBarAtEnd(app, screen: tab.name) { failures.append(problem) }
         }
 
