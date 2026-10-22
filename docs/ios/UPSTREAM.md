@@ -914,19 +914,22 @@ What changed in the move, and why:
   over the contributors themselves, then re-filters in the original order, so the rows keep
   Compose's order inside each group rather than the weight order it selected them by.
 
-Tests: `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/RecoveryGlowTest.kt`, 40 tests (the
-header note's five forms, the three no-score sentences, the sleep contributor's note, the strap's
-estimate and its parts, the strap's fallbacks, the hero's headline and body, the trend's two-letter
-weekdays and its empty case, Charge's at-waking note and its four hint/fact forms, `signed`'s zero,
-the 96 quarter-hour buckets and their clock readout, the four flow rows' signs and fractions, the
-highest/lowest note, the contributors' fold and unfold, Compose's group order with its rules, the
-five caveat notes, the six tiles' order/units/accents, faster/slower vs higher/lower, the skin
-temperature deviation, a missing reading, the seven-day week with gaps, the normal note, the alert's
-and the watch's wording, How it works' comparison and its two paragraphs, `forDay`, the empty
-histories and the 30-day window), and `TodayQueriesTest.kt` gained one (a real database: the six
-signals' month, the four the seed writes every day and the two it never writes, the window's last
-day, and a malformed date answering six empty lists). `:shared:jvmTest` 314 -> 356 tests, 0 failures,
-1 opt-in skip.
+Tests: `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/RecoveryGlowTest.kt`, 41 tests (the
+header note's five forms, the three no-score sentences and which of them is the learning state, the
+sleep contributor's note, the strap's estimate and its parts, the strap's fallbacks, the hero's
+headline and body, the trend's two-letter weekdays and its empty case, Charge's at-waking note and
+its four hint/fact forms, `signed`'s zero, the 96 quarter-hour buckets and their clock readout, the
+four flow rows' signs and fractions, the highest/lowest note, the contributors' fold and unfold,
+Compose's group order with its rules, the five caveat notes, the six tiles' order/units/accents,
+faster/slower vs higher/lower, the skin temperature deviation, a missing reading, the seven-day week
+with gaps, the normal note, the alert's and the watch's wording, How it works' comparison and its two
+paragraphs, `forDay`, the empty histories and the 30-day window), `TodayQueriesTest.kt` gained one (a
+real database: the six signals' month, the four the seed writes every day and the two it never
+writes, the window's last day, and a malformed date answering six empty lists) and
+`RecoveryQueriesTest.kt` is new, one test over the demo month: the learning state is days 23 to 29
+back, 26 previous-day taps land inside it, and yesterday is a scored day. `:shared:jvmTest`
+314 -> 358 tests, 0 failures, 1 opt-in skip (measured with the machine's zone in daylight: see the
+last section).
 
 ### Not copied
 
@@ -949,4 +952,50 @@ day, and a malformed date answering six empty lists). `:shared:jvmTest` 314 -> 3
 
 ### What the CI runs found
 
-(see the summary of card t_3a1afc6f for the run ids and what each cost)
+Six iOS runs, in order. The Kotlin was green locally throughout; every failure below was Swift, the
+UI test's own queries, or another card's recorded flake.
+
+- 39695085373: `RecoveryScreen.swift:228: cannot find type 'RecoveryReadiness' in scope`. The Swift
+  name of `Recovery.Readiness`, nested in a Kotlin `object`, is not what the nested-class rule
+  suggests, and no iOS file had needed to spell it before (Today passes it straight into `TodayGlow`).
+  The contributors panel now takes a `(Bool) -> ContributorsModel` builder, so the type is only ever
+  passed through, as on Today.
+- 39696188876: `testRecovery` drew the whole tab — the walk, How it works opened, the contributors
+  unfolded — then failed at `recovery.body`.firstMatch.exists` with "Failed to get matching snapshot:
+  No matches found". XCTest *raises* on a query that matches nothing in this Xcode; it does not answer
+  false, and the scored first day has no such text.
+- 39699291782: the same step again, with the matches read as a list
+  (`matching(identifier:).allElementsBoundByIndex`). Same raise, from the query itself rather than
+  from `firstMatch`.
+- 39702319788: the same step, enumerating `app.staticTexts` while a day's card re-rendered: the list
+  went stale mid-read ("No matches found for Element at index 64"). Three different ways of polling
+  the tree, three ways to lose; the state is now named where it is decided instead
+  (`RecoveryGlow.card`'s `learning`, the identifier `recovery.learning`), the test steps back a fixed
+  26 days and waits once, and `RecoveryQueriesTest` pins the window that depends on.
+- 39705831612: red in the Kotlin step, before Swift: `StrapEngineTest.linkDownReportsDisconnected`
+  threw a `GattException`. Card F1's recorded leak between the shared device tests (`t_f71167f6`), in
+  `shared/.../device/` which this card does not touch. Rerun as fa6b839.
+- 39706501713 / 39706497906 and 39708990618 / 39708996602: cancelled, not failed. The iOS workflow has
+  `concurrency: cancel-in-progress`, and three cards were pushing reruns to `ios` within minutes of
+  each other, so each new push cancelled the run before it.
+- 39706541852: `testRecovery` **passed**, with `testEveryTabAndYouScreen`, `testToday` and
+  `testPairScreenAppears`. The one red was `testDesignLab`'s recorded "Timed out while evaluating UI
+  query" (card F5's flake; the operator's note says rerun once and do not fix).
+- 39709841241 (commit e63ee39, which contains every U6 commit): **ALL GREEN**, Android run
+  39709845294 green too. The ten U6 screenshots committed here come from that run's artifact.
+
+Two local measurements worth recording, because they cost time to find:
+
+- `:shared:jvmTest` on this machine was red for six *pre-existing* tests at 00:50 local time
+  (`HealthQueriesTest.todayCarriesWhatTheScoreFunctionsCompute`, `recoveryIsTheAndroidRecoveryScreen`,
+  `DayStateLoaderTest.loadFillsTheDayFromTheSampleMonth`, `recoveryIsScoredAfterTheLearningPeriod`,
+  `ScreenQueriesTest.dayIsTheAndroidTodayState`, `recoveryIsScoredAfterTheLearningPeriod`) and green
+  at 13:50 with the same tree, 358 tests either way. The sample seed writes only the minutes up to
+  "now", so at 01:00 the day it calls today has had an hour, all of it asleep: no steps, no awake
+  stress, no evening. The suite is 314 -> 358 tests, 0 failures when `TZ` puts the machine's clock in
+  daylight. None of the six is this card's.
+- `TZ=Asia/Calcutta` on this machine is not the zone the JVM reads: `/usr/share/zoneinfo/Asia/Calcutta`
+  does not exist, so libc falls back to UTC while the JDK's own tzdb resolves +05:30. SQLite's
+  `date(…, 'localtime')` and `Clock.System.todayIn` then disagree by a day after 18:30 UTC. The same
+  six tests fail. `Asia/Kolkata` or `UTC` keeps them in step.
+
