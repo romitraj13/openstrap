@@ -211,7 +211,7 @@ final class BleDriverImpl: NSObject, BleDriver, CBCentralManagerDelegate, CBPeri
         case .poweredOff:
             log("Bluetooth is off")
         case .unauthorized:
-            log("Bluetooth permission is denied for OpenStrap")
+            log("Bluetooth permission is denied for OpenHealth")
         case .unsupported:
             log("This device does not support Bluetooth")
         default:

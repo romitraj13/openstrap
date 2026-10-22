@@ -15,7 +15,7 @@ struct PairView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("OpenStrap")
+                    Text("OpenHealth")
                         .appTextStyle(AppTypography.headlineLarge)
                         .foregroundStyle(glowInk)
                         .padding(.top, 12)
@@ -47,7 +47,7 @@ struct PairPanel: View {
                     .appTextStyle(GlowType.title)
                     .foregroundStyle(glowInk)
                 Text(
-                    "OpenStrap needs the strap's auth key, which Zepp creates when you link the strap. " +
+                    "OpenHealth needs the strap's auth key, which Zepp creates when you link the strap. " +
                         "You only do this once."
                 )
                 .appTextStyle(AppTypography.bodyMedium)

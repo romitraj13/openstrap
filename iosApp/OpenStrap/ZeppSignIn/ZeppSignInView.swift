@@ -47,7 +47,7 @@ struct ZeppSignInView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Use the email and password of the Zepp account your strap is linked to. Google, Apple and other sign-ins don't work here.")
                 .font(.footnote)
-            Text("This is Zepp's own page, so OpenStrap never sees your password. It reads only the app token and user ID, then asks Zepp once for your devices.")
+            Text("This is Zepp's own page, so OpenHealth never sees your password. It reads only the app token and user ID, then asks Zepp once for your devices.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let webView = model.webView {

@@ -159,7 +159,7 @@ struct YouView: View {
                     .accessibilityAddTraits(.isButton)
                 }
 
-                Text("OpenStrap \(appVersion) · local-first, no cloud")
+                Text("OpenHealth \(appVersion) · local-first, no cloud")
                     .appTextStyle(AppTypography.bodySmall)
                     .foregroundStyle(ThemeColors.onSurfaceVariant)
                     .multilineTextAlignment(.center)

@@ -41,7 +41,7 @@ struct StrapView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(
-                "OpenStrap will disconnect and delete the strap's address and auth key from this phone. " +
+                "OpenHealth will disconnect and delete the strap's address and auth key from this phone. " +
                     "Your synced health data stays. To pair again you'll need the auth key.\n\n" +
                     "This doesn't unbind the strap from your Zepp account."
             )

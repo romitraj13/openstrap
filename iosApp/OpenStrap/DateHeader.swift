@@ -1,7 +1,7 @@
 import SwiftUI
 
 /*
- * The top of every date screen: the OpenStrap wordmark and the strap chip, the gap a pull opens,
+ * The top of every date screen: the OpenHealth wordmark and the strap chip, the gap a pull opens,
  * then ‹ TODAY › with a calendar of the days that have data.
  *
  * Ported from `DateHeader` (`app/src/main/kotlin/org/openstrap/app/ui/dashboard/ScreenParts.kt:101`)
@@ -128,7 +128,7 @@ struct PullSyncReveal: View {
     }
 }
 
-/// Top bar: OpenStrap wordmark and strap battery chip, then ‹ TODAY › centered on its own row.
+/// Top bar: OpenHealth wordmark and strap battery chip, then ‹ TODAY › centered on its own row.
 /// Tapping the day opens a calendar of the days that have data. (`DateHeader`, ScreenParts.kt:101)
 struct DateHeader: View {
     var date: Date
@@ -222,10 +222,15 @@ struct DateHeader: View {
         }
     }
 
-    /// "OpenStrap." with the red full stop (`buildAnnotatedString`, ScreenParts.kt:113-124).
+    /// "OpenHealth." with the red full stop (`buildAnnotatedString`, ScreenParts.kt:113-124).
+    ///
+    /// Card R1: the text deliberately differs from Android's wordmark, which keeps upstream's name
+    /// OpenStrap. The iPhone app's visible name is OpenHealth (Romit's decision, 2026-10-22), while
+    /// the Android app, which is upstream's, stays as it is. Only the text differs: the font, size,
+    /// weight and the red period are the Compose screen's.
     private var wordmark: Text {
         let font = DesignFontFamily.museoModerno.font(size: 22, weight: 600)
-        return Text("OpenStrap").font(font).foregroundColor(ThemeColors.onSurface)
+        return Text("OpenHealth").font(font).foregroundColor(ThemeColors.onSurface)
             + Text(".").font(font).foregroundColor(wordmarkDot)
     }
 
