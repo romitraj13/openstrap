@@ -258,16 +258,11 @@ final class OpenStrapUITests: XCTestCase {
             return "\(screen): the floating bar never reported its top edge"
         }
         let barTop = bar.frame.minY
-        // The header's wordmark travels with the content, so its offset says how far the walk moved
-        // the screen; a walk that never scrolled would leave it where it started.
         let wordmark = app.staticTexts["app.wordmark"]
-        let start = wordmark.exists ? wordmark.frame.minY : .nan
-        let drags = scrollToEndOfTab(app)
-        let end = wordmark.exists ? wordmark.frame.minY : .nan
-        print(
-            "F10 \(screen): wordmark minY \(start) -> \(end) in \(drags) drags, "
-                + "scrollView=\(app.scrollViews.firstMatch.frame)"
-        )
+        guard wordmark.waitForExistence(timeout: 30) else {
+            return "\(screen): the dated tab has no wordmark to walk by"
+        }
+        let walk = scrollToEndOfTab(app, wordmark: wordmark)
         let drawn = lowestTexts(app, above: barTop)
         for one in drawn.prefix(6) {
             print("F10 \(screen) lowest: \(one.label.prefix(44)) minY=\(one.frame.minY) maxY=\(one.frame.maxY)")
@@ -276,8 +271,12 @@ final class OpenStrapUITests: XCTestCase {
         let bottom = drawn.first ?? (label: "(no text)", frame: .zero)
         print(
             "F4 \(screen): \(bottom.label) maxY=\(bottom.frame.maxY) barTop=\(barTop) "
-                + "window=\(app.windows.firstMatch.frame) drags=\(drags)"
+                + "window=\(app.windows.firstMatch.frame) drags=\(walk.drags) scrolled=\(walk.moved)"
         )
+        guard walk.moved > 200 else {
+            return "\(screen): the walk never scrolled the tab — the wordmark moved \(walk.moved) pt "
+                + "in \(walk.drags) drags, so this is the top of the screen, not its end"
+        }
         guard bottom.frame.maxY <= barTop else {
             return "\(screen): the screen's last text, \"\(bottom.label)\", ends at \(bottom.frame.maxY), under "
                 + "the floating bar whose top is \(barTop), so it cannot be scrolled clear of it"
@@ -305,35 +304,33 @@ final class OpenStrapUITests: XCTestCase {
         return drawn.sorted { $0.frame.maxY > $1.frame.maxY }
     }
 
-    /// Card F10: drag a dated tab to its end, and then a few drags past it.
+    /// Card F10: drag a dated tab to its end, watching the header's wordmark.
     ///
-    /// The stop condition cannot be a frame: card F2's note is that a SwiftUI stack's off-screen
-    /// children report frames clamped into the viewport, and a clamped frame does not move with the
-    /// scroll — the first draft of this walk read Today's last row as 819 pt down the window and
-    /// stopped after four drags, well short of the end (run 39842589519). Bytes are better: with
-    /// `-glowStill` the cards hold still, so two captures of one scroll position are the same PNG,
-    /// which is how the design lab's own walk finds the bottom of a section. The walk always takes
-    /// at least `least` drags first, because a tab whose first two captures match for another
-    /// reason would otherwise be measured where it started. Returns the number of drags it took.
-    private func scrollToEndOfTab(_ app: XCUIApplication) -> Int {
-        let least = 10
-        var previous = app.screenshot().pngRepresentation
+    /// The wordmark is the top of the scrolled content: it starts on screen and its y goes negative
+    /// as the list moves, so it is the one element that can be followed the whole way down. A row
+    /// near the bottom cannot be followed (card F2's note: a SwiftUI stack's off-screen children
+    /// report frames clamped into the viewport, and a clamped frame never moves with the scroll —
+    /// the first draft of this walk stopped after four drags on Today for that reason), and a
+    /// capture cannot either while a card still animates (run 39842589519's successor ran its whole
+    /// drag budget on captures that never settled). When two drags in a row leave the wordmark
+    /// where it is, the scroll view has nothing left to give.
+    private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat) {
+        let start = wordmark.frame.minY
+        var previous = start
         var still = 0
         var drags = 0
-        // A held drag moves a little over half a window and the tallest dated tab is about six
-        // screenfuls (card U7's walk), so twenty-eight is past the end of any of them.
-        for _ in 0..<28 {
+        // A held drag moves about half a window; the tallest dated tab is six screenfuls (card U7),
+        // so twenty-four is past the end of any of them.
+        for _ in 0..<24 {
             drag(app, from: 0.78, to: 0.22)
             drags += 1
-            // Long enough for the scroll indicator to finish fading, which is the one thing left
-            // moving on a still screen.
-            Thread.sleep(forTimeInterval: 0.7)
-            let shot = app.screenshot().pngRepresentation
-            still = shot == previous ? still + 1 : 0
-            previous = shot
-            if drags >= least && still == 2 { return drags }
+            Thread.sleep(forTimeInterval: 0.4)
+            let top = wordmark.frame.minY
+            still = top < previous - 1 ? 0 : still + 1
+            previous = top
+            if still == 2 { return (drags, start - top) }
         }
-        return drags
+        return (drags, start - previous)
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
