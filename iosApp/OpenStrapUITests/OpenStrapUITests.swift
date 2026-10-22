@@ -308,14 +308,16 @@ final class OpenStrapUITests: XCTestCase {
         // score needs, so the card says what it is waiting for (GlowRecoveryScreen.kt:135-137).
         scrollToTop(app)
         let learning = "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate."
-        // `firstMatch.exists` raises when the query matches nothing (run 39696188876: "Failed to get
-        // matching snapshot"), so the matches are read as a list instead.
-        let bodies = app.staticTexts.matching(identifier: "recovery.body")
         let previous = app.buttons["date.previous"]
         XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
         var found = false
         for _ in 0..<30 {
-            if bodies.allElementsBoundByIndex.contains(where: { $0.label == learning }) {
+            // XCTest raises when a query matches nothing ("Failed to get matching snapshot"), and the
+            // first day is a scored one, so there is no `recovery.body` to look for: the check reads
+            // every static text on the screen instead (runs 39696188876 and 39699291782 both died
+            // on the query, not on the state). Kotlin's `RecoveryQueriesTest` pins that the sentence
+            // is 23 days back in this month, inside these thirty taps.
+            if app.staticTexts.allElementsBoundByIndex.contains(where: { $0.label == learning }) {
                 found = true
                 break
             }
