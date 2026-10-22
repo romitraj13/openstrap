@@ -398,11 +398,13 @@ object ActivityGlow {
     /** [load] at [now] in [zone], for the tests. */
     fun load(r: RecoveryResult?, effect: SportEffectRow?, now: Long, zone: TimeZone): LoadModel {
         val trend = r?.loadTrend
-        val weekly = effect?.weeklyLoad
-        val low = effect?.optimalLoadMin
-        val high = effect?.optimalLoadMax
-        val hasWeek = weekly != null && low != null && high != null
-        val inRange = hasWeek && weekly!! >= low!! && weekly <= high!!
+        // The strap's week, when it sent all three of the figures the row prints (:301-318).
+        val week = effect?.let { e ->
+            val load = e.weeklyLoad ?: return@let null
+            val low = e.optimalLoadMin ?: return@let null
+            val high = e.optimalLoadMax ?: return@let null
+            WeekRow(load = load, low = low, high = high, end = e.end)
+        }
         return LoadModel(
             hasRecovery = r != null,
             strain = r?.let { "%.1f".format(it.strain) } ?: "",
@@ -421,24 +423,31 @@ object ActivityGlow {
             acwr = r?.acwr?.let { "%.2f".format(it) } ?: "",
             acwrWord = "Contested",
             acwrNote = "Last 7 days against the last 4 weeks. Shown for interest only: the evidence for a \"safe\" ratio is disputed, so it never enters Recovery.",
-            hasWeek = hasWeek,
-            weekLoad = weekly?.let { "${it.roundToInt()}" } ?: "",
+            hasWeek = week != null,
+            weekLoad = week?.let { "${it.load.roundToInt()}" } ?: "",
             weekWord = when {
-                !hasWeek -> ""
-                weekly!! < low!! -> "Below productive"
-                weekly > high!! -> "Above productive"
+                week == null -> ""
+                week.load < week.low -> "Below productive"
+                week.load > week.high -> "Above productive"
                 else -> "Productive"
             },
-            weekAccent = if (inRange) ActivityAccent.Good else ActivityAccent.Steps,
-            weekFraction = if (hasWeek) weekly!! / (high!! * 1.25f) else 0f,
-            weekNote = if (hasWeek) {
-                "Productive range $low–$high, from the strap (updated ${shortDate(effect!!.end, zone)}). Its load is on a different scale from today's."
-            } else "",
+            weekAccent = if (week != null && week.load in week.low.toFloat()..week.high.toFloat()) {
+                ActivityAccent.Good
+            } else {
+                ActivityAccent.Steps
+            },
+            weekFraction = week?.let { it.load / (it.high * 1.25f) } ?: 0f,
+            weekNote = week?.let {
+                "Productive range ${it.low}–${it.high}, from the strap (updated ${shortDate(it.end, zone)}). Its load is on a different scale from today's."
+            } ?: "",
             maxHrNote = r?.takeIf { !it.maxHrFromAge }?.let {
                 "Max HR is estimated. Add your age for accurate effort numbers."
             },
         )
     }
+
+    /** The strap's weekly load against its own productive range (:301-318). */
+    private data class WeekRow(val load: Float, val low: Int, val high: Int, val end: Long)
 
     // ---- FitnessPanel, GlowActivityScreen.kt:333-371 ---------------------------------------------
 

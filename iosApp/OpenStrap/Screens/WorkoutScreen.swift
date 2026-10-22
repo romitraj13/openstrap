@@ -71,8 +71,8 @@ private struct HeartCard: View {
 
     private var style: GlowStyle {
         var style = GlowStyle.chart(MetricColors.heart)
-        // `GlowMotion.Heartbeat(w.averageHeartRate ?: 100)` (:68).
-        style.motion = .heartbeat(bpm: model.heartbeat)
+        // `GlowMotion.Heartbeat(w.averageHeartRate ?: 100)` (:68); Kotlin's Int arrives as Int32.
+        style.motion = .heartbeat(bpm: Int(model.heartbeat))
         return style
     }
 

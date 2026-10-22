@@ -269,7 +269,9 @@ private struct PaiPanel: View {
                         Fact(label: "Today", value: today)
                     }
                 }
-                PaiStack(daily: model.daily)
+                PaiStack { width in
+                    ActivityGlow.shared.paiSegments(daily: model.daily, width: width)
+                }
                 // Each day's points under the bar, oldest first; today in red like its segment (:208-218).
                 HStack(spacing: 0) {
                     ForEach(Array(model.days.enumerated()), id: \.offset) { _, day in
@@ -294,20 +296,23 @@ private struct PaiPanel: View {
 /// The rolling total as one bar to 100, built from the days that fill it (:242-266). The segments'
 /// arithmetic is shared Kotlin's (`ActivityGlow.paiSegments`); this draws them.
 private struct PaiStack: View {
-    /// Each of the seven days' points, oldest first, as Kotlin hands them over.
-    var daily: [KotlinFloat]
+    /// The bar's segments for a given width, in points. The caller closes over the model's seven
+    /// days, so this file never has to name the type Kotlin boxes a `List<Float>` into.
+    var segments: (Float) -> [PaiSegment]
 
     var body: some View {
         GeometryReader { proxy in
-            let segments = ActivityGlow.shared.paiSegments(daily: daily, width: Float(proxy.size.width))
+            let segments = self.segments(Float(proxy.size.width))
             Canvas { context, size in
                 let bar = Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2)
                 context.fill(bar, with: .color(.white.opacity(0.07)))
-                context.clip(to: bar)
+                // The bar is a capsule: a segment that runs past the end is cut by its shape (:246-248).
+                var clipped = context
+                clipped.clip(to: bar)
                 for segment in segments {
                     // Today's segment is heart red, the rest white at the day's own opacity (:256-260).
                     let color = segment.today ? MetricColors.heart : Color.white.opacity(Double(segment.white))
-                    context.fill(
+                    clipped.fill(
                         Path(CGRect(x: CGFloat(segment.from), y: 0, width: CGFloat(segment.width), height: size.height)),
                         with: .color(color)
                     )
