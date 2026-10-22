@@ -1173,6 +1173,64 @@ and effect.
 
 
 
+## Card U9 (metric detail)
+
+One copy under standing instruction 5, one class removed, one screen.
+
+### `ui/glow/GlowMetricDetail.kt` -> `shared/.../app/ui/glow/MetricDetailGlow.kt`
+
+New file, same package as its source. It holds what the screen works out beyond plain formatting:
+the day's series and the window each metric is drawn over (breathing over the sleep, the rest over the
+day); the day's number for each metric and the two facts beside it (heart rate's own low/high and
+average, the usual and status words for the rest); the evenly spaced buckets and the touch readout on
+each point and column; the range's series with a value a week over a year, its axis labels and each
+point's date; the summary's total, day count and status; the lowest and highest with their days; your
+normal and the sentence while it is still learning; and the About panel's two paragraphs. `dayName`,
+`evenly` and `clock` are the three private helpers Compose keeps in the same file.
+
+Unchanged apart from `java.time` -> `kotlinx.datetime` (`DayOfWeek`, `MONTHS`, `WEEKDAYS` as the
+English name lists the other copies already use), `Color` -> a `MetricColor` name for `Theme.swift`,
+`Math.round` -> `round(...)`, and `LocalDate.now()` -> `ScreenClock.today()` through the new
+`model(..., today, zone)` parameter (card F7: a `-demoData` run must name the same day at any hour).
+
+Two things the model carries so Swift decides nothing:
+
+- `historyRange(rangeIndex)`, Compose's `maxOf(range.days, History.NORMAL_DAYS)` window: the screen
+  asks `ScreenQueries.history` for `Month` on Day/Week/Month and `Year` on Year, exactly the read
+  Compose makes.
+- `motion` / `heartbeat` / `breathPerMinute`: `GlowMotion.Heartbeat(value ?: 62)` on a day of heart
+  rate and `Breath(5f)` or `Breath(6f)` elsewhere.
+
+Tests: `MetricDetailGlowTest.kt` (14 cases), covering the day names, each card header and unit, the
+heart-rate facts and buckets, the steps bars and their readouts, the empty sentences, the breathing
+night window, the resting trend, a week/month/year (values, labels, band, legend, lowest/highest, the
+year's week count), the learning state, loading vs. an empty range, and About/Related.
+
+### `shared/.../shared/health/HealthQueries.kt` (four reads and six classes removed)
+
+Card U9 deleted `today`, `sleep`, `heart` and `recovery` and the data classes they answered with
+(`TodaySnapshot`, `SleepSnapshot`, `HeartSnapshot`, `RecoverySnapshot`, `StageTotals`, `StageSegment`,
+`HeartSample`, `TrendDay`, `RecoveryContributor`, `ChargeSummary`). No screen read them any more: cards
+U4-U8 moved the four tabs onto `ScreenQueries` and the shared Glow models, and `HealthExportQueue`
+never used them. The class keeps the `-demoData` seed and its `DEMO_DAYS`. `HealthQueriesTest.kt` keeps
+the seed's idempotence — the one assertion with no other home — rewritten against `ScreenQueries`;
+the other eight cases pinned only the removed code, and each is still covered by
+`ScreenQueriesTest`, `DayStateLoaderTest` or `RecoveryQueriesTest` (named in that file's doc comment).
+
+### Swift
+
+`iosApp/OpenStrap/Screens/MetricDetailScreen.swift` is the screen: `GlowDetailHeader`, `GlowSegments`,
+one `GlowCard` whose chart is the line, the hour bars or the resting trend the model names, and the
+Lowest/Highest, Your normal, About and Related dot panels. `iosApp/OpenStrap/Design/GlowDetailHeader.swift`
+gains `GlowSegments` (`GlowMetricDetail.kt`'s second shared piece) beside the header row card U8 put
+there. Every placeholder route from U5-U8 (`MetricDetailPlaceholder`) is gone: Today, Recovery, Sleep
+and Activity push this screen for a metric and card U8's `WorkoutScreen` for a workout. Each of those
+tabs now passes its `StrapController` down, so the Live switch appears on today's heart rate when the
+strap is connected, as Compose's `canUseLive` does. `HealthModel` gains `loadHistory` and loses the
+four dead snapshot reads. The UI test walks the eleven states with a new debug launch flag
+`-metricDetail <Kotlin metric name>`, which opens one metric's detail on launch so a screenshot does
+not depend on which tiles Today shows.
+
 ## R1 — the visible name differs from upstream's
 
 **The iPhone app's visible name is OpenHealth, and upstream's is OpenStrap.** Card R1 renames what a

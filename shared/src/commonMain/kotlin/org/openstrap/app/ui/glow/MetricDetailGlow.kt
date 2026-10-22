@@ -14,8 +14,10 @@ import org.openstrap.app.ui.components.ChartPoint
 import org.openstrap.app.ui.dashboard.ABOUT
 import org.openstrap.app.ui.dashboard.DayUiState
 import org.openstrap.app.ui.dashboard.Metric
+import org.openstrap.app.ui.dashboard.MetricColor
 import org.openstrap.app.ui.dashboard.RELATED
 import org.openstrap.app.ui.dashboard.Range
+import org.openstrap.app.ui.dashboard.color
 import org.openstrap.shared.clock.ScreenClock
 import kotlin.time.Instant
 
@@ -76,7 +78,18 @@ data class MetricCardModel(
     /** Why there is no number, in the card's words (:227, :274); nil when there is one. */
     val emptyText: String? = null,
     val chart: MetricChartModel? = null,
+    /**
+     * The glow's motion: `Heartbeat` on a day of heart rate (`GlowMotion.Heartbeat(value ?: 62)`, :196)
+     * and `Breath` on everything else — five a minute for a day, six for a week, month or year
+     * (:196, :264).
+     */
+    val motion: String = "Breath",
+    val heartbeat: Int = 62,
+    val breathPerMinute: Int = 5,
 )
+
+/** One row of Related: the metric and the colour its dot takes (`colorOf`, MetricInfo.kt:18). */
+data class RelatedMetricRow(val metric: Metric, val color: MetricColor)
 
 /** A label, its value and the day it belongs to: the Lowest and Highest panel's two columns (:332-344). */
 data class MetricFactRow(val label: String, val value: String, val note: String)
@@ -106,6 +119,8 @@ data class MetricDetailModel(
     val subtitle: String,
     val ranges: List<String>,
     val rangeIndex: Int,
+    /** The metric's own accent (`colorOf`, MetricInfo.kt:18), named for `Theme.swift`. */
+    val accent: MetricColor,
     /**
      * The history the screen must ask `ScreenQueries.history` for: `maxOf(range.days, History.NORMAL_DAYS)`
      * days ending on the day (:124), which is a `Month` read for Day, Week and Month and a `Year` read
@@ -117,7 +132,7 @@ data class MetricDetailModel(
     val lowHigh: List<MetricFactRow> = emptyList(),
     val normal: MetricNormalModel,
     val about: MetricAboutModel,
-    val related: List<Metric> = emptyList(),
+    val related: List<RelatedMetricRow> = emptyList(),
 )
 
 /** The detail screen's computations, copied from `GlowMetricDetail.kt` (card U9). */
@@ -127,6 +142,14 @@ object MetricDetailGlow {
 
     /** The four range labels, in `Range.entries`' order (:132). */
     val RANGES = Range.entries.map { it.label }
+
+    /**
+     * The history read a screen must make for [rangeIndex]: `maxOf(range.days, History.NORMAL_DAYS)`
+     * days ending on the day (:124), which is a `Month` read for Day, Week and Month and a `Year` read
+     * for Year. Swift asks this rather than naming the enum.
+     */
+    fun historyRange(rangeIndex: Int): Range =
+        if (Range.entries.getOrElse(rangeIndex) { Range.Day } == Range.Year) Range.Year else Range.Month
 
     /** The screen's model on the app's clock; the Swift call. */
     fun model(
@@ -175,7 +198,8 @@ object MetricDetailGlow {
             subtitle = dayName(state.date, today),
             ranges = RANGES,
             rangeIndex = index,
-            historyRange = if (range == Range.Year) Range.Year else Range.Month,
+            accent = metric.color,
+            historyRange = historyRange(index),
             card = card,
             lowHigh = if (summary == null) emptyList() else lowHigh(metric, range, summary),
             normal = normalPanel(metric, normal, days),
@@ -184,7 +208,7 @@ object MetricDetailGlow {
                 what = what,
                 moves = moves,
             ),
-            related = RELATED[metric].orEmpty(),
+            related = RELATED[metric].orEmpty().map { RelatedMetricRow(it, it.color) },
         )
     }
 
@@ -215,6 +239,9 @@ object MetricDetailGlow {
     /** `clock` (:162): the time of an epoch second as "HH:mm". */
     fun clock(epoch: Long, zone: TimeZone): String =
         Instant.fromEpochSeconds(epoch).atZone(zone).let { "%02d:%02d".format(it.hour, it.minute) }
+
+    /** `metric.format(v)`, for Swift's chart's average label, so no number is formatted in Swift. */
+    fun format(metric: Metric, value: Float): String = metric.format(value)
 
     // ---- The day's card (DayCard, :177-257) -----------------------------------------------------
 
@@ -325,6 +352,9 @@ object MetricDetailGlow {
             unit = unit,
             facts = facts,
             chart = chart,
+            motion = if (metric == Metric.HeartRate) "Heartbeat" else "Breath",
+            heartbeat = if (metric == Metric.HeartRate) value.toInt() else 62,
+            breathPerMinute = 5,
         )
     }
 
@@ -402,6 +432,7 @@ object MetricDetailGlow {
                     "Your normal shows after ${History.MIN_NORMAL_DAYS} days of data"
                 },
             ),
+            breathPerMinute = 6,
         )
     }
 

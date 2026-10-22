@@ -49,6 +49,8 @@ enum ActivityRoute: Hashable {
 
 struct ActivityScreen: View {
     @ObservedObject var health: HealthModel
+    /// The strap, which today's heart-rate detail asks for its Live switch (card U9).
+    var controller: StrapController? = nil
 
     @State private var route: ActivityRoute?
 
@@ -67,8 +69,10 @@ struct ActivityScreen: View {
         .navigationDestination(item: $route) { route in
             switch route {
             case .metric(let name):
-                let metric = TodayGlow.shared.metric(name: name)
-                MetricDetailPlaceholder(title: metric?.title ?? name, note: metric?.unit ?? "")
+                if let metric = TodayGlow.shared.metric(name: name) {
+                    // Card U9: one screen for every metric (GlowMetricDetail.kt).
+                    MetricDetailScreen(health: health, metric: metric, controller: controller)
+                }
             case .workout(let start):
                 WorkoutScreen(health: health, start: start)
             case .allWorkouts:

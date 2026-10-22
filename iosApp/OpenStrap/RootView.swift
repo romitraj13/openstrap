@@ -84,15 +84,15 @@ struct RootView: View {
                     }
                 case .recovery:
                     DayTab(tab: .recovery, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        RecoveryScreen(health: health)
+                        RecoveryScreen(health: health, controller: controller)
                     }
                 case .sleep:
                     DayTab(tab: .sleep, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        SleepScreen(health: health)
+                        SleepScreen(health: health, controller: controller)
                     }
                 case .activity:
                     DayTab(tab: .activity, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        ActivityScreen(health: health)
+                        ActivityScreen(health: health, controller: controller)
                     }
                 case .you:
                     YouTab(controller: controller, health: health, path: $youPath)

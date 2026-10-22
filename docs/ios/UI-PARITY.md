@@ -1303,12 +1303,89 @@ pane and load, fitness and workouts in a right one (`:89-96`); this app is portr
 | `ZONE_NAMES` — "Warm-up", "Fat burn", "Aerobic", "Anaerobic", "Maximum" (7) | `ZONE_NAMES` (WorkoutGlow.kt:29) | ported |
 | `signedDrop` — "−24", "+3", "0" (10) | `WorkoutGlow.signedDrop` (WorkoutGlow.kt:35-39) | ported |
 
-## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowMetricDetail.kt` — the pieces card U8 ports
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowMetricDetail.kt` (card U9)
+
+One screen for every metric. The numbers, dates and sentences are computed by `MetricDetailGlow`
+(shared Kotlin, standing instruction 5); `MetricDetailScreen.swift` draws them.
 
 | Compose element or string (file:line) | Swift (file:line) | Status |
 |---|---|---|
-| `GlowDetailHeader(title, subtitle, onBack)` — 48.dp back arrow, title at `GlowType.title` × 1.25, subtitle in `bodySmall` at 60 % (61-69) | `GlowDetailHeader` (GlowDetailHeader.swift:11-60) | ported; card U9's metric detail uses the same row |
-| `dayName(date)` — "Today", "Yesterday", else "EEE d MMM" (71-75) | `dayName` (WorkoutGlow.kt:368-372) | ported |
+| `GlowDetailHeader(title, subtitle, onBack)` — 48.dp back arrow, title at `GlowType.title` × 1.25, subtitle in `bodySmall` at 60 % (61-69) | `GlowDetailHeader` (GlowDetailHeader.swift:10-60), used at MetricDetailScreen.swift:83 | ported by card U8; the metric detail uses the same row |
+| `dayName(date)` — "Today", "Yesterday", else "EEE d MMM" (71-75) | `MetricDetailGlow.dayName` (MetricDetailGlow.kt:218-224) → the subtitle (MetricDetailScreen.swift:83) | ported |
+| `GlowSegments(options, selected, onSelect)`: white 6 % pill, chosen segment white 16 %, 9.dp vertical, label in `labelLarge` (79-96) | `GlowSegments` (GlowDetailHeader.swift:66-95); `GlowSegmentStyle` presses to 0.97 (GlowDetailHeader.swift:97-105) | ported; the press is a scale, and still under Reduce Motion |
+| `HOURS = ["00", "06", "12", "18", "24"]` (100) | `MetricDetailGlow.HOURS` (MetricDetailGlow.kt:141) | ported |
+| `GlowMetricDetailScreen`: `BackHandler`, `rangeIndex` remembered per metric (108-127) | `MetricDetailScreen` (MetricDetailScreen.swift:31-125); `@State rangeIndex` (:41), the back arrow pops the stack | ported |
+| `Range.entries.map { it.label }` as the switch's options (132) | `MetricDetailGlow.RANGES` (MetricDetailGlow.kt:144) | ported |
+| The history read's window: `maxOf(range.days, NORMAL_DAYS)` days ending the day (124-125) | `MetricDetailGlow.historyRange` (MetricDetailGlow.kt:151-152) → `HealthModel.loadHistory` (HealthModel.swift:224-230) | ported; the screen fetches a `Month` read for Day/Week/Month and a `Year` read for Year |
+| `stats` starts null and each new range restarts it — "Loading…" until the read lands (125) | `MetricDetailScreen.stats` (MetricDetailScreen.swift:43), set to nil per range (:115) | ported |
+| The list's order: header, switch, the card, Lowest/Highest (not Day), Your normal, About, Related (131-145) | MetricDetailScreen.swift:82-104 | ported |
+| `DayCard`: the day's series and window per metric; breathing over `sleep.start..sleep.end` (181-189) | `MetricDetailGlow.dayCard` (MetricDetailGlow.kt:248-268) | ported |
+| The day's number: live HR else `latestHeartRate`; `restingHeartRate`; `steps`; else the series' average (190-195) | `dayCard` (MetricDetailGlow.kt:270-275) | ported |
+| `GlowStyle.chart(color)` with `Heartbeat(value ?: 62)` for heart rate, else `Breath(5f)` (196) | `MetricCardView.style` (MetricDetailScreen.swift:138-144) from `MetricCardModel.motion` / `.heartbeat` | ported |
+| `"Latest"` / `"Now"` (201) | `dayCard` header (MetricDetailGlow.kt:276-283); the `"Now"` rule is tested in `MetricDetailGlowTest` | ported |
+| `"Resting"` (202) | same (:279) | ported |
+| `"Total"` (203) | same (:280) | ported |
+| `"Average during sleep"` (204) | same (:281) | ported |
+| `"Day average"` (205) | same (:282) | ported |
+| `"Live"` + `GlowSwitch(on, onLiveToggle, accent = color)` (207-215) | MetricDetailScreen.swift:146-163 | ported; shown only for today's heart rate on a connected strap (`canUseLive`, :135) |
+| `facts` for heart rate: `"Low N · high N"`, `"Average N"` (219-221) | `dayCard` (MetricDetailGlow.kt:285-295) | ported |
+| `normalFacts`: `"Usually N"`, `"Above your normal"`, `"Below your normal"`, `"Within your normal"` (165-173) | `MetricDetailGlow.normalFacts` (MetricDetailGlow.kt:362-372) | ported |
+| `"No ${title.lowercase()} for this day yet."` (227) | `dayCard` (MetricDetailGlow.kt:297-303) | ported |
+| `"Breathing rate is measured during sleep."` (227) | same (:299-301) | ported |
+| `GlowHeroNumber(format(value).replace(",", ""), unit.ifEmpty { "/ 100" }, facts)` (232) | MetricDetailScreen.swift:166 / `dayCard` (MetricDetailGlow.kt:345-347) | ported |
+| `GlowDotBars(hourlySteps, ChartHeight, HOURS, accent = White)` (236-239) | `MetricChartView` (MetricDetailScreen.swift:194-200) | ported |
+| `"%02d:00–%02d:00 · %,d steps"` (237) | `dayCard` readouts (MetricDetailGlow.kt:322-324) | ported |
+| `GlowTrend(restingTrend, ChartHeight)` when the trend has a value (240-243) | MetricDetailScreen.swift:202-205 / `dayCard` (MetricDetailGlow.kt:327-336) | ported |
+| Five-minute buckets for heart rate, fifteen for the rest (246) | `dayCard` (MetricDetailGlow.kt:340) | ported |
+| `evenly(points, range, seconds)` — averages into buckets, gaps null (151-160) | `MetricDetailGlow.evenly` (MetricDetailGlow.kt:225-238) | ported |
+| `clock(epoch)` — "HH:mm" (162) | `MetricDetailGlow.clock` (MetricDetailGlow.kt:240-241) | ported |
+| `labels = if (window == day) HOURS else [clock(first), clock(last)]` (248) | `dayCard` (MetricDetailGlow.kt:341-343) | ported |
+| `GlowLineChart(values, ChartHeight, labels, format = metric::format)` (250) | `MetricChartView` (MetricDetailScreen.swift:207-213) | ported |
+| `"${format(v)} ${unit} · ${clock(from + i * bucket)}".replace("  ", " ")` (251) | `dayCard` readouts (MetricDetailGlow.kt:344-346) | ported |
+| `HistoryCard`: `GlowStyle.chart(color)` with `Breath(6f)` (264) | `MetricCardView.style` (MetricDetailScreen.swift:138-144) from `MetricCardModel.breathPerMinute` = 6 | ported |
+| `"Steps a day"` / `"Daily average"` (267) | `MetricDetailGlow.historyCard` (MetricDetailGlow.kt:384) | ported |
+| `"Last 7 days"` / `"Last 30 days"` / `"Last 12 months"` (268) | same (:385-389) | ported |
+| `"Loading…"` / `"No ${title.lowercase()} in this range yet."` (271-276) | same (:391-401) | ported |
+| `"%,d in total"`, `"${days} days with data"`, and the status word (279-285) | same (:403-408) | ported; a year carries no status word (:282) |
+| `GlowLineChart(values, ChartHeight, labels, showAverage = false, band = normal.low..high)` (287-292) | `MetricChartView` (MetricDetailScreen.swift:207-213), band from `MetricChartModel.bandLow`/`bandHigh` (:218-223) | ported |
+| `"Week of d MMM"` over a year, `"EEE d MMM"` otherwise, and its readout (293-296) | `historyCard` (MetricDetailGlow.kt:420-430) | ported |
+| `series(range, stats, start, end)` — a day, or a Monday-started week over a year (311-329) | `MetricDetailGlow.series` (MetricDetailGlow.kt:446-472) | ported |
+| Week labels: `getDisplayName(SHORT).take(2)` (324) | same (:461) | ported |
+| Month/year labels: four dates at 0, ⅓, ⅔, 1 (325-326) | same (:462-471) / `FOUR_POINTS` (:473) | ported |
+| The "Your normal" legend row: 10×6 box at white 25 %, text at 70 % (298-305) | `MetricCardView` (MetricDetailScreen.swift:169-186) | ported |
+| `"Your normal"` (301) | `historyCard` (MetricDetailGlow.kt:433-435) | ported |
+| `"Your normal shows after ${MIN_NORMAL_DAYS} days of data"` (302) | same (:434-436) | ported |
+| `LowHighPanel`: a `DotPanel` of two equal columns (332-344) | `LowHighPanel` (MetricDetailScreen.swift:237-252) | ported |
+| `"Lowest"` / `"Highest"`, or `"Lowest day"` / `"Highest day"` over a year (338) | `MetricDetailGlow.lowHigh` (MetricDetailGlow.kt:477-485) | ported |
+| `"${format(value)} ${unit}".trim()` and `"EEE d MMM"` (338-339) | same (:480-483) | ported |
+| `NormalPanel`: `DotHeader("Your normal", trailing = "Last 30 days")` (350) | `NormalPanel` (MetricDetailScreen.swift:258-281) / `MetricDetailGlow.normalPanel` (MetricDetailGlow.kt:486-489) | ported |
+| `"Your normal shows after ${MIN_NORMAL_DAYS} days of data ($days so far). It's the range your daily values usually fall in."` (352) | same (:493-497) | ported |
+| `GlowBar(days / MIN_NORMAL_DAYS, colorOf(metric))` (353) | MetricDetailScreen.swift:275-278 | ported |
+| `Fact("Usual", …)` and `Fact("Range", "low–high")` (357-358) | same (:266-270) / `normalPanel` (:503-505) | ported |
+| `"From ${days} days. Most of your days fall inside this range; outside it is worth a look, not a worry.")` (360) | same (:506-509) | ported |
+| `AboutPanel`: `DotHeader("About ${title.lowercase()}")`, the paragraph at 90 %, the note (364-372) | `AboutPanel` (MetricDetailScreen.swift:287-298) / `MetricAboutModel` (MetricDetailGlow.kt:106-107) | ported |
+| `RelatedPanel`: `DotHeader("Related")`, one glass row per metric (374-389) | `RelatedPanel` (MetricDetailScreen.swift:304-334) | ported |
+| The row's 7.dp colour dot, title in `bodyMedium`, 70 % caret, 14/12 padding (383-386) | same (:309-329) | ported; the dot's colour is `RelatedMetricRow.color` (MetricDetailGlow.kt:95) |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/Routes.kt` (card U9)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Metric` enum: eight entries, titles and units (9-21) | `Metric` (Metric.kt:15-27, copied by U4) | ported; the enum crossed into shared at U4 |
+| `Metric.format`: `%,d` for steps, else the entry's decimals (20) | `Metric.format` (Metric.kt:26) → `MetricDetailGlow.format` (MetricDetailGlow.kt:244) | ported |
+| `Detail.OfMetric` / `Detail.Workout` / `Detail.AllWorkouts` (27-31) | `TodayRoute` (TodayScreen.swift:23-26) and `ActivityRoute` (ActivityScreen.swift:40-46) | ported; each tab keeps its own stack, as Compose's `Saver` does |
+| `Detail.StackSaver` — the stack survives process death (35-54) | not ported: iOS restores a tab's stack through SwiftUI's own `NavigationStack` state, which this app does not persist across a relaunch | not ported: nothing in the app writes the stack to disk, so there is no string to restore |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/MetricInfo.kt` (card U9)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `Range`: Day, Week, Month, Year, with 1/7/30/365 days (13) | `Range` (Metric.kt:47) | ported at U4 |
+| `DailyHistory` — a `Flow` per metric and window (16) | `ScreenQueries.history` (ScreenQueries.kt:85-88), a plain callback, never a `Flow` (standing instruction 12) | ported as the Swift-safe shape |
+| `colorOf(metric)` (18-25) | `Metric.color` (Metric.kt:36-44) → `MetricDetailModel.accent`, mapped to `Theme.swift` in `metricColor` (MetricDetailScreen.swift:19-28) | ported |
+| `RELATED` — the three metrics each detail offers (27-36) | `RELATED` (Metric.kt:50-59) → `MetricDetailModel.related` (MetricDetailGlow.kt:209) | ported |
+| `ABOUT` — the eight "what it is / what moves it" pairs (38-71) | `ABOUT` (Metric.kt:62-94) → `MetricAboutModel` (MetricDetailGlow.kt:203-207) | ported, word for word |
+
 
 ## Not in this card
 

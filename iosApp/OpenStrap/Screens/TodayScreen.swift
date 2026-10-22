@@ -55,6 +55,21 @@ enum TodayFlags {
         #endif
     }
 
+    /// The metric whose detail a UI test opens straight away (`-metricDetail HeartRate`), so card
+    /// U9's screenshots do not depend on which tiles Today happens to show. The value is the Kotlin
+    /// enum's name, the same one `TodayGlow.metric(name:)` matches. Debug builds only.
+    static var launchMetric: String? {
+        #if DEBUG
+        let arguments = CommandLine.arguments
+        guard let flag = arguments.firstIndex(of: "-metricDetail"), flag + 1 < arguments.count else {
+            return nil
+        }
+        return arguments[flag + 1]
+        #else
+        return nil
+        #endif
+    }
+
     #if DEBUG
     private static func at(hour: Int, of day: Date) -> Date {
         Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
@@ -99,7 +114,16 @@ struct TodayScreen: View {
             .presentationDetents([.height(420)])
             .presentationBackground(.clear)
         }
-        .onAppear { health.reloadToday() }
+        .onAppear {
+            openLaunchMetric()
+            health.reloadToday()
+        }
+    }
+
+    /// A UI test's `-metricDetail <name>`: push that metric's detail as if its tile had been tapped.
+    private func openLaunchMetric() {
+        guard route == nil, let name = TodayFlags.launchMetric else { return }
+        route = .metric(name)
     }
 
     // MARK: - The list
@@ -242,17 +266,19 @@ struct TodayScreen: View {
         route = .metric(metric.name)
     }
 
-    // MARK: - The pushed detail (a placeholder until card U9)
+    // MARK: - The pushed detail
 
     @ViewBuilder
     private func destination(for route: TodayRoute) -> some View {
         switch route {
         case .metric(let name):
-            let metric = TodayGlow.shared.metric(name: name)
-            MetricDetailPlaceholder(title: metric?.title ?? name, note: metric?.unit ?? "")
+            if let metric = TodayGlow.shared.metric(name: name) {
+                // Card U9: one screen for every metric (GlowMetricDetail.kt).
+                MetricDetailScreen(health: health, metric: metric, controller: controller)
+            }
         case .workout(let start):
-            let workout = health.workoutList.first { $0.workout.start == start }
-            MetricDetailPlaceholder(title: workout?.sportName ?? "", note: "")
+            // Card U8's workout screen; Today's tap opens it the same way Activity's does.
+            WorkoutScreen(health: health, start: start)
         }
     }
 }
@@ -925,36 +951,5 @@ private struct CheckBox: View {
         }
         .frame(width: 20, height: 20)
         .accessibilityHidden(true)
-    }
-}
-
-// MARK: - The pushed detail, until card U9
-
-/// Where a metric or workout tap lands until card U9 builds the detail screens: the thing's own
-/// name, and nothing invented. `TodayRoute` stays as the route U9 fills in. Card U6's Recovery tab
-/// pushes the same route for its body-signal tiles, so this is shared, not private.
-struct MetricDetailPlaceholder: View {
-    var title: String
-    var note: String
-
-    var body: some View {
-        ScrollView {
-            DotPanel {
-                Text(title)
-                    .appTextStyle(GlowType.title)
-                    .foregroundStyle(glowInk)
-                    .accessibilityIdentifier("today.detail")
-                if !note.isEmpty {
-                    Text(note)
-                        .appTextStyle(AppTypography.bodyMedium)
-                        .foregroundStyle(glowInk.opacity(0.7))
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-        }
-        .background(ThemeColors.background.ignoresSafeArea())
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 }

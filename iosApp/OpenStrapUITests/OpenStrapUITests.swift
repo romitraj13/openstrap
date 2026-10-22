@@ -312,18 +312,24 @@ final class OpenStrapUITests: XCTestCase {
     /// clamped into the viewport (card F2's note in this file), so "tap Heart rate" tapped the
     /// overview card's Sleep row every time, whatever the test did about scrolling. The tile is the
     /// same `TodayRoute.metric` push the heart card makes.
+    ///
+    /// Card U9 replaced the placeholder this used to land on, so the proof that the detail opened is
+    /// its range switch — every metric detail has one — and its title.
     private func openTileDetail(_ app: XCUIApplication, _ label: String, opens title: String) {
         let tile = app.staticTexts[label]
         XCTAssertTrue(tile.waitForExistence(timeout: 30), "the \(label) tile never appeared")
         tile.tap()
-        let detail = app.staticTexts["today.detail"]
-        if !detail.waitForExistence(timeout: 30) {
+        let daySegment = app.buttons["detail.range.Day"]
+        if !daySegment.waitForExistence(timeout: 30) {
             attach(app, "U5-detail-missing")
             print("U5 after tapping \(label):\n\(app.debugDescription)")
             XCTFail("Tapping the \(label) tile pushed no detail")
             return
         }
-        XCTAssertEqual(detail.label, title, "the detail that opened is not the tile's metric")
+        XCTAssertTrue(
+            app.staticTexts[title].exists,
+            "the detail with the range switch is not the \(label) tile's metric (\(title))"
+        )
     }
 
     /// Card U6: the Recovery tab, every section in Compose's order, the folded panels opened, and the
@@ -601,6 +607,93 @@ final class OpenStrapUITests: XCTestCase {
             "The all-workouts list never drew"
         )
         walk(app, prefix: "U8-workouts", milestones: ["Workouts", "Outdoor run"], screenfuls: 4)
+    }
+
+    /// Card U9: the metric detail, every state the card touches.
+    ///
+    /// One screen serves all eight metrics, so the walk is: heart rate in all four ranges (the day's
+    /// own card, then a week, a month and a year of daily values), then the day for the other seven.
+    /// Each launch opens its metric straight away with `-metricDetail` (a debug flag, like
+    /// `-todayEvening`), so a screenshot never depends on which tiles Today happens to show.
+    ///
+    /// Screenshots: `U9-detail-heartrate-day`, `U9-detail-heartrate-week`, `U9-detail-heartrate-month`,
+    /// `U9-detail-heartrate-year`, then `U9-detail-<metric>-day` for restinghr, hrv, spo2, stress,
+    /// skintemperature, breathing and steps.
+    func testMetricDetail() {
+        // Heart rate: the day, then one value a day over the week, the month and the year.
+        let heart = openDetail("HeartRate")
+        XCTAssertTrue(
+            heart.staticTexts["Heart rate"].waitForExistence(timeout: 120),
+            "the heart-rate detail never drew its header"
+        )
+        XCTAssertTrue(
+            heart.staticTexts["Latest"].waitForExistence(timeout: 60),
+            "the day's card never drew its latest reading"
+        )
+        assertPanels(heart, about: "About heart rate")
+        attach(heart, "U9-detail-heartrate-day")
+
+        selectRange(heart, "Week", showing: "Last 7 days")
+        XCTAssertTrue(heart.staticTexts["Lowest"].exists, "the week has no lowest and highest")
+        attach(heart, "U9-detail-heartrate-week")
+
+        selectRange(heart, "Month", showing: "Last 30 days")
+        attach(heart, "U9-detail-heartrate-month")
+
+        selectRange(heart, "Year", showing: "Last 12 months")
+        // Over a year the panel names the day it belongs to (:338).
+        XCTAssertTrue(heart.staticTexts["Lowest day"].exists, "the year has no lowest day")
+        attach(heart, "U9-detail-heartrate-year")
+        heart.terminate()
+
+        // The other seven metrics, each on its day, where the card leads with its own word.
+        let others: [(name: String, header: String, about: String)] = [
+            ("RestingHr", "Resting", "About resting heart rate"),
+            ("Hrv", "Day average", "About heart-rate variability"),
+            ("Spo2", "Day average", "About blood oxygen"),
+            ("Stress", "Day average", "About stress"),
+            ("SkinTemperature", "Day average", "About skin temperature"),
+            ("Breathing", "Average during sleep", "About breathing rate"),
+            ("Steps", "Total", "About steps"),
+        ]
+        for metric in others {
+            let app = openDetail(metric.name)
+            XCTAssertTrue(
+                app.staticTexts[metric.header].waitForExistence(timeout: 120),
+                "the \(metric.name) detail never drew its \(metric.header) card"
+            )
+            assertPanels(app, about: metric.about)
+            // The Kotlin name, lowercased: `heartrate`, `skintemperature`. `screens.py` reads it
+            // with `(U|R)\d+-<word>(-<word>)*`.
+            attach(app, "U9-detail-\(metric.name.lowercased())-day")
+            app.terminate()
+        }
+    }
+
+    /// A launch that opens one metric's detail: `-metricDetail <Kotlin name>`, as a tap would.
+    private func openDetail(_ metric: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData", "-glowStill", "-metricDetail", metric]
+        app.launch()
+        return app
+    }
+
+    /// Taps one range and waits for the card's trailing note, which only that range prints.
+    private func selectRange(_ app: XCUIApplication, _ range: String, showing trailing: String) {
+        let segment = app.buttons["detail.range.\(range)"]
+        XCTAssertTrue(segment.waitForExistence(timeout: 60), "the \(range) range never appeared")
+        segment.tap()
+        XCTAssertTrue(
+            app.staticTexts[trailing].waitForExistence(timeout: 60),
+            "the \(range) range never drew \"\(trailing)\""
+        )
+    }
+
+    /// The three quiet panels every metric detail carries: Your normal, About, Related (:142-145).
+    private func assertPanels(_ app: XCUIApplication, about: String) {
+        XCTAssertTrue(app.staticTexts["Your normal"].exists, "no Your normal panel")
+        XCTAssertTrue(app.staticTexts[about].exists, "no \(about) panel")
+        XCTAssertTrue(app.staticTexts["Related"].exists, "no Related panel")
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.

@@ -34,16 +34,13 @@ enum DemoData {
     }
 }
 
-/// The four screens' data, read from the shared Kotlin `HealthQueries`. One object for the app, made
+/// The screens' data, read from the shared Kotlin `ScreenQueries` (U4's calendar, profile and goals;
+/// U5-U8's day, workouts and PAI) and `HealthQueries` (the demo seed). One object for the app, made
 /// once beside the controller so a tab switch does not reopen the database.
 ///
 /// Kotlin calls back on the main thread, so every assignment here lands on the main thread and
 /// SwiftUI can draw it without a hop.
 final class HealthModel: ObservableObject {
-    @Published private(set) var today: TodaySnapshot?
-    @Published private(set) var sleep: SleepSnapshot?
-    @Published private(set) var heart: HeartSnapshot?
-    @Published private(set) var recovery: RecoverySnapshot?
     /// The Diagnostics line the demo seed wrote; nil until `-demoData` has run.
     @Published private(set) var demoMessage: String?
 
@@ -132,18 +129,6 @@ final class HealthModel: ObservableObject {
 
     /// Asks the shared code for every screen's data. The four answers arrive separately.
     func reload() {
-        queries.today(date: date) { [weak self] snapshot in
-            self?.today = snapshot
-        }
-        queries.sleep(date: date) { [weak self] snapshot in
-            self?.sleep = snapshot
-        }
-        queries.heart(date: date) { [weak self] snapshot in
-            self?.heart = snapshot
-        }
-        queries.recovery(date: date) { [weak self] snapshot in
-            self?.recovery = snapshot
-        }
         // Today's own reads, once that screen has asked for them: a launch that never shows Today
         // (the design lab, a fresh install on Pair) pays for none of them.
         if dayState != nil { reloadToday() }
@@ -234,6 +219,13 @@ final class HealthModel: ObservableObject {
         screens.workout(start: start) { [weak self] analysis in
             self?.openWorkout = analysis
         }
+    }
+
+    /// The metric detail's daily series (card U9): one value per day of [range] ending on [date], the
+    /// same `history(m.daily, from, end)` Compose reads (GlowMetricDetail.kt:124-125). Days without
+    /// data are absent, as they are there.
+    func loadHistory(metric: Metric, range: Range, date: String, onResult: @escaping ([DayStat]) -> Void) {
+        screens.history(metric: metric, range: range, date: date, onResult: onResult)
     }
 
     /// Answers - or clears, with nil - the selected day's check-in (`CheckIn.save`, GlowCheckIn.kt).

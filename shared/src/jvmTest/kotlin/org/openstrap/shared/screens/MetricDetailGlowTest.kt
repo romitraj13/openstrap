@@ -23,6 +23,7 @@ import org.openstrap.app.ui.dashboard.RELATED
 import org.openstrap.app.ui.dashboard.Range
 import org.openstrap.app.ui.glow.MetricChartKind
 import org.openstrap.app.ui.glow.MetricDetailGlow
+import org.openstrap.app.ui.dashboard.MetricColor
 
 /**
  * What `GlowMetricDetail.kt` computes, copied into `MetricDetailGlow` so the iPhone's metric detail
@@ -94,6 +95,8 @@ class MetricDetailGlowTest {
         assertEquals("Today", header.subtitle)
         assertEquals(listOf("Day", "Week", "Month", "Year"), header.ranges)
         assertEquals(0, header.rangeIndex)
+        // The card's glow and the Related dots take the metric's own colour (`colorOf`, MetricInfo.kt:18).
+        assertEquals(MetricColor.Heart, header.accent)
 
         // `dayName` (GlowMetricDetail.kt:71-75): today, yesterday, then "EEE d MMM".
         assertEquals("Yesterday", model(Metric.HeartRate, dayState(day.minusDays(1))).subtitle)
@@ -123,6 +126,10 @@ class MetricDetailGlowTest {
         assertEquals("61 bpm · 00:05", chart.readouts[1])
         assertTrue(chart.showAverage)
         assertNull(chart.legend)
+        // The glow beats at the number it shows, and breathes at five a minute (:196).
+        assertEquals("Heartbeat", card.motion)
+        assertEquals(64, card.heartbeat)
+        assertEquals(5, card.breathPerMinute)
         // The history the screen must ask for: `maxOf(range.days, History.NORMAL_DAYS)` days (:124).
         assertEquals(Range.Month, model(Metric.HeartRate).historyRange)
     }
@@ -283,6 +290,9 @@ class MetricDetailGlowTest {
         assertEquals(normal.high, chart.bandHigh)
         assertEquals("Your normal", chart.legend)
         assertFalse(chart.showAverage)
+        // A history card breathes at six a minute (:264).
+        assertEquals("Breath", card.motion)
+        assertEquals(6, card.breathPerMinute)
         assertEquals("89 bpm · Wed 21 Oct", chart.readouts[6])
 
         // Lowest and highest of the range, with their days (:332-344).
@@ -375,9 +385,13 @@ class MetricDetailGlowTest {
         assertEquals("About heart rate", heart.about.title)
         assertEquals(ABOUT.getValue(Metric.HeartRate).first, heart.about.what)
         assertEquals(ABOUT.getValue(Metric.HeartRate).second, heart.about.moves)
-        assertEquals(RELATED.getValue(Metric.HeartRate), heart.related)
+        assertEquals(RELATED.getValue(Metric.HeartRate), heart.related.map { it.metric })
+        // Each Related row's dot is that metric's colour (:383).
+        assertEquals(listOf(MetricColor.Heart, MetricColor.Hrv, MetricColor.Stress), heart.related.map { it.color })
 
-        assertEquals(listOf(Metric.HeartRate), model(Metric.Steps).related)
+        val steps = model(Metric.Steps)
+        assertEquals(listOf(Metric.HeartRate), steps.related.map { it.metric })
+        assertEquals(MetricColor.Steps, steps.accent)
 
         // `metric.title.lowercase()` in the panel's title (:368).
         assertEquals("About blood oxygen", model(Metric.Spo2).about.title)
@@ -388,5 +402,12 @@ class MetricDetailGlowTest {
         val history = model(Metric.HeartRate, rangeIndex = 9)
         assertEquals(0, history.rangeIndex)
         assertEquals("Latest", history.card.header)
+        // Swift asks the same rule before it fetches, so the card and the read cannot disagree.
+        assertEquals(Range.Day, Range.entries[history.rangeIndex])
+        assertEquals(Range.Month, MetricDetailGlow.historyRange(0))
+        assertEquals(Range.Month, MetricDetailGlow.historyRange(1))
+        assertEquals(Range.Month, MetricDetailGlow.historyRange(2))
+        assertEquals(Range.Year, MetricDetailGlow.historyRange(3))
+        assertEquals(Range.Month, MetricDetailGlow.historyRange(9))
     }
 }

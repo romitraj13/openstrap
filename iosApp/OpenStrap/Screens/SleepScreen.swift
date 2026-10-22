@@ -46,9 +46,12 @@ private enum SleepColors {
 
 struct SleepScreen: View {
     @ObservedObject var health: HealthModel
+    /// The strap, which today's heart-rate detail asks for its Live switch (card U9).
+    var controller: StrapController? = nil
 
     /// A vital tile opens its metric, as Compose's `onOpenMetric` does (GlowSleepScreen.kt:94).
-    /// Card U9 replaces the placeholder this pushes; the route is Today's, as Android's `Detail` is one.
+    /// Card U9 fills the route with the one metric detail screen; the route is Today's, as Android's
+    /// `Detail` is one.
     @State private var route: TodayRoute?
 
     var body: some View {
@@ -66,11 +69,11 @@ struct SleepScreen: View {
         .navigationDestination(item: $route) { route in
             switch route {
             case .metric(let name):
-                let metric = TodayGlow.shared.metric(name: name)
-                MetricDetailPlaceholder(title: metric?.title ?? name, note: metric?.unit ?? "")
+                if let metric = TodayGlow.shared.metric(name: name) {
+                    MetricDetailScreen(health: health, metric: metric, controller: controller)
+                }
             case .workout(let start):
-                let workout = health.workoutList.first { $0.workout.start == start }
-                MetricDetailPlaceholder(title: workout?.sportName ?? "", note: "")
+                WorkoutScreen(health: health, start: start)
             }
         }
         .onAppear { health.reloadSleep() }
