@@ -1238,9 +1238,9 @@ pane and load, fitness and workouts in a right one (`:89-96`); this app is portr
 | `Fact("Today", "+${today}")` (200-201) | ActivityScreen.swift:269 | ported |
 | Seven day columns: `getDisplayName(SHORT).take(2)`, the points, `labelSmall` over `bodySmall` (203-218) | ActivityScreen.swift:271-286 / `PaiDayRow` | ported |
 | `paiPoints`: `"+12"`, `"+<1"`, `"–"` (232) | `ActivityGlow.paiPoints` (ActivityGlow.kt:383-387) | ported |
-| `PaiStack`: 14.dp bar, 0.07 track, 1.5.dp gaps, 3.dp sliver for any day, heart red today, fading whites (242-266) | `PaiStack` (ActivityScreen.swift:296-320) with `ActivityGlow.paiSegments` (ActivityGlow.kt:358-377) | ported; where a segment starts is Kotlin's, the draw is Swift's |
+| `PaiStack`: 14.dp bar, 0.07 track, 1.5.dp gaps, 3.dp sliver for any day, heart red today, fading whites (242-266) | `PaiStack` (ActivityScreen.swift:298-326) with `ActivityGlow.paiSegments` (ActivityGlow.kt:358-377) | ported; where a segment starts is Kotlin's, the draw is Swift's |
 | `"Tomorrow ${day}'s +N drops off."` / `"You're at or above 100. …"` / `"N to go. …"` (219-227) | `ActivityGlow.pai` (ActivityGlow.kt:337-342) | ported |
-| `DotHeader("Training load")` (272) | ActivityScreen.swift:331 | ported |
+| `DotHeader("Training load")` (272) | ActivityScreen.swift:330 | ported |
 | `Fact("Strain", "%.1f")`, `Fact("Load today", …)`, `Fact("vs your usual", "${pct}th pct" / "—")` (275-277) | ActivityScreen.swift:334-338 / `ActivityGlow.load` | ported |
 | `Fact("Fitness")`, `Fact("Fatigue")`, `Fact("Form", sign + Int)` (279-285) | ActivityScreen.swift:343-350 / `ActivityGlow.load` | ported |
 | `"Fitness and fatigue are 42- and 7-day averages of your daily load; form is fitness minus fatigue."` (285) | `LoadModel.trendNote` (ActivityGlow.kt:415) | ported |
@@ -1254,13 +1254,13 @@ pane and load, fitness and workouts in a right one (`:89-96`); this app is portr
 | `Fact("Estimated fitness (VO2 max)", "≈ ${low}–${high}")` and the Jurca/FRIEND note with the fitness age (352-360) | ActivityScreen.swift:423-425 / `FitnessModel.estimateNote` (ActivityGlow.kt:465-473) | ported |
 | `"Estimated fitness: ${it.reason}"` when withheld (361) | ActivityScreen.swift:427-429 / `FitnessModel.withheldNote` | ported |
 | `"VO2 max appears after a workout …"`, `"Recovery time is the strap's estimate …"`, `"Highest heart rate today N bpm."`, and the `ifEmpty` line (363-369) | `FitnessModel.note` (ActivityGlow.kt:484-488) | ported |
-| `DotHeader("Workouts", trailing = "${n} recorded")` (381) | ActivityScreen.swift:445 | ported |
-| `"Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered."` (383) | ActivityScreen.swift:447-449 / `WorkoutsPanelModel.emptyNote` | ported |
+| `DotHeader("Workouts", trailing = "${n} recorded")` (381) | ActivityScreen.swift:443 | ported |
+| `"Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered."` (383) | ActivityScreen.swift:446-448 / `WorkoutsPanelModel.emptyNote` | ported |
 | `"No workouts this day."` (386) | ActivityScreen.swift:451-453 / `WorkoutsPanelModel.noTodayNote` | ported |
 | The day's `WorkoutLine`s (387) | ActivityScreen.swift:454-458 | ported |
-| `DotDivider()` + `"RECENT"` (389-390) | ActivityScreen.swift:460-463 | ported |
+| `DotDivider()` + `"RECENT"` (389-390) | ActivityScreen.swift:462-465 | ported |
 | The recent three, `showDate = true` (391) | ActivityScreen.swift:464-468 | ported |
-| `"All workouts"` row with its caret (393-398) | ActivityScreen.swift:470-490 | ported |
+| `"All workouts"` row with its caret (393-398) | ActivityScreen.swift:474-497 | ported |
 | `WorkoutLine(a, showDate, onClick)` (403-422) | `WorkoutLine` (GlowWorkoutRow.swift:11) | ported by card U5; its second line is `TodayGlow.workoutDetail` |
 | `shortDate(epoch)` (424) | `ActivityGlow.shortDate` (ActivityGlow.kt:517-520) | ported |
 
