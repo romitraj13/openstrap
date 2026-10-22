@@ -1097,3 +1097,58 @@ uses `+`, so no other output moved.
 draws the week's clock. `SleepView.swift`, `HeartView.swift`, `StageBar` and `Stat` are deleted: the
 first was card U4's interim Sleep tab, the second was never routed, and the two helpers existed only
 for them.
+
+## Card U8 (Activity and workouts)
+
+Three copies and two new reads, all under standing instruction 5.
+
+### `ui/glow/GlowActivityScreen.kt` -> `shared/.../app/ui/glow/ActivityGlow.kt`
+
+New file, same package as its source. It holds everything the tab works out beyond formatting: the
+steps goal's sentence, its distance fallback and its two notes (`steps`); the active-minutes row and
+its WHO note (`activeMinutes`); the energy panel's three figures and its five-part note (`energy`);
+PAI's total, its seven days, its points and its three closing sentences (`pai`); the rolling bar's
+segments (`paiSegments`); the load panel's strain/load/fitness/fatigue/form rows, its acute:chronic
+row, the strap's weekly load against its productive range, and every note under them (`load`); the
+fitness panel's VO2 max, its sparkline values, the recovery time left and the Jurca/FRIEND estimate's
+sentence (`fitness`); the workouts panel's day/recent/all split (`workoutsPanel`); and `shortDate`.
+
+Unchanged apart from `java.time` -> `kotlinx.datetime`, `Color` -> an `ActivityAccent` name, and
+`LocalDate.now()` / `System.currentTimeMillis()` -> `ScreenClock` (card F7: a `-demoData` run must
+draw the same day at any hour). Two pieces are deliberately Kotlin's rather than Swift's:
+
+- `paiSegments(daily, width)` takes the bar's width, because where a segment starts is arithmetic
+  (Compose's canvas does it inline at :249-262); the drawing stays `PaiStack`'s.
+- the workouts panel receives `WorkoutAnalysis` values so `WorkoutLine` (card U5's port) can draw
+  them, rather than Swift slicing the list itself.
+
+### `ui/glow/GlowWorkoutScreen.kt` -> `shared/.../app/ui/glow/WorkoutGlow.kt`
+
+New file, same package. The one workout: the heart card's ten-second buckets, its two labels, its
+touch readout and the recovery tail's sentence (`heart`, `heartReadout`); the time split
+(`summary`); the recovery rating, its two drops, its bar's fraction and its two sentences
+(`recovery`); the five zones with their bpm ranges and shares (`zones`, which also answers
+`zoneSeconds.sum() > 0` so Swift never adds them up); the training effect (`effect`); and the
+all-workouts list's days (`all`, `dateLine`). `signedDrop` moves here from `ui/workout/WorkoutStyle.kt`
+unchanged, and the five zone names and colours are private to it.
+
+### `shared/.../shared/screens/ScreenQueries.kt` (two reads)
+
+- `sportEffects()` - `WorkoutsLoader.effects()`, the strap's sport-effect rows (Android's
+  `WorkoutsViewModel.effects`). The load and fitness panels need them and nothing else fetched them.
+- `paiWeek(from, to)` - `HealthRepository.dailyPai`'s `Flow<Map<LocalDate, DailyPai>>` flattened to a
+  list, oldest first, because neither a `Flow` nor a `Map` crosses into Swift (plan section 6). A
+  malformed date is an empty week, like every other read here.
+
+Tests: `ActivityGlowTest.kt` (26 cases), `WorkoutGlowTest.kt` (17), and two new cases in
+`ScreenQueriesTest.kt` for the two reads.
+
+### Swift
+
+`iosApp/OpenStrap/Screens/ActivityScreen.swift` draws the tab, `WorkoutScreen.swift` one workout and
+`WorkoutsScreen.swift` the whole list. `iosApp/OpenStrap/Design/GlowDetailHeader.swift` is
+`GlowMetricDetail.kt`'s header row - shared by both detail screens here and by card U9 later. The
+Activity tab's interim panel (`InterimRecoveryPanel` in `RootView.swift`) is deleted now that the
+screen exists. `HealthModel` gains `sportEffects`, `paiWeek` and `openWorkout`, read in the same
+pass as Today's own data.
+

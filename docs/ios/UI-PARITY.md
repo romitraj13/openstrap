@@ -1198,6 +1198,118 @@ what Swift ports. The file is listed here because the card names it.
 | `Text("${clock(start)} – ${clock(end)} · ${formatDuration(end - start)}")` (25) | `SleepNap.line` (SleepGlow.kt:345-347) | ported (in the Sleep tab's panel) |
 | `clock(epochSeconds)` (16-17) | `clockOf` (SleepPanels.kt:257) | ported |
 
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowActivityScreen.kt` (card U8)
+
+The Activity tab. On a wide screen Compose puts the steps, active minutes, energy and PAI in a left
+pane and load, fitness and workouts in a right one (`:89-96`); this app is portrait only, so
+`GlowScreenList` stacks them in the order written here, which is what `ActivityScreen` draws.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `PAI_TARGET = 100` (53) | `PAI_TARGET` (ActivityGlow.kt:40) | ported |
+| `RECENT_WORKOUTS = 3` (56) | `RECENT_WORKOUTS` (ActivityGlow.kt:43) | ported |
+| `GlowActivityScreen(state, recovery, workouts, effects, paiHistory, battery, charging, onPrev, onNext, picker, contentPadding, onOpenMetric, onOpenWorkout, onAllWorkouts, onEditProfile)` (66-82) | `ActivityScreen` (ActivityScreen.swift:50) | ported; `DateHeader`, `onPrev`, `onNext` and `picker` are `RootView.DayTab`'s (card U4), and `onEditProfile` pushes `ProfileScreen` over the tab as Android opens its profile page |
+| The list's order (87-97) | `ActivityScreen.content` (ActivityScreen.swift:88-118) | ported |
+| `HOURS = ["00", "06", "12", "18", "24"]` (101) | `StepsCard.hours` (ActivityScreen.swift:130) | ported |
+| `GlowStyle.chart(steps)` with `GlowMotion.Stride(energy = progress)` (108) | `StepsCard.style` (ActivityScreen.swift:133-138) | ported |
+| `GlowHeader("Steps", chevron = true)` (111) | ActivityScreen.swift:142 | ported |
+| `"Goal reached"` / `"%d%% of %,d"` (112) | `ActivityGlow.steps` (ActivityGlow.kt:229-250) | ported |
+| `GlowHeroNumber("${state.steps}", "steps", listOf(goal))` (113) | ActivityScreen.swift:143 | ported |
+| `GlowChartGap()` (114) | ActivityScreen.swift:144 | ported |
+| `GlowDotBars(state.hourlySteps, GlowLayout.ChartHeight, HOURS, steps)` (115) | ActivityScreen.swift:145-154 | ported |
+| `"%02d:00–%02d:00 · %,d steps"` (116) | `TodayGlow.hourStepReadout` (TodayGlow.kt:396-397) | ported by card U5 |
+| `Spacer(Modifier.height(18.dp))` (118) | `Color.clear.frame(height: 18)` (ActivityScreen.swift:155) | ported |
+| `Fact("Active hours", "${state.activeHours} of ${goals.activeHours}")` (120) | ActivityScreen.swift:156 / `ActivityGlow.steps` | ported |
+| `Fact("Distance", …)` — `"≈ %.1f km"`, else `"—"` (122) | ActivityScreen.swift:158 / `ActivityGlow.steps` (234-236) | ported |
+| `Fact("Active kcal", state.activeCalories ?: "—")` (123) | ActivityScreen.swift:160 / `ActivityGlow.steps` | ported |
+| `"The strap's step counter (%,d) and its minute records (%,d) differ by more than 5 %."` (127) | `StepsModel.divergeNote` (ActivityGlow.kt:242-245) | ported |
+| `"Most of the benefit is reached by about %,d steps a day (Paluch et al. 2022)."` (129) | `StepsModel.stepGoalNote` (ActivityGlow.kt:239-241) | ported |
+| `DotPanel { DotHeader("Energy", trailing = "Partial day") }` (137-138) | `EnergyPanel` (ActivityScreen.swift:204-210) | ported |
+| `"Add age, weight and height to estimate the energy you use."` with the caret row (140-143) | ActivityScreen.swift:212-231 | ported |
+| `Fact("Total", "≈ ${kcal} kcal")`, `Fact("At rest", "${bmr} /day")`, `Fact("Activity level", …)` (147-149) | ActivityScreen.swift:234-238 / `ActivityGlow.energy` | ported |
+| Energy's note: Mifflin-St Jeor sentence, the partial total, the implausible-total warning, HR-assisted minutes, food digestion (151-159) | `EnergyModel.note` (ActivityGlow.kt:282-288) | ported |
+| `DotHeader("Active minutes", trailing = "Last 7 days")` (168) | ActivityScreen.swift:185 | ported |
+| `Fact("This week", "${a.weekEquivalent} / $target")`, `"Moderate"`, `"Vigorous"` (170-172) | ActivityScreen.swift:187-191 / `ActivityGlow.activeMinutes` | ported |
+| `GlowBar(a.weekEquivalent / target, MetricColors.steps)` (174) | ActivityScreen.swift:194 | ported |
+| `"Brisk walking (100+ steps a minute) is moderate, …"` with its HR-assisted clause (175-179) | `ActiveMinutesModel.note` (ActivityGlow.kt:257-260) | ported |
+| `DotHeader("PAI", trailing = "Last 7 days")` (191) | ActivityScreen.swift:255 | ported |
+| `"PAI shows after the strap's next sync. It counts minutes your heart rate is raised, harder minutes counting more."` (193) | `ActivityGlow.pai` (ActivityGlow.kt:311-323) | ported |
+| `Text("${total}")` + `" / $PAI_TARGET"` (196-198) | ActivityScreen.swift:259-267 | ported |
+| `Fact("Today", "+${today}")` (200-201) | ActivityScreen.swift:269 | ported |
+| Seven day columns: `getDisplayName(SHORT).take(2)`, the points, `labelSmall` over `bodySmall` (203-218) | ActivityScreen.swift:271-286 / `PaiDayRow` | ported |
+| `paiPoints`: `"+12"`, `"+<1"`, `"–"` (232) | `ActivityGlow.paiPoints` (ActivityGlow.kt:383-387) | ported |
+| `PaiStack`: 14.dp bar, 0.07 track, 1.5.dp gaps, 3.dp sliver for any day, heart red today, fading whites (242-266) | `PaiStack` (ActivityScreen.swift:296-320) with `ActivityGlow.paiSegments` (ActivityGlow.kt:358-377) | ported; where a segment starts is Kotlin's, the draw is Swift's |
+| `"Tomorrow ${day}'s +N drops off."` / `"You're at or above 100. …"` / `"N to go. …"` (219-227) | `ActivityGlow.pai` (ActivityGlow.kt:337-342) | ported |
+| `DotHeader("Training load")` (272) | ActivityScreen.swift:331 | ported |
+| `Fact("Strain", "%.1f")`, `Fact("Load today", …)`, `Fact("vs your usual", "${pct}th pct" / "—")` (275-277) | ActivityScreen.swift:334-338 / `ActivityGlow.load` | ported |
+| `Fact("Fitness")`, `Fact("Fatigue")`, `Fact("Form", sign + Int)` (279-285) | ActivityScreen.swift:343-350 / `ActivityGlow.load` | ported |
+| `"Fitness and fatigue are 42- and 7-day averages of your daily load; form is fitness minus fatigue."` (285) | `LoadModel.trendNote` (ActivityGlow.kt:415) | ported |
+| `"Each minute counts by how hard your heart works between resting (…) and maximum (…). Strain runs 0–21 …"` (287-290) | `LoadModel.effortNote` (ActivityGlow.kt:416-419) | ported |
+| Acute:chronic row, `StatusPill("Contested", white 0.7)`, its note (292-300) | ActivityScreen.swift:356-361 / `ActivityGlow.load` | ported |
+| `Fact("This week (strap)", …)`, `"Productive"` / `"Below productive"` / `"Above productive"`, its bar and note (301-318) | ActivityScreen.swift:364-373 / `ActivityGlow.load` (399-443) | ported |
+| `"Max HR is estimated. Add your age for accurate effort numbers."` row (319-327) | ActivityScreen.swift:375-395 | ported |
+| `DotHeader("Fitness")` (339) | ActivityScreen.swift:408 | ported |
+| `Fact("VO2 max")`, `Fact("Recovery", "Done" / "… left")`, `Fact("Max HR")` (340-348) | ActivityScreen.swift:410-414 / `ActivityGlow.fitness` | ported |
+| `Sparkline(vo2.takeLast(7), MetricColors.hrv, 24.dp)` (349) | ActivityScreen.swift:417-421 | ported |
+| `Fact("Estimated fitness (VO2 max)", "≈ ${low}–${high}")` and the Jurca/FRIEND note with the fitness age (352-360) | ActivityScreen.swift:423-425 / `FitnessModel.estimateNote` (ActivityGlow.kt:465-473) | ported |
+| `"Estimated fitness: ${it.reason}"` when withheld (361) | ActivityScreen.swift:427-429 / `FitnessModel.withheldNote` | ported |
+| `"VO2 max appears after a workout …"`, `"Recovery time is the strap's estimate …"`, `"Highest heart rate today N bpm."`, and the `ifEmpty` line (363-369) | `FitnessModel.note` (ActivityGlow.kt:484-488) | ported |
+| `DotHeader("Workouts", trailing = "${n} recorded")` (381) | ActivityScreen.swift:445 | ported |
+| `"Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered."` (383) | ActivityScreen.swift:447-449 / `WorkoutsPanelModel.emptyNote` | ported |
+| `"No workouts this day."` (386) | ActivityScreen.swift:451-453 / `WorkoutsPanelModel.noTodayNote` | ported |
+| The day's `WorkoutLine`s (387) | ActivityScreen.swift:454-458 | ported |
+| `DotDivider()` + `"RECENT"` (389-390) | ActivityScreen.swift:460-463 | ported |
+| The recent three, `showDate = true` (391) | ActivityScreen.swift:464-468 | ported |
+| `"All workouts"` row with its caret (393-398) | ActivityScreen.swift:470-490 | ported |
+| `WorkoutLine(a, showDate, onClick)` (403-422) | `WorkoutLine` (GlowWorkoutRow.swift:11) | ported by card U5; its second line is `TodayGlow.workoutDetail` |
+| `shortDate(epoch)` (424) | `ActivityGlow.shortDate` (ActivityGlow.kt:517-520) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowWorkoutScreen.kt` (card U8)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `clock(epoch)` / `dateLine(epoch)` (38-39) | `WorkoutGlow.clock` / `WorkoutGlow.dateLine` (WorkoutGlow.kt:358-378) | ported |
+| `GlowWorkoutScreen`: `BackHandler`, the list's order (46-62) | `WorkoutScreen` (WorkoutScreen.swift:17-63) | ported; the back arrow pops the stack, as BackHandler does |
+| `GlowDetailHeader(a?.sportName ?: "Workout", dateLine(start), onBack)` (51) | WorkoutScreen.swift:30-36 | ported |
+| `DotPanel { Note("Loading…") }` while the workout is null (52-55) | WorkoutScreen.swift:50-53 | ported |
+| `GlowStyle.chart(heart)` with `GlowMotion.Heartbeat(avg ?: 100)` (68) | `HeartCard.style` (WorkoutScreen.swift:71-77) | ported |
+| `GlowHeader("Heart rate", trailing = "Every second")` (71) | WorkoutScreen.swift:82 | ported |
+| `GlowHeroNumber(avg ?: "-", "bpm avg", [Peak N, duration · kcal])` (72-75) | WorkoutScreen.swift:83 / `WorkoutGlow.heart` (WorkoutGlow.kt:174-230) | ported |
+| `"The strap hasn't sent this workout's heart rate yet."` (78) | WorkoutScreen.swift:86 / `WorkoutHeartModel.emptyNote` | ported |
+| Ten-second buckets across the workout, gaps null (83-94) | `WorkoutGlow.heart` (WorkoutGlow.kt:210-230) | ported |
+| `GlowLineChart(values, ChartHeight, [clock(first), clock(last)], showAverage = false)` (96-99) | WorkoutScreen.swift:91-104 | ported |
+| `"${v.toInt()} bpm · ${clock(first + i * step)}"` (98-99) | `WorkoutGlow.heartReadout` (WorkoutGlow.kt:234-240) | ported |
+| `"The strap kept recording for ${formatDuration(…)} after you stopped, for recovery heart rate."` (100-103) | `WorkoutHeartModel.tailNote` (WorkoutGlow.kt:226-228) | ported |
+| `Fact("Active")`, `Fact("Paused")`, `Fact("Lowest HR")` and `"%,d steps."` (113-119) | `SummaryPanel` (WorkoutScreen.swift:121-131) / `WorkoutGlow.summary` (WorkoutGlow.kt:244-256) | ported |
+| `DotHeader("Recovery heart rate", trailing = label)` with Excellent/Good/Fair/Low (128-135) | `RecoveryPanel` (WorkoutScreen.swift:146) / `WorkoutGlow.recovery` (WorkoutGlow.kt:258-292) | ported; an unrated drop has no label, as Compose's `null` |
+| `Fact("After 1 min", "${signedDrop} bpm")`, `Fact("After 2 min", …)` (136-139) | WorkoutScreen.swift:148-152 | ported |
+| `GlowBar(drop / 40f, color)`, rated only (140) | WorkoutScreen.swift:155-157 | ported |
+| Recovery's two notes: the rated one and the "close to resting" one (141-149) | `WorkoutRecoveryModel.note` (WorkoutGlow.kt:279-291) | ported |
+| `DotHeader("Heart-rate zones", trailing = "Max N bpm")` (157) | `ZonesPanel` (WorkoutScreen.swift:171) | ported |
+| Zones 5 to 1: 7.dp dot, name, `"$lo$hi"`, `formatDuration`, 56.dp column, `GlowBar(share)` (158-170) | WorkoutScreen.swift:172-191 / `WorkoutGlow.zones` (WorkoutGlow.kt:294-313) | ported |
+| `DotHeader("Training effect", trailing = "From the strap")` (180) | `EffectPanel` (WorkoutScreen.swift:205) | ported |
+| `Fact("Aerobic")`, `Fact("Anaerobic")`, `Fact("Load")` (181-185) | WorkoutScreen.swift:207-213 | ported |
+| `Fact("VO₂ max")` at weight 1 and `Fact("Recovery time")` at weight 2 (187-190) | WorkoutScreen.swift:214-219 | ported; the second fact takes an equal half where Compose gives it twice the width |
+| `"Training effect runs 0–5 for each system. VO₂ max shows up once the strap has enough data to estimate it."` (191) | `WorkoutEffectModel.note` (WorkoutGlow.kt:331) | ported |
+| `GlowDetailHeader("Workouts", "${workouts.size} recorded", onBack)` (201) | `WorkoutsScreen` (WorkoutsScreen.swift:24) | ported |
+| `"Workouts you start on the strap show up here after a sync."` (203) | WorkoutsScreen.swift:28-30 / `AllWorkoutsModel.emptyNote` | ported |
+| One `DotPanel` per day: `dayName(date)`, the year when it is not this year's, `DotDivider` between rows (206-217) | WorkoutsScreen.swift:32-47 / `WorkoutGlow.all` (WorkoutGlow.kt:336-355) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/workout/WorkoutStyle.kt` (card U8)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `ZONE_COLORS` — five zone colours, cool to hot (6) | `ZONE_ACCENTS` (WorkoutGlow.kt:30-33) through `ActivityColors.of` (ActivityScreen.swift:23-34) | ported |
+| `ZONE_NAMES` — "Warm-up", "Fat burn", "Aerobic", "Anaerobic", "Maximum" (7) | `ZONE_NAMES` (WorkoutGlow.kt:29) | ported |
+| `signedDrop` — "−24", "+3", "0" (10) | `WorkoutGlow.signedDrop` (WorkoutGlow.kt:35-39) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowMetricDetail.kt` — the pieces card U8 ports
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GlowDetailHeader(title, subtitle, onBack)` — 48.dp back arrow, title at `GlowType.title` × 1.25, subtitle in `bodySmall` at 60 % (61-69) | `GlowDetailHeader` (GlowDetailHeader.swift:11-60) | ported; card U9's metric detail uses the same row |
+| `dayName(date)` — "Today", "Yesterday", else "EEE d MMM" (71-75) | `dayName` (WorkoutGlow.kt:368-372) | ported |
+
 ## Not in this card
 
 The debug Design lab (`DesignLabView.swift`, `-designLab`) has no Compose counterpart: Android has
