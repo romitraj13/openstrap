@@ -120,4 +120,43 @@ class RecoveryQueriesTest {
             assertNotNull(card(1)?.score, "yesterday has no Recovery score, so the walk would start on the learning state")
         }
     }
+
+    /** Fills [org.openstrap.app.DemoData] (Android's emulator seed, three weeks) instead of the SampleData month. */
+    private suspend fun seededDemo(): ScreenQueries {
+        val path = newPath()
+        val database = OpenStrapIosDatabase.open(path)
+        try {
+            org.openstrap.app.DemoData.fill(database.healthDao())
+        } finally {
+            database.close()
+        }
+        return ScreenQueries(path).also { queries = it }
+    }
+
+    @Test
+    fun `the demo seed's learning window is reachable`() {
+        kotlinx.coroutines.runBlocking {
+            val queries = seededDemo()
+            fun dayBack(back: Int): LocalDate = LocalDate.fromEpochDays(today.toEpochDays() - back)
+            fun card(back: Int): org.openstrap.app.ui.glow.RecoveryCardModel? {
+                val day = await<DayUiState> { done -> queries.day(iso(dayBack(back)), done) }
+                val rec = await<RecoveryResult?> { done -> queries.recovery(iso(dayBack(back)), done) }
+                val shown = RecoveryGlow.forDay(day, rec) ?: return null
+                return RecoveryGlow.card(shown, null)
+            }
+            val learningDays = (1..21).filter { card(it)?.learning == true }
+
+            // The demo seed is three weeks, so its learning window is the week at its start, days
+            // 14-20 back. The UI test taps previous-day 17 times; two swallowed taps either side
+            // must still land on a learning day.
+            assertTrue(learningDays.isNotEmpty(), "no day in the demo seed is the learning state")
+            assertTrue(
+                (15..19).all { it in learningDays },
+                "17 taps lands on days 15..19, and these are not all learning days: $learningDays",
+            )
+            // The day the walk starts on (yesterday) is a scored one, not the learning state.
+            assertEquals(false, card(1)?.learning)
+            assertNotNull(card(1)?.score, "yesterday has no Recovery score, so the walk would start on the learning state")
+        }
+    }
 }

@@ -304,26 +304,26 @@ final class OpenStrapUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
         attach(app, "U6-recovery-7")
 
-        // The learning state: the first days of the seeded month have fewer than the seven nights a
+        // The learning state: the first days of the demo seed have fewer than the seven nights a
         // score needs, so the card says what it is waiting for (GlowRecoveryScreen.kt:135-137).
         //
         // Three runs (39696188876, 39699291782, 39702319788) died here asking XCUITest to read a
         // list of elements step by step: a query for an element that is not there raises "Failed to
         // get matching snapshot" rather than answering empty, and enumerating `app.staticTexts`
         // while a day's card re-renders can go stale mid-list. So the walk is a fixed count and one
-        // wait: `RecoveryQueriesTest` pins that the learning state starts 23 days back in this
-        // seeded month and runs to its 29th day, and 26 taps lands inside that window even if two
-        // taps are swallowed by a re-render.
+        // wait: the demo seed is three weeks, and `RecoveryQueriesTest` pins that its learning
+        // state covers the week at its start, days 14-20 back; 17 taps lands inside that window
+        // even if two taps are swallowed by a re-render.
         scrollToTop(app)
         let previous = app.buttons["date.previous"]
         XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
-        for _ in 0..<26 {
+        for _ in 0..<17 {
             previous.tap()
             Thread.sleep(forTimeInterval: 0.5)
         }
         XCTAssertTrue(
             app.staticTexts["recovery.learning"].firstMatch.waitForExistence(timeout: 60),
-            "Twenty-six days back is not drawing the learning state's sentence"
+            "Seventeen days back is not drawing the learning state's sentence"
         )
         walk(app, prefix: "U6-recoverylearning", milestones: ["Recovery", "Charge", "Body signals"], screenfuls: 3)
     }
