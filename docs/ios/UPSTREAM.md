@@ -1172,3 +1172,54 @@ entities and `HealthDao` methods it calls are already present, so no DAO method 
 and effect.
 
 
+
+## R1 — the visible name differs from upstream's
+
+**The iPhone app's visible name is OpenHealth, and upstream's is OpenStrap.** Card R1 renames what a
+person reads on the iPhone — the home-screen label, the wordmark, the usage prompts, the pairing,
+You and Recovery sentences, one Diagnostics log line — while the Android app in `app/` is upstream's
+and keeps OpenStrap. Nothing that identifies the app or its data to iOS moved: the bundle
+identifier, `PRODUCT_NAME`, the target and scheme names, the Swift modules, the `org.openstrap.*`
+packages and the seven `org.openstrap.*` / `openstrap.*` / `strap-auth-key` string constants are all
+as upstream has them. `RenameTests` (`iosApp/OpenStrapTests/RenameTests.swift`) pins them, and
+`docs/ios/UI-PARITY.md` lists every changed sentence with its old text. The one place the two names
+sit beside each other on screen is the first row of the licence list, which has to name upstream.
+
+### The icon, copied from the plan pack
+
+```
+/opt/data/.hermes/plans/2026-10-22_openhealth-rename/icon/AppIcon.appiconset/ @ 2026-10-22 -> iosApp/OpenStrap/Assets.xcassets/AppIcon.appiconset/
+/opt/data/.hermes/plans/2026-10-22_openhealth-rename/icon/{openhealth-icon-full,openhealth-icon-small,openhealth-icon-tinted}.svg @ 2026-10-22 -> iosApp/design/icon/
+/opt/data/.hermes/plans/2026-10-22_openhealth-rename/icon/make_icon.js @ 2026-10-22 -> iosApp/design/icon/make_icon.js
+```
+
+The appiconset is byte-identical to the pack: 13 PNGs, all 8-bit colour type 2 (opaque RGB, which is
+what iOS requires of an app icon) at the sizes their names claim, and the 18-entry `Contents.json`
+covering iPhone, iPad and the App Store. `project.yml` sets
+`ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`, so actool emits `CFBundleIcons` with
+`CFBundleIconName` = `AppIcon`. The pack's comparison sheet and the 1024 px previews are not copied —
+the repository carries no other PNGs.
+
+`iosApp/design/icon/` is the artwork's source, not a copy for reference: the three SVGs and
+`make_icon.js` regenerate the whole set.
+
+```
+cd iosApp/design/icon
+npm install --no-save @resvg/resvg-js pngjs
+node make_icon.js <outdir>        # writes <outdir>/AppIcon.appiconset + the three 1024 px SVGs
+```
+
+Run here with those two packages, `node make_icon.js out` produced an `AppIcon.appiconset`
+byte-identical to the committed one (md5 `15c588470112cfb47d128daf7c9db149` over all 14 files).
+
+### The licences upstream's notice needs
+
+```
+LICENSE-MIT @ 2026-10-22 -> iosApp/OpenStrap/Design/Licenses/OpenStrap-LICENSE-MIT.txt
+LICENSE-APACHE @ 2026-10-22 -> iosApp/OpenStrap/Design/Licenses/OpenStrap-LICENSE-APACHE.txt
+```
+
+Both are byte-identical to the repository root (checked with `cmp`) and keep their names: the file
+name, not the licence, says whose notice it is. XcodeGen copies `Design/Licenses/` to the bundle root
+beside `MIT-Phosphor.txt`, `OFL-Funnel.txt` and `OFL-MuseoModerno.txt`, which is how `LicencesView`
+finds them.

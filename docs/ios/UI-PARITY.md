@@ -1323,3 +1323,38 @@ build; the panel titles and metric names inside those samples (`Heart rate`, `Re
 
 The three font files and the three licence files are copies, not ports; they are logged in
 `docs/ios/UPSTREAM.md`.
+## Rename to OpenHealth (card R1)
+
+Not a port: card R1 renames what a person reads inside the iPhone app to **OpenHealth** and changes
+nothing that identifies the app or its data to iOS. The Android app keeps OpenStrap, because it is
+upstream's, so every row below is a deliberate difference from the Compose source rather than a
+translation of it. The Compose lines keep their old text; the Swift and shared Kotlin lines carry
+the new one.
+
+| Where | Old text | New text | Status |
+|---|---|---|---|
+| `project.yml:40` `CFBundleDisplayName` (the home screen's label) | absent — iOS fell back to `CFBundleName`, which is `$(PRODUCT_NAME)` = OpenStrap | `OpenHealth` | renamed (Romit, 2026-10-22) |
+| `project.yml:52` `NSBluetoothAlwaysUsageDescription` | OpenStrap connects to your Amazfit Helio Strap over Bluetooth to read your heart rate and sync your history. | OpenHealth connects to your Amazfit Helio Strap over Bluetooth to read your heart rate and sync your history. | renamed (Romit, 2026-10-22) |
+| `project.yml:53` `NSHealthUpdateUsageDescription` | OpenStrap writes your heart rate, sleep and activity to Apple Health. | OpenHealth writes your heart rate, sleep and activity to Apple Health. | renamed (Romit, 2026-10-22) |
+| Wordmark (`DateHeader.swift:233`, `ScreenParts.kt:113-124`) | OpenStrap. | OpenHealth. | renamed (Romit, 2026-10-22): the same font, size, weight and red full stop; only the text differs |
+| `YouView.swift:162` | OpenStrap \(appVersion) · local-first, no cloud | OpenHealth \(appVersion) · local-first, no cloud | renamed (Romit, 2026-10-22) |
+| `StrapView.swift:44` forget-strap dialog | OpenStrap will disconnect and delete the strap's address and auth key from this phone. | OpenHealth will disconnect and delete the strap's address and auth key from this phone. | renamed (Romit, 2026-10-22) |
+| `PairView.swift:18` pairing title | OpenStrap | OpenHealth | renamed (Romit, 2026-10-22) |
+| `PairView.swift:50` auth-key sentence | OpenStrap needs the strap's auth key, which Zepp creates when you link the strap. | OpenHealth needs the strap's auth key, which Zepp creates when you link the strap. | renamed (Romit, 2026-10-22) |
+| `ZeppSignIn/ZeppSignInView.swift:50` | This is Zepp's own page, so OpenStrap never sees your password. … | This is Zepp's own page, so OpenHealth never sees your password. … | renamed (Romit, 2026-10-22) |
+| `BleDriverImpl.swift:214` Diagnostics log line | Bluetooth permission is denied for OpenStrap | Bluetooth permission is denied for OpenHealth | renamed (Romit, 2026-10-22) |
+| `RecoveryCopy.kt:17` `LEARNING` (`GlowRecoveryScreen.kt`) | OpenStrap scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate. | OpenHealth scores Recovery once it has … | renamed (Romit, 2026-10-22) |
+| `RecoveryCopy.kt:33` `EXPLANATION` (`HowItWorksPanel`) | Each morning OpenStrap compares your night with what's normal for you, … | Each morning OpenHealth compares your night with what's normal for you, … | renamed (Romit, 2026-10-22) |
+| `RecoveryGlow.kt:229` strap estimate note | … Shown for reference; it never enters OpenStrap's score. | … Shown for reference; it never enters OpenHealth's score. | renamed (Romit, 2026-10-22) |
+| `RecoveryGlow.kt:267` `noScoreBody` withheld | OpenStrap scores Recovery once it has … | OpenHealth scores Recovery once it has … | renamed (Romit, 2026-10-22) |
+| `RecoveryGlow.kt:532` `bodySignals` watch | One signal is outside your usual range. OpenStrap is keeping an eye on it. | One signal is outside your usual range. OpenHealth is keeping an eye on it. | renamed (Romit, 2026-10-22) |
+| `RecoveryGlow.kt:550` `howItWorks` explainer | Each morning OpenStrap compares your night with what's normal for you, … | Each morning OpenHealth compares your night with what's normal for you, … | renamed (Romit, 2026-10-22) |
+| `RecoveryGlow.kt:562` `howItWorks` strap note | OpenStrap keeps both each day to tune its own score … | OpenHealth keeps both each day to tune its own score … | renamed (Romit, 2026-10-22) |
+| `LicencesView.swift:29-48` new first row (`YouScreen.kt`'s Licences list has no upstream row) | — | Title `OpenStrap`; subtitle `OpenHealth is based on OpenStrap by sayed0am, used under the MIT licence. github.com/sayed0am/openstrap`; opens the MIT text with the Apache text below it | added (Romit, 2026-10-22): the card's one new wording, required by the MIT and Apache notices |
+
+What deliberately did **not** change, and is pinned by `RenameTests`:
+`PRODUCT_BUNDLE_IDENTIFIER` (`Base.xcconfig`, `Local.xcconfig`), `PRODUCT_NAME`, the three target
+names and the one scheme name, the Swift module `OpenStrap` and the framework `OpenStrapShared`, the
+`org.openstrap.*` Kotlin packages, and the seven string constants `org.openstrap.ios`,
+`strap-auth-key`, `org.openstrap.central`, `org.openstrap.ble`, `openstrap.db`,
+`openstrap.strapPeripheralIdentifier` and `openstrap.writeToAppleHealth`.
