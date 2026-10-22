@@ -244,7 +244,17 @@ struct DesignLabView: View {
 
     private var dotMatrixSection: some View {
         section("Dot matrix", identifier: "lab.dotmatrix") {
-            DotMatrixText("0123456789", color: ThemeColors.onBackground)
+            VStack(alignment: .leading, spacing: 14) {
+                DotMatrixText("0123456789", color: ThemeColors.onBackground)
+                // Card F8: the hero number inside a card, which is where its last digit went
+                // missing. The lab's width gives this card the 302 pt of content a phone card
+                // gives its own, and five digits beside two facts is the case that clipped — the
+                // steps card's own value, at the top of the Activity tab.
+                GlowCard(GlowStyle.chart(MetricColors.steps), sizesToContent: true) {
+                    GlowHeader("Steps", chevron: true)
+                    GlowHeroNumber("12345", unit: "steps", facts: ["43% of 8,000", "Goal reached"])
+                }
+            }
         }
     }
 

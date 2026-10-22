@@ -379,7 +379,7 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | runs of left/right blocks in two columns, full blocks spanning; a lopsided run stacks (117-127) | `sections` + `sectionView` (GlowLayout.swift:135-168) | ported |
 | `scrollTo` animates to the block's key (110-113) | `ScrollViewReader` + `onAppear` / `onChange` (GlowLayout.swift:113-124) | ported |
 | `GlowHeader(title, trailing, chevron, trailingContent)` (162-177) | `GlowHeader` (GlowLayout.swift:171) | ported |
-| `GlowHeroNumber(value, unit, facts, side)` (184-193) | `GlowHeroNumber` (GlowLayout.swift:225) | ported |
+| `GlowHeroNumber(value, unit, facts, side)` (184-193) | `GlowHeroNumber` (GlowLayout.swift:225) | ported: `Row` measures its unweighted number with the whole remaining width and leaves the rest to the `weight(1f)` unit text, so the Swift `HStack` gives the same priority to the `DotMatrixText` (`.layoutPriority(1)`, card F8: without it the number took a share of the row and `.clipped()` cut its last digit) |
 | `GlowChartGap()` (197) | `GlowChartGap` (GlowLayout.swift:271) | ported |
 
 ## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowQuiet.kt` (card U2)

@@ -238,6 +238,18 @@ struct GlowHeroNumber<Side: View>: View {
     var body: some View {
         HStack(alignment: .bottom) {
             DotMatrixText(value, dot: GlowLayout.heroDot, gap: GlowLayout.heroGap)
+                // Compose's `Row` measures its unweighted children first, with the whole remaining
+                // width, and gives what is left to the `weight(1f)` unit text below
+                // (`GlowLayout.kt:184-191`). SwiftUI splits the row between the views that can
+                // grow, and since F2 `DotMatrixText` answers a constrained parent with
+                // `min(proposal, ideal)` — so the row read the number as a view that can shrink,
+                // gave it a share of the width, and `.clipped()` ate the last digit: the demo
+                // day's 11,602 steps drew as "116" and a sliver of a "0" (card F8).
+                // `.layoutPriority(1)` is Row's rule in SwiftUI: the number is offered the room
+                // first and takes the width it asks for. Not `.fixedSize()`: that is the F2
+                // overflow, where a number too wide for the card widened the column instead of
+                // cropping at its edge.
+                .layoutPriority(1)
             Text(unit)
                 .appTextStyle(AppTypography.bodySmall)
                 .foregroundStyle(glowInk.opacity(0.7))
