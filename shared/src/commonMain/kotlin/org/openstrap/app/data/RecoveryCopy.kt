@@ -14,7 +14,7 @@ object RecoveryCopy {
     const val NO_SLEEP = "Recovery is scored each morning from the night's sleep. Wear the strap to bed."
 
     /** A night exists, but the HRV and resting-HR baselines are still filling up. */
-    val LEARNING = "OpenStrap scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
+    val LEARNING = "OpenHealth scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
 
     /** Past the baseline nights, but last night's own readings failed the validity rule. */
     const val WITHHELD_TONIGHT = "Last night's HRV and resting heart rate didn't have enough clean readings, so there's no Recovery score today. Sleep alone isn't readiness."
@@ -30,7 +30,7 @@ object RecoveryCopy {
 
     /** `HowItWorksPanel`: what Readiness is. */
     const val EXPLANATION =
-        "Each morning OpenStrap compares your night with what's normal for you, not with other people: HRV, resting heart " +
+        "Each morning OpenHealth compares your night with what's normal for you, not with other people: HRV, resting heart " +
             "rate, skin temperature, breathing and blood oxygen, last night's sleep and the past few nights, and how hard " +
             "the previous days were. The score is a weighted mix; one signal far from normal caps it."
 

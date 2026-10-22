@@ -90,7 +90,7 @@ class RecoveryQueriesTest {
         kotlinx.coroutines.runBlocking {
             val queries = seeded()
             val learning =
-                "OpenStrap scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
+                "OpenHealth scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
 
             // The days the Recovery card calls the learning state, newest first.
             fun dayBack(back: Int): LocalDate = LocalDate.fromEpochDays(today.toEpochDays() - back)

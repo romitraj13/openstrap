@@ -226,7 +226,7 @@ object RecoveryGlow {
             sleepNote = if (score == null) sleep?.let { "Sleep ${it.score} · ${it.detail}" } else null,
             strapValue = if (score == null && ready.showStrapEstimate) strapScore?.toString() else null,
             strapNote = if (score == null && ready.showStrapEstimate && strapParts.isNotEmpty()) {
-                strapParts.joinToString(" · ") + ". Shown for reference; it never enters OpenStrap's score."
+                strapParts.joinToString(" · ") + ". Shown for reference; it never enters OpenHealth's score."
             } else {
                 null
             },
@@ -264,7 +264,7 @@ object RecoveryGlow {
     fun noScoreBody(ready: Recovery.Readiness): String = when {
         !ready.withheld -> "Recovery is scored each morning from the night's sleep. Wear the strap to bed."
         ready.phase == Recovery.Phase.Withheld ->
-            "OpenStrap scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
+            "OpenHealth scores Recovery once it has ${Recovery.SCORED_NIGHTS} good nights of your own HRV and resting heart rate."
         else ->
             "Last night's HRV and resting heart rate didn't have enough clean readings, so there's no Recovery " +
                 "score today. Sleep alone isn't readiness."
@@ -529,7 +529,7 @@ object RecoveryGlow {
         val tail = if (alert) {
             BodySignalsCopy.CAUSES + " " + BodySignalsCopy.ADVICE
         } else {
-            "One signal is outside your usual range. OpenStrap is keeping an eye on it."
+            "One signal is outside your usual range. OpenHealth is keeping an eye on it."
         }
         return BodySignalsModel(
             title = BodySignalsCopy.TITLE,
@@ -547,7 +547,7 @@ object RecoveryGlow {
         val strapScore = strap?.score
         return HowItWorksModel(
             explainer =
-                "Each morning OpenStrap compares your night with what's normal for you, not with other people: HRV, " +
+                "Each morning OpenHealth compares your night with what's normal for you, not with other people: HRV, " +
                     "resting heart rate, skin temperature, breathing and blood oxygen, last night's sleep and the past " +
                     "few nights, and how hard the previous days were. The score is a weighted mix; one signal far from " +
                     "normal caps it.",
@@ -559,7 +559,7 @@ object RecoveryGlow {
             oursValue = if (strapScore != null) ready.score?.toString() else null,
             strapNote = if (strapScore != null) {
                 "The strap's score doesn't count sleep length, so after a short night it reads higher than ours. " +
-                    "OpenStrap keeps both each day to tune its own score once there are a couple of weeks to compare."
+                    "OpenHealth keeps both each day to tune its own score once there are a couple of weeks to compare."
             } else {
                 null
             },

@@ -183,7 +183,7 @@ class RecoveryGlowTest {
     fun withheldSaysWhatTheScoreNeeds() {
         val card = RecoveryGlow.card(result(readiness(score = null, nights = 5, withheld = true)), null)
         assertEquals(
-            "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate.",
+            "OpenHealth scores Recovery once it has 7 good nights of your own HRV and resting heart rate.",
             card.body,
         )
     }
@@ -223,7 +223,7 @@ class RecoveryGlowTest {
         val withStrap = RecoveryGlow.card(result(ready), strap(score = 81, hrv = 70, rhr = 66))
         assertEquals("81", withStrap.strapValue)
         assertEquals(
-            "HRV 70 · resting HR 66. Shown for reference; it never enters OpenStrap's score.",
+            "HRV 70 · resting HR 66. Shown for reference; it never enters OpenHealth's score.",
             withStrap.strapNote,
         )
         // Past the withheld phase the strap's score stays out of this card entirely.
@@ -587,7 +587,7 @@ class RecoveryGlowTest {
         assertEquals("Watching", model.trailing)
         assertEquals(
             "Resting heart rate up 6 bpm, skin temperature up 0.6 °C. One signal is outside your usual range. "
-                + "OpenStrap is keeping an eye on it.",
+                + "OpenHealth is keeping an eye on it.",
             model.text,
         )
         assertNull(model.cause)
@@ -623,7 +623,7 @@ class RecoveryGlowTest {
     @Test
     fun howItWorksCarriesComposesTwoParagraphsAndTheDisclaimer() {
         val model = RecoveryGlow.howItWorks(readiness(), null)
-        assertTrue(model.explainer.startsWith("Each morning OpenStrap compares your night with what's normal for you"))
+        assertTrue(model.explainer.startsWith("Each morning OpenHealth compares your night with what's normal for you"))
         assertTrue(model.explainer.endsWith("The score is a weighted mix; one signal far from normal caps it."))
         assertEquals(
             "Charge is a running battery: sleep and calm rest fill it, movement, stress and simply being awake drain it.",
