@@ -331,10 +331,9 @@ final class OpenStrapUITests: XCTestCase {
     /// Card U7: the Sleep tab, every section in Compose's order, and a night the strap never recorded.
     /// Screenshots: `U7-sleep-1..n` from the top down, then `U7-sleepempty-1..n`.
     ///
-    /// The seeded month writes no strap sleep score and no naps (`SampleData.kt:73` inserts a bare
-    /// `SleepSession(start, end)`), so the hero here is the no-score state — the night the card
-    /// calls out — and the scored hero, "What shaped the score" and "Naps" cannot be reached from
-    /// `-demoData`. The screenshots say so rather than inventing rows.
+    /// The demo data writes a scored night (`DemoData.kt` seeds `score = 72 + …`), so the hero here
+    /// is the scored state and "What shaped the score" is reachable. It still writes no naps, so
+    /// "Naps" is the one section `-demoData` cannot photograph.
     func testSleep() {
         let app = XCUIApplication()
         app.launchArguments = ["-demoData"]
@@ -349,15 +348,15 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["sleep.title"].firstMatch.waitForExistence(timeout: 60),
             "The Sleep tab never drew the night's card"
         )
-        // No score on the seeded night: the arc carries the time asleep (GlowSleepScreen.kt:141-150).
+        // A scored night: the arc carries the score (GlowSleepScreen.kt:141-150).
         XCTAssertTrue(
-            app.staticTexts["sleep.noscore"].exists,
-            "The seeded night is not drawing the no-score label"
+            app.staticTexts["sleep.score"].exists,
+            "The seeded night is not drawing the scored label"
         )
 
         // Every section `GlowSleepScreen.kt:81-101` draws for this data, in its order. A section that
         // never rendered at all fails here rather than quietly missing from the screenshots.
-        let sections = ["Sleep", "Stages", "Sleep vitals", "Heart rate", "This week", "Last 7 nights"]
+        let sections = ["Sleep", "Stages", "What shaped the score", "Sleep vitals", "Heart rate", "This week", "Last 7 nights"]
         let missing = sections.filter { !app.staticTexts[$0].exists }
         XCTAssertTrue(missing.isEmpty, "Sleep never drew: \(missing)")
         walk(app, prefix: "U7-sleep", milestones: sections, screenfuls: 6)
@@ -380,14 +379,11 @@ final class OpenStrapUITests: XCTestCase {
     /// Card U8: the Activity tab, every panel in `GlowActivityScreen.kt:87-97`'s order.
     /// Screenshots: `U8-activity-1..n`.
     ///
-    /// The seeded month writes no PAI row, no profile and no workout (`SampleData.kt`), so this
-    /// card's panels draw their own missing-data states here: PAI's "after the strap's next sync",
-    /// the energy row that asks for the profile, the workouts panel's empty note, the withheld VO2
-    /// max and the effort/trend notes under the load. Each is asserted, so a panel that silently
-    /// vanished fails here rather than quietly leaving the screenshots.
-    ///
-    /// The workout detail and the all-workouts list cannot be reached from `-demoData` at all -
-    /// there is no workout row to open. The card's own note on demo data covers that.
+    /// The demo data writes PAI, workouts and their sport effects (`DemoData.kt`, Android's emulator
+    /// seed), so the PAI panel shows its total and the workouts panel lists today's run. It still
+    /// writes no profile, so the energy row that asks for the profile and the fitness estimate's
+    /// withheld note are the missing-data states shown here. `testWorkout` opens the run and the
+    /// all-workouts list.
     func testActivity() {
         let app = XCUIApplication()
         // `-glowStill` holds the cards' cores still: the steps card's stride never settles, and
@@ -430,9 +426,7 @@ final class OpenStrapUITests: XCTestCase {
         // The state each panel is in for this data: PAI's note, the profile row the energy panel
         // asks for, the workouts panel's empty note and the load panel's trend line.
         let notes = [
-            "PAI shows after the strap's next sync. It counts minutes your heart rate is raised, harder minutes counting more.",
             "Add age, weight and height to estimate the energy you use.",
-            "Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered.",
             "Fitness and fatigue are 42- and 7-day averages of your daily load; form is fitness minus fatigue.",
         ]
         let written = Set(
@@ -444,6 +438,12 @@ final class OpenStrapUITests: XCTestCase {
         for note in notes {
             XCTAssertTrue(written.contains(note), "a panel is not drawing its own note: \(note)")
         }
+
+        // The demo data has PAI and a workout, so those panels show data, not their empty notes.
+        XCTAssertTrue(
+            app.staticTexts["Outdoor run"].exists,
+            "The Workouts panel is not listing the seeded run"
+        )
 
         // The two sentences that carry a figure, matched by their opening words.
         let prefixOne = "Estimated fitness: "
@@ -460,6 +460,77 @@ final class OpenStrapUITests: XCTestCase {
         }
 
         walk(app, prefix: "U8-activity", milestones: [], screenfuls: 6)
+    }
+
+    /// Card U8: the workout detail and the all-workouts list, reached from the Activity tab's
+    /// Workouts panel. Screenshots: `U8-workout-1..n` (today's run, pushed) and `U8-workouts-1..n`
+    /// (the list). The demo data seeds one run today and ten on other evenings (`DemoData.kt`), so
+    /// both screens have a workout to draw.
+    ///
+    /// The recovery-heart-rate panel needs the three-minute tail the strap records after a workout,
+    /// which the seed's `WorkoutHeartRate` stream stops short of, so it is not asserted here — the
+    /// heart chart, zones and training effect are.
+    func testWorkout() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData", "-glowStill"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded month"
+        )
+        app.buttons["Activity"].tap()
+        XCTAssertTrue(
+            app.staticTexts["Steps"].waitForExistence(timeout: 60),
+            "The Activity tab never drew its steps card"
+        )
+        Thread.sleep(forTimeInterval: 5)
+
+        // Scroll the Workouts panel into view and open today's run, the first "Outdoor run" row.
+        let run = app.staticTexts["Outdoor run"].firstMatch
+        var swipes = 0
+        while !run.isHittable && swipes < 12 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(run.isHittable, "never scrolled the run into view")
+        run.tap()
+
+        // The pushed detail: the heart card, the summary, the zones and the strap's training effect.
+        XCTAssertTrue(
+            app.staticTexts["Training effect"].waitForExistence(timeout: 60),
+            "The workout detail never drew its training-effect panel"
+        )
+        let detail = ["Heart rate", "Active", "Paused", "Lowest HR", "Heart-rate zones", "Training effect"]
+        let drawn = Set(
+            app.staticTexts
+                .matching(NSPredicate(format: "label IN %@", detail))
+                .allElementsBoundByIndex
+                .map(\.label)
+        )
+        let missing = detail.filter { !drawn.contains($0) }
+        XCTAssertTrue(missing.isEmpty, "the workout detail never drew: \(missing)")
+        walk(app, prefix: "U8-workout", milestones: detail, screenfuls: 3)
+
+        // Back to the Activity tab, then the whole list.
+        app.buttons["Back"].tap()
+        XCTAssertTrue(
+            app.staticTexts["Steps"].waitForExistence(timeout: 60),
+            "Back never returned to the Activity tab"
+        )
+        let all = app.staticTexts["All workouts"].firstMatch
+        var listSwipes = 0
+        while !all.isHittable && listSwipes < 12 {
+            app.swipeUp()
+            listSwipes += 1
+        }
+        XCTAssertTrue(all.isHittable, "never scrolled the All workouts row into view")
+        all.tap()
+        XCTAssertTrue(
+            app.staticTexts["Workouts"].waitForExistence(timeout: 60),
+            "The all-workouts list never drew"
+        )
+        walk(app, prefix: "U8-workouts", milestones: ["Workouts", "Outdoor run"], screenfuls: 4)
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.
