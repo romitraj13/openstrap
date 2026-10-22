@@ -180,6 +180,12 @@ final class HealthModel: ObservableObject {
         }
     }
 
+    /// The Sleep tab's own reads (card U7): the day, and Readiness behind the sleep-health panels.
+    /// Today's own pass already fetches both; this only runs it when Sleep is the first tab drawn.
+    func reloadSleep() {
+        if dayState == nil { reloadToday() }
+    }
+
     /// Answers - or clears, with nil - the selected day's check-in (`CheckIn.save`, GlowCheckIn.kt).
     func saveCheckIn(_ feeling: Int?) {
         let date = self.date

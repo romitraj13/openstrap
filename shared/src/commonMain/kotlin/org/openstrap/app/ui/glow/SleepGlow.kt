@@ -85,10 +85,17 @@ data class SleepChartRow(
     val accent: SleepAccent,
     /** 110.dp for heart rate, 90.dp for breathing. */
     val height: Float,
+    /** "bpm", or "br/min" for the breathing line (:272, :280). */
+    val unit: String,
 )
 
 /** The heart-rate and breathing charts under the night (NightChartsPanel, GlowSleepScreen.kt:259-284). */
-data class NightChartsModel(val rows: List<SleepChartRow>, val labels: List<String>)
+data class NightChartsModel(
+    val rows: List<SleepChartRow>,
+    val labels: List<String>,
+    /** The night's first second, so a touch readout can name the time it is over. */
+    val start: Long,
+)
 
 /** One nap, with what its row shows and what opening it adds (:304-331). */
 data class SleepNap(
@@ -289,6 +296,7 @@ object SleepGlow {
                         values = evenly(hr, window, FIVE_MINUTES),
                         accent = SleepAccent.Heart,
                         height = 110f,
+                        unit = "bpm",
                     ),
                 )
             }
@@ -300,11 +308,12 @@ object SleepGlow {
                         values = evenly(breath, window, FIVE_MINUTES),
                         accent = SleepAccent.SleepLight,
                         height = 90f,
+                        unit = "br/min",
                     ),
                 )
             }
         }
-        return NightChartsModel(rows, labels)
+        return NightChartsModel(rows, labels, session.start)
     }
 
     // ---- NapsPanel (GlowSleepScreen.kt:298-335) --------------------------------------------------

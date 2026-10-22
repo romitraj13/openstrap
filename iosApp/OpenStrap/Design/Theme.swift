@@ -177,6 +177,17 @@ enum MetricColors {
         }
     }
 
+    /// `Narrative.Rating`'s colours (Narrative.kt:14-19): Optimal good, Good hrv, Fair warn,
+    /// Pay attention stress. Recovery's contributors and Sleep's both read them through this.
+    static func rating(_ label: String) -> Color {
+        switch label {
+        case "Optimal": return good
+        case "Good": return hrv
+        case "Fair": return warn
+        default: return stress
+        }
+    }
+
     /// A What changed tile's dot: the metric's own accent (`Signal` accents, GlowTodayScreen.kt:416).
     static func signal(_ accent: SignalAccent) -> Color {
         switch accent.name {

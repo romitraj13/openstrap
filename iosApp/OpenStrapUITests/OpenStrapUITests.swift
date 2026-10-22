@@ -45,7 +45,7 @@ final class OpenStrapUITests: XCTestCase {
         attach(app, "U4-recovery-1")
 
         app.buttons["Sleep"].tap()
-        XCTAssertTrue(app.staticTexts["sleepScore"].waitForExistence(timeout: 30), "Sleep never drew the night's score")
+        XCTAssertTrue(app.staticTexts["sleep.title"].waitForExistence(timeout: 60), "Sleep never drew the night's card")
         attach(app, "U4-sleep-1")
 
         app.buttons["Activity"].tap()
@@ -326,6 +326,55 @@ final class OpenStrapUITests: XCTestCase {
             "Twenty-six days back is not drawing the learning state's sentence"
         )
         walk(app, prefix: "U6-recoverylearning", milestones: ["Recovery", "Charge", "Body signals"], screenfuls: 3)
+    }
+
+    /// Card U7: the Sleep tab, every section in Compose's order, and a night the strap never recorded.
+    /// Screenshots: `U7-sleep-1..n` from the top down, then `U7-sleepempty-1..n`.
+    ///
+    /// The seeded month writes no strap sleep score and no naps (`SampleData.kt:73` inserts a bare
+    /// `SleepSession(start, end)`), so the hero here is the no-score state — the night the card
+    /// calls out — and the scored hero, "What shaped the score" and "Naps" cannot be reached from
+    /// `-demoData`. The screenshots say so rather than inventing rows.
+    func testSleep() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded month"
+        )
+        app.buttons["Sleep"].tap()
+        XCTAssertTrue(
+            app.staticTexts["sleep.title"].firstMatch.waitForExistence(timeout: 60),
+            "The Sleep tab never drew the night's card"
+        )
+        // No score on the seeded night: the arc carries the time asleep (GlowSleepScreen.kt:141-150).
+        XCTAssertTrue(
+            app.staticTexts["sleep.noscore"].exists,
+            "The seeded night is not drawing the no-score label"
+        )
+
+        // Every section `GlowSleepScreen.kt:81-101` draws for this data, in its order. A section that
+        // never rendered at all fails here rather than quietly missing from the screenshots.
+        let sections = ["Sleep", "Stages", "Sleep vitals", "Heart rate", "This week", "Last 7 nights"]
+        let missing = sections.filter { !app.staticTexts[$0].exists }
+        XCTAssertTrue(missing.isEmpty, "Sleep never drew: \(missing)")
+        walk(app, prefix: "U7-sleep", milestones: sections, screenfuls: 6)
+
+        // A night the strap never recorded: far enough back that the seeded month has run out
+        // (GlowSleepScreen.kt:128-135).
+        scrollToTop(app)
+        let previous = app.buttons["date.previous"]
+        XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
+        for _ in 0..<40 {
+            previous.tap()
+        }
+        XCTAssertTrue(
+            app.staticTexts["sleep.empty"].waitForExistence(timeout: 60),
+            "A day before the seeded month is not drawing the no-sleep sentence"
+        )
+        walk(app, prefix: "U7-sleepempty", milestones: [], screenfuls: 2)
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.

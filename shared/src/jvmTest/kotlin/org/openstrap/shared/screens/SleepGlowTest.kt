@@ -347,6 +347,9 @@ class SleepGlowTest {
         assertEquals(12.5f, model.rows[1].values[0])
         assertEquals(110f, model.rows[0].height)
         assertEquals(90f, model.rows[1].height)
+        assertEquals(listOf("bpm", "br/min"), model.rows.map { it.unit })
+        // The readout's clock runs from the night's first second (:272).
+        assertEquals(nightStart, model.start)
         assertEquals("51 bpm · 23:12", SleepGlow.readout(from = nightStart, index = 0, value = 51f, unit = "bpm", zone = utc))
     }
 

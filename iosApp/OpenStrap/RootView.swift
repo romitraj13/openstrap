@@ -88,7 +88,7 @@ struct RootView: View {
                     }
                 case .sleep:
                     DayTab(tab: .sleep, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        SleepView(health: health)
+                        SleepScreen(health: health)
                     }
                 case .activity:
                     DayTab(tab: .activity, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
