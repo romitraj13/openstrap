@@ -34,6 +34,10 @@ targets:
       path: OpenStrap/Info.plist
       properties:
         CFBundleDevelopmentRegion: $(DEVELOPMENT_LANGUAGE)
+        # Card R1: the name on the home screen. Only the visible name changes: the bundle
+        # identifier, PRODUCT_NAME, the target and scheme names and the Swift module stay as they
+        # are, so iOS still treats this as the same app with the same history and pairing.
+        CFBundleDisplayName: OpenHealth
         CFBundleExecutable: $(EXECUTABLE_NAME)
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleInfoDictionaryVersion: "6.0"
@@ -45,8 +49,8 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        NSBluetoothAlwaysUsageDescription: OpenStrap connects to your Amazfit Helio Strap over Bluetooth to read your heart rate and sync your history.
-        NSHealthUpdateUsageDescription: OpenStrap writes your heart rate, sleep and activity to Apple Health.
+        NSBluetoothAlwaysUsageDescription: OpenHealth connects to your Amazfit Helio Strap over Bluetooth to read your heart rate and sync your history.
+        NSHealthUpdateUsageDescription: OpenHealth writes your heart rate, sleep and activity to Apple Health.
         UIBackgroundModes:
           - bluetooth-central
         # Card U1: the three variable fonts the glow design system sets type in
@@ -59,9 +63,10 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: OpenStrap/OpenStrap.entitlements
-        # The asset catalogue only carries the Phosphor image sets (card U1); the app has no icon
-        # yet, so stop Xcode looking for an AppIcon set that does not exist.
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # Card R1: the dot-matrix "OH." icon from the design pack. The set lives in
+        # Assets.xcassets/AppIcon.appiconset with all 18 entries actool needs (iPhone, iPad and the
+        # App Store), every PNG opaque RGB. Its artwork is regenerable from iosApp/design/icon.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Kotlin's static framework needs the system libraries it links through platform libs:
         # zlib (platform.zlib) and Security (SecRandomCopyBytes). A static framework does not
         # carry those linker flags into the app.
