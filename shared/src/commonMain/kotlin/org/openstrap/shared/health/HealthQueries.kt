@@ -16,6 +16,7 @@ import org.openstrap.app.data.RecoveryEngine
 import org.openstrap.app.data.RecoveryResult
 import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.Summaries
+import org.openstrap.app.DemoData
 import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.data.db.SleepStage
 import org.openstrap.app.data.settings.SettingsRepository
@@ -276,18 +277,18 @@ class HealthQueries(private val databasePath: String) {
     // ---- Demo data ------------------------------------------------------------------------------
 
     /**
-     * Seeds [DEMO_DAYS] of sample wear, for the `-demoData` launch argument in debug builds. The
+     * Fills the database with [DemoData] for the `-demoData` launch argument in debug builds. The
      * app calls this before the first screen appears; [onDone] gets a line for Diagnostics.
      */
     fun seedDemoData(onDone: (String) -> Unit) {
         scope.launch {
             val message = try {
-                SampleData.load(healthDao, DEMO_DAYS)
-                "sample data: seeded $DEMO_DAYS days"
+                DemoData.fill(healthDao)
+                "demo data: seeded"
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                "sample data: could not seed ($e)"
+                "demo data: could not seed ($e)"
             }
             withContext(Dispatchers.Main) { onDone(message) }
         }
@@ -433,7 +434,7 @@ class HealthQueries(private val databasePath: String) {
     )
 
     companion object {
-        /** Days the `-demoData` argument seeds: a month, so Readiness is past its learning phase. */
+        /** Days the JVM query tests seed with [SampleData.load]; the `-demoData` path fills [DemoData] instead. */
         const val DEMO_DAYS = SampleData.DEMO_DAYS
 
         /** Minutes of heart rate a day needs before we estimate its resting HR ourselves (DayViewModel's). */

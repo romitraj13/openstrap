@@ -16,8 +16,9 @@ import org.openstrap.shared.clock.DemoDay
 import org.openstrap.shared.clock.ScreenClock
 
 /**
- * `SampleData.load`: the demo month the `-demoData` launch argument writes. Card U5 relaunches the
- * app once per screen state, so a second launch must not write the month a second time.
+ * `SampleData.load`: the sample month the JVM query tests seed. Card U8 moved `-demoData` to
+ * `DemoData.fill` (Android's emulator seed, which has a workout), so this file now pins only the
+ * tests' seed; a second launch must still not write the month a second time.
  *
  * Card F7: the tests read the fixed demo day, exactly as a `-demoData` run does, so they do not
  * depend on the hour or the zone of the machine running them.

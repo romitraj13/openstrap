@@ -23,8 +23,9 @@ import kotlin.random.Random
  * numbers, same random seed. What changed: `java.time` became kotlinx-datetime (`ZoneId.systemDefault`
  * → `TimeZone.currentSystemDefault`, `LocalDate.now` → `Clock.System.todayIn`), `System.currentTimeMillis()`
  * became `Clock.System`, and `load` takes the number of days to seed, defaulting to the week the
- * Android debug build writes. The iOS `-demoData` launch argument asks for [DEMO_DAYS] so the screens
- * have a month of history and the score's baselines are past their learning phase.
+ * Android debug build writes. Card U8 moved the `-demoData` launch argument to `DemoData` (Android's
+ * emulator seed, which has a workout); [DEMO_DAYS] remains only for the JVM tests that seed this file
+ * directly, so Readiness is past its learning phase on screen.
  *
  * Android has no test for this file, so there is no test to copy with it; the JVM tests in
  * `shared/src/jvmTest/.../HealthQueriesTest.kt` exercise it through a real database instead.

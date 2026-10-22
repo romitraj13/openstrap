@@ -1152,3 +1152,23 @@ Activity tab's interim panel (`InterimRecoveryPanel` in `RootView.swift`) is del
 screen exists. `HealthModel` gains `sportEffects`, `paiWeek` and `openWorkout`, read in the same
 pass as Today's own data.
 
+### `app/src/debug/kotlin/org/openstrap/app/DemoData.kt` -> `shared/.../app/DemoData.kt`
+
+The demo seed the workout screens needed. Android's emulator demo is not `SampleData.kt` (that copy
+writes no workout): it is `DemoData.kt`, called from `MainActivity.kt:104`, which seeds three weeks
+with a workout on alternate evenings (and this morning, so Today has one), its `WorkoutHeartRate`
+stream, a `SportEffectRow`, `RecoveryHeartRateRow`, `DailyMaxHr` and `PaiSample`, plus sleep SpO2,
+HRV SDNN, OSA, stress and skin temperature. `-demoData` now fills from it instead of `SampleData`,
+which stays only for the JVM tests that seed it directly (`HealthQueriesTest`, `SampleDataTest`, the
+screens' query tests).
+
+Copy is line-for-line with the same `Random(7)` seed, so iOS shows the workout Android's screenshots
+show. What changed, as in the `SampleData` copy: `java.time` -> `kotlinx-datetime` via the `Dates.kt`
+shims (`atStartOfDay`, `toEpochSecond`, `minusDays`), `ZoneId.systemDefault()` -> `ScreenClock.zone()`,
+`LocalDate.now()` -> `ScreenClock.today()`, `System.currentTimeMillis()` -> `ScreenClock.nowEpochSeconds()`
+(card F7's fixed demo day still holds), and `Math.PI` -> `kotlin.math.PI` for commonMain. The shared
+entities and `HealthDao` methods it calls are already present, so no DAO method needed porting.
+`DemoDayTest.kt` now fills `DemoData` and adds a test that the demo day has a workout with its stream
+and effect.
+
+

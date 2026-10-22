@@ -5,14 +5,15 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.openstrap.app.DemoData
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.HealthRepository
-import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.data.settings.SettingsRepository
 import org.openstrap.app.ui.dashboard.DayStateLoader
@@ -29,6 +30,10 @@ import kotlin.time.Instant
  * Before F7 the seed asked the wall clock for "today" and for "how far into today to write", so the
  * same commit seeded a different amount of wear on every CI run — and Today's leading score moved
  * with it (29, 50 and 72 in three runs of F6's code).
+ *
+ * Card U8: `-demoData` fills [DemoData] (Android's emulator seed, three weeks with a workout) instead
+ * of the old `SampleData` month, so the workout screens have a workout to draw. This test still pins
+ * the same fixed demo day, so the seed writes the same rows at any hour in any runner's zone.
  */
 class DemoDayTest {
     private val directory = File("build/tmp/demo-day-test")
@@ -61,16 +66,40 @@ class DemoDayTest {
     }
 
     @Test
-    fun `the demo month ends at the demo mid morning`() = runTest {
+    fun `the demo data ends at the demo mid morning`() = runTest {
         ScreenClock.pinDemo()
         val database = database()
-        SampleData.load(database.healthDao(), days = SampleData.DEMO_DAYS)
+        DemoData.fill(database.healthDao())
 
         val day = DayWindow.of(LocalDate(2026, 10, 21), TimeZone.UTC)
-        val minutes = database.healthDao().activity(day.from, day.to).first().size
+        val minutes = database.healthDao().activity(day.from, day.to).first()
 
-        // 00:00 to 09:30 inclusive is 571 minute records; 09:31 is past the fixed instant.
-        assertEquals(571, minutes, "the demo day should stop at 09:30 UTC whatever the runner's clock says")
+        // The seed writes the day up to the pinned 09:30 instant and not a minute past it, so the
+        // last awake minute is the one before the fixed mid-morning, whatever the runner's clock says.
+        assertTrue(minutes.isNotEmpty(), "the demo day has no activity")
+        assertTrue(minutes.all { it.timestamp < DemoDay.epochSeconds }, "a minute is at or past 09:30 UTC")
+        assertEquals(DemoDay.epochSeconds - 60, minutes.maxOf { it.timestamp }, "the demo day should stop at 09:29 UTC")
+    }
+
+    @Test
+    fun `the demo day has a workout with its heart-rate stream and sport effect`() = runTest {
+        ScreenClock.pinDemo()
+        val database = database()
+        DemoData.fill(database.healthDao())
+
+        val day = DayWindow.of(DemoDay.TODAY, TimeZone.UTC)
+        val workouts = database.healthDao().workoutsOnce(day.from, day.to)
+        assertTrue(workouts.isNotEmpty(), "the demo day has no workout to open")
+        val run = workouts.first()
+        assertEquals(1, run.sportType, "the demo workout is an outdoor run")
+        assertTrue(
+            database.healthDao().workoutHeartRate(run.start).first().isNotEmpty(),
+            "the workout has no heart-rate stream for its chart",
+        )
+        assertTrue(
+            database.healthDao().sportEffects().first().isNotEmpty(),
+            "the workout has no sport effect for its training-effect panel",
+        )
     }
 
     // ---- The card's step 2 ----------------------------------------------------------------------
@@ -95,7 +124,7 @@ class DemoDayTest {
         ScreenClock.phone = wall
         ScreenClock.pinDemo()
         val database = database()
-        SampleData.load(database.healthDao(), days = SampleData.DEMO_DAYS)
+        DemoData.fill(database.healthDao())
         val loader = DayStateLoader(HealthRepository(database.healthDao()), SettingsRepository(database.settingsDao()))
         return loader.load(DemoDay.TODAY, todaySteps = null, zone = ScreenClock.zone())
     }
