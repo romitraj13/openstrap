@@ -16,6 +16,22 @@ enum DemoData {
         return false
         #endif
     }
+
+    /// Debug only: `-glowStill` holds every glow core still for the whole life of the view.
+    ///
+    /// The UI tests must query a screen whose card animates for ever, and XCUITest waits for a
+    /// quiescent app before every query: card F5 lost runs 39587579214 and 39594198894 to a 30 s
+    /// query timeout on the design lab, and card U8's `testActivity` timed out the same way in run
+    /// 39737184826 on a tree that had just passed. F5 answered it for the lab with `-designLabStill`;
+    /// this is the same switch for the tab screens, and it also makes a run's screenshots the same
+    /// picture every time.
+    static var glowStill: Bool {
+        #if DEBUG
+        return CommandLine.arguments.contains("-glowStill")
+        #else
+        return false
+        #endif
+    }
 }
 
 /// The four screens' data, read from the shared Kotlin `HealthQueries`. One object for the app, made

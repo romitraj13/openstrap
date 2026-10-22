@@ -390,7 +390,10 @@ final class OpenStrapUITests: XCTestCase {
     /// there is no workout row to open. The card's own note on demo data covers that.
     func testActivity() {
         let app = XCUIApplication()
-        app.launchArguments = ["-demoData"]
+        // `-glowStill` holds the cards' cores still: the steps card's stride never settles, and
+        // XCUITest waits for a quiescent app before every query (card F5's `-designLabStill`, and
+        // run 39737184826's 30 s query timeout on this test).
+        app.launchArguments = ["-demoData", "-glowStill"]
         app.launch()
 
         XCTAssertTrue(
@@ -398,41 +401,65 @@ final class OpenStrapUITests: XCTestCase {
             "Today never drew its What changed panel from the seeded month"
         )
         app.buttons["Activity"].tap()
+
+        // The steps card glows on the day's stride and never settles, and XCUITest waits for a
+        // quiescent app before every query: card F5 lost runs 39587579214 and 39594198894 to a 30 s
+        // query timeout on a screen that animated for ever, and this test timed out the same way in
+        // run 39737184826 after passing in 39732609901 on an identical tree. A glow card renders its
+        // blurred layers on first appearance, one at a time and behind a lock, so the first query
+        // after the tab switch is the one that waits. Pause for that render, then ask one query per
+        // group of strings instead of one per string.
+        Thread.sleep(forTimeInterval: 5)
+
         XCTAssertTrue(
             app.staticTexts["Steps"].waitForExistence(timeout: 60),
             "The Activity tab never drew its steps card"
         )
 
-        // Every section `GlowActivityScreen.kt:87-97` draws, in its order.
+        // Every section `GlowActivityScreen.kt:87-97` draws, in its order, in a single query.
         let sections = ["Steps", "Active minutes", "Energy", "PAI", "Training load", "Fitness", "Workouts"]
-        let missing = sections.filter { !app.staticTexts[$0].exists }
+        let drawn = Set(
+            app.staticTexts
+                .matching(NSPredicate(format: "label IN %@", sections))
+                .allElementsBoundByIndex
+                .map(\.label)
+        )
+        let missing = sections.filter { !drawn.contains($0) }
         XCTAssertTrue(missing.isEmpty, "Activity never drew: \(missing)")
 
-        // The state each panel is in for this data.
+        // The state each panel is in for this data: PAI's note, the profile row the energy panel
+        // asks for, the workouts panel's empty note and the load panel's trend line.
         let notes = [
-            (
-                "PAI",
-                "PAI shows after the strap's next sync. It counts minutes your heart rate is raised, harder minutes counting more."
-            ),
-            ("Energy", "Add age, weight and height to estimate the energy you use."),
-            (
-                "Workouts",
-                "Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered."
-            ),
-            ("Training load", "Fitness and fatigue are 42- and 7-day averages of your daily load; form is fitness minus fatigue."),
+            "PAI shows after the strap's next sync. It counts minutes your heart rate is raised, harder minutes counting more.",
+            "Add age, weight and height to estimate the energy you use.",
+            "Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered.",
+            "Fitness and fatigue are 42- and 7-day averages of your daily load; form is fitness minus fatigue.",
         ]
-        for (panel, text) in notes {
-            XCTAssertTrue(app.staticTexts[text].exists, "\(panel) is not drawing its own note")
-        }
-        for (panel, prefix) in [
-            ("Fitness", "Estimated fitness: "),
-            ("Training load", "Each minute counts by how hard your heart works between resting "),
-        ] {
-            let match = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
-            XCTAssertTrue(match.exists, "\(panel) is not drawing its \(prefix) sentence")
+        let written = Set(
+            app.staticTexts
+                .matching(NSPredicate(format: "label IN %@", notes))
+                .allElementsBoundByIndex
+                .map(\.label)
+        )
+        for note in notes {
+            XCTAssertTrue(written.contains(note), "a panel is not drawing its own note: \(note)")
         }
 
-        walk(app, prefix: "U8-activity", milestones: sections, screenfuls: 6)
+        // The two sentences that carry a figure, matched by their opening words.
+        let prefixOne = "Estimated fitness: "
+        let prefixTwo = "Each minute counts by how hard your heart works between resting "
+        let sentences = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@", prefixOne, prefixTwo))
+            .allElementsBoundByIndex
+            .map(\.label)
+        for prefix in [prefixOne, prefixTwo] {
+            XCTAssertTrue(
+                sentences.contains { $0.hasPrefix(prefix) },
+                "no sentence starts with \(prefix), so that panel's own line is missing"
+            )
+        }
+
+        walk(app, prefix: "U8-activity", milestones: [], screenfuls: 6)
     }
 
     /// A medium sheet has no close button: drag it down, as a finger would.

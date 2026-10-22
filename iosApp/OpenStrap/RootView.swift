@@ -110,6 +110,9 @@ struct RootView: View {
             .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .background(ThemeColors.background.ignoresSafeArea())
+        // Card U8: `-glowStill` holds every glow core still, so a UI test's first query does not
+        // wait for a card that never settles (card F5's `-designLabStill`, for the tab screens).
+        .environment(\.glowPaused, DemoData.glowStill)
         .onAppear {
             health.prepareDemoData()
             health.reload()
