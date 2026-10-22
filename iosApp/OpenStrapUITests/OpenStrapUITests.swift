@@ -25,9 +25,15 @@ final class OpenStrapUITests: XCTestCase {
         app.launchArguments = ["-demoData"]
         app.launch()
 
-        // The wordmark, with the red full stop still after it.
+        // The wordmark, with the red full stop still after it. Waiting for Today's first panel as
+        // well, so the shot is the header over a drawn screen rather than over an empty one: the
+        // wordmark draws at once, the seeded day a moment later.
         let wordmark = app.staticTexts["app.wordmark"]
         XCTAssertTrue(wordmark.waitForExistence(timeout: 120), "Today never drew its header")
+        XCTAssertTrue(
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded sample data"
+        )
         XCTAssertEqual(wordmark.label, "OpenHealth.", "the wordmark is not the new name plus its red full stop")
         attach(app, "R1-today-header")
 
