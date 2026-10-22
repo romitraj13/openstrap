@@ -8,8 +8,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -28,6 +26,8 @@ import org.openstrap.app.data.db.SyncLog
 import org.openstrap.app.data.settings.UserProfile
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.minusDays
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 import kotlin.time.Clock
 
 /**
@@ -36,8 +36,8 @@ import kotlin.time.Clock
  * the screens show is checked against the score functions themselves, so the two cannot drift.
  */
 class HealthQueriesTest {
-    private val zone = TimeZone.currentSystemDefault()
-    private val today: LocalDate = Clock.System.todayIn(zone)
+    private val zone = DemoDay.ZONE
+    private val today: LocalDate = DemoDay.TODAY
     private val iso = today.toString()
 
     private val directory = File("build/tmp/health-queries-test")
@@ -49,6 +49,8 @@ class HealthQueriesTest {
     fun installMain() {
         directory.mkdirs()
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Card F7: the demo day is fixed, so a run at 03:00 and a run at 13:00 read the same rows.
+        ScreenClock.pinDemo()
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -56,6 +58,7 @@ class HealthQueriesTest {
     fun removeMain() {
         queries?.close()
         Dispatchers.resetMain()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()

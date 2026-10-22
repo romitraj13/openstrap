@@ -16,7 +16,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.db.OpenStrapIosDatabase
@@ -25,15 +24,16 @@ import org.openstrap.app.data.settings.Goals
 import org.openstrap.app.data.settings.UserProfile
 import org.openstrap.app.ui.dashboard.Metric
 import org.openstrap.app.ui.dashboard.Range
-import kotlin.time.Clock
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 
 /**
  * `ScreenQueries` is the one class Swift calls for the screens, so the tests ask it exactly the way
  * the app does: an ISO date in, a plain answer on a callback, no `suspend` and no `Flow` in sight.
  */
 class ScreenQueriesTest {
-    private val zone = TimeZone.currentSystemDefault()
-    private val today = Clock.System.todayIn(zone)
+    private val zone = DemoDay.ZONE
+    private val today = DemoDay.TODAY
     private val iso = today.toString()
     private val directory = File("build/tmp/screen-queries-test")
     private val files = mutableListOf<File>()
@@ -43,12 +43,15 @@ class ScreenQueriesTest {
     fun installMain() {
         directory.mkdirs()
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Card F7: read the fixed demo day, as a `-demoData` run does, whatever hour this runs at.
+        ScreenClock.pinDemo()
     }
 
     @AfterTest
     fun removeMain() {
         queries?.close()
         Dispatchers.resetMain()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()

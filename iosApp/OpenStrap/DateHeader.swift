@@ -144,7 +144,8 @@ struct DateHeader: View {
     private let calendar = Calendar.current
     private let wordmarkDot = Color(hex: 0xFFFF4D5E)
 
-    private var today: Date { calendar.startOfDay(for: Date()) }
+    /// The phone's today, or the fixed demo day while `-demoData` is pinned (card F7).
+    private var today: Date { HealthModel.today }
     private var isToday: Bool { calendar.isDate(date, inSameDayAs: today) }
 
     var body: some View {

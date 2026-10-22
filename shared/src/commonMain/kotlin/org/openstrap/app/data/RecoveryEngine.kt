@@ -2,11 +2,10 @@ package org.openstrap.app.data
 
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.db.HealthDao
 import org.openstrap.app.data.db.SleepSession
 import org.openstrap.app.data.settings.UserProfile
-import kotlin.time.Clock
+import org.openstrap.shared.clock.ScreenClock
 import kotlin.time.Instant
 
 /** Everything the Charge screens show for one day. */
@@ -55,7 +54,7 @@ data class RecoveryResult(
 /** Loads what [Recovery] needs from the database and runs it. All work happens off the main thread by the caller. */
 class RecoveryEngine(private val dao: HealthDao) {
 
-    suspend fun compute(date: LocalDate, profile: UserProfile, zone: TimeZone = TimeZone.currentSystemDefault(), now: Long = Clock.System.now().epochSeconds): RecoveryResult {
+    suspend fun compute(date: LocalDate, profile: UserProfile, zone: TimeZone = ScreenClock.zone(), now: Long = ScreenClock.nowEpochSeconds()): RecoveryResult {
         val day = DayWindow.of(date, zone)
         val from = DayWindow.of(date.minusDays(Recovery.BASELINE_NIGHTS.toLong() + 1), zone).from
         val to = day.to
@@ -244,7 +243,7 @@ class RecoveryEngine(private val dao: HealthDao) {
      * Max HR as of [date] by the same rule [compute] uses, for screens that don't run the whole model (workout zones):
      * the tested value, else Tanaka or the strap's PAI value, raised by observed peaks over [LOAD_DAYS].
      */
-    suspend fun maxHeartRate(profile: UserProfile, date: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()), zone: TimeZone = TimeZone.currentSystemDefault()): Float {
+    suspend fun maxHeartRate(profile: UserProfile, date: LocalDate = ScreenClock.today(), zone: TimeZone = ScreenClock.zone()): Float {
         val to = DayWindow.of(date, zone).to
         val loadFrom = DayWindow.of(date.minusDays(LOAD_DAYS.toLong()), zone).from
         // Same PAI window as compute: the latest record within the nightly baseline span.

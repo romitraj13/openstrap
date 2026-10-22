@@ -45,7 +45,8 @@ struct DayCalendarSheet: View {
         _month = State(initialValue: start)
     }
 
-    private var today: Date { calendar.startOfDay(for: Date()) }
+    /// The phone's today, or the fixed demo day while `-demoData` is pinned (card F7).
+    private var today: Date { HealthModel.today }
     private var firstMonth: Date {
         let earliest = available.min().map { min($0, today) } ?? today
         return calendar.dateInterval(of: .month, for: earliest)?.start ?? today

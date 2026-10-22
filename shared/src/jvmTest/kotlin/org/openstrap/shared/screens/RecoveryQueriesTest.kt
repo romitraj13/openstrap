@@ -15,14 +15,14 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.Recovery
 import org.openstrap.app.data.RecoveryResult
 import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.ui.dashboard.DayUiState
 import org.openstrap.app.ui.glow.RecoveryGlow
-import kotlin.time.Clock
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 
 /**
  * The learning state, over the seeded month: the days at the start of it have fewer than the seven
@@ -31,8 +31,8 @@ import kotlin.time.Clock
  * day exists in the month the demo launch writes.
  */
 class RecoveryQueriesTest {
-    private val zone = TimeZone.currentSystemDefault()
-    private val today: LocalDate = Clock.System.todayIn(zone)
+    private val zone = DemoDay.ZONE
+    private val today: LocalDate = DemoDay.TODAY
     private val directory = File("build/tmp/recovery-queries-test")
     private val files = mutableListOf<File>()
     private var queries: ScreenQueries? = null
@@ -41,12 +41,15 @@ class RecoveryQueriesTest {
     fun installMain() {
         directory.mkdirs()
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Card F7: the fixed demo day, so "26 days back" is 26 days back from the same day every run.
+        ScreenClock.pinDemo()
     }
 
     @AfterTest
     fun removeMain() {
         queries?.close()
         Dispatchers.resetMain()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()

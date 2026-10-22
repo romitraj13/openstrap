@@ -10,12 +10,10 @@ import org.openstrap.app.data.db.SleepStage
 import org.openstrap.app.data.db.Spo2Sample
 import org.openstrap.app.data.db.StressSample
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
+import org.openstrap.shared.clock.ScreenClock
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
-import kotlin.time.Clock
 
 /**
  * Fills the database with a plausible stretch of wear so the screens can be previewed without a
@@ -30,6 +28,11 @@ import kotlin.time.Clock
  *
  * Android has no test for this file, so there is no test to copy with it; the JVM tests in
  * `shared/src/jvmTest/.../HealthQueriesTest.kt` exercise it through a real database instead.
+ *
+ * What card F7 changed: the day it writes is no longer `Clock.System`'s. It is [ScreenClock]'s, which
+ * is the phone's clock unless a `-demoData` launch has pinned the fixed [org.openstrap.shared.clock.DemoDay]
+ * — otherwise the CI runner's hour decided how much of the last day existed, and every screenshot
+ * of "today" showed a different amount of wear.
  */
 object SampleData {
     const val AVAILABLE = true
@@ -41,10 +44,10 @@ object SampleData {
     const val DEMO_DAYS = 30
 
     suspend fun load(dao: HealthDao, days: Int = DAYS) {
-        val zone = TimeZone.currentSystemDefault()
+        val zone = ScreenClock.zone()
         val rnd = Random(42)
-        val today: LocalDate = Clock.System.todayIn(zone)
-        val nowEpoch = Clock.System.now().epochSeconds
+        val today: LocalDate = ScreenClock.today()
+        val nowEpoch = ScreenClock.nowEpochSeconds()
         for (d in (days - 1) downTo 0) {
             val date = today.minusDays(d.toLong())
             val dayStart = date.atStartOfDay(zone).toEpochSecond()

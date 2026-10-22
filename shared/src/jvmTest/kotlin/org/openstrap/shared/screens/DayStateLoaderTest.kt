@@ -11,8 +11,6 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.HealthRepository
 import org.openstrap.app.data.SampleData
@@ -26,15 +24,16 @@ import org.openstrap.app.ui.dashboard.Metric
 import org.openstrap.app.ui.dashboard.Range
 import org.openstrap.app.ui.dashboard.SLEEP_NIGHTS
 import org.openstrap.protocol.services.StepTotals
-import kotlin.time.Clock
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 
 /**
  * `DayStateLoader` over a real database seeded with the copied debug sample month: the day the
  * Android `DayViewModel` builds from its flow combines, read one shot at a time.
  */
 class DayStateLoaderTest {
-    private val zone = TimeZone.currentSystemDefault()
-    private val today: LocalDate = Clock.System.todayIn(zone)
+    private val zone = DemoDay.ZONE
+    private val today: LocalDate = DemoDay.TODAY
     private val directory = File("build/tmp/day-state-loader-test")
     private val files = mutableListOf<File>()
     private var database: OpenStrapIosDatabase? = null
@@ -42,11 +41,13 @@ class DayStateLoaderTest {
     @BeforeTest
     fun makeDirectory() {
         directory.mkdirs()
+        ScreenClock.pinDemo()
     }
 
     @AfterTest
     fun close() {
         database?.close()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()

@@ -11,7 +11,6 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.RecoveryEngine
 import org.openstrap.app.data.SampleData
@@ -23,8 +22,9 @@ import org.openstrap.app.data.db.Workout
 import org.openstrap.app.data.db.WorkoutHeartRate
 import org.openstrap.app.data.settings.SettingsRepository
 import org.openstrap.app.ui.workout.WorkoutsLoader
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 import kotlin.math.roundToInt
-import kotlin.time.Clock
 
 /**
  * `WorkoutsLoader`, the `WorkoutsViewModel` logic read one shot: the list newest first, each workout
@@ -32,7 +32,7 @@ import kotlin.time.Clock
  * and detail screen call.
  */
 class WorkoutsLoaderTest {
-    private val zone = TimeZone.currentSystemDefault()
+    private val zone = DemoDay.ZONE
     private val directory = File("build/tmp/workouts-loader-test")
     private val files = mutableListOf<File>()
     private var database: OpenStrapIosDatabase? = null
@@ -40,11 +40,13 @@ class WorkoutsLoaderTest {
     @BeforeTest
     fun makeDirectory() {
         directory.mkdirs()
+        ScreenClock.pinDemo()
     }
 
     @AfterTest
     fun close() {
         database?.close()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()
@@ -60,7 +62,7 @@ class WorkoutsLoaderTest {
         val dao = db.healthDao()
         SampleData.load(dao, SampleData.DEMO_DAYS)
 
-        val today = Clock.System.todayIn(zone)
+        val today = DemoDay.TODAY
         val day = DayWindow.of(today, zone)
         val older = day.from + 9 * 3600
         val newer = day.from + 18 * 3600

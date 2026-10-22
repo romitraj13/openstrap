@@ -20,7 +20,6 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.atStartOfDay
 import org.openstrap.app.data.atZone
@@ -29,7 +28,8 @@ import org.openstrap.app.data.db.StrapReadinessRow
 import org.openstrap.app.ui.dashboard.Metric
 import org.openstrap.app.ui.glow.OverviewTone
 import org.openstrap.app.ui.glow.TodayGlow
-import kotlin.time.Clock
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 
 /**
  * The two reads card U5 added to `ScreenQueries`: the strap's own Readiness for the day (Today's
@@ -37,8 +37,8 @@ import kotlin.time.Clock
  * database, as the iOS screens read them.
  */
 class TodayQueriesTest {
-    private val zone = TimeZone.currentSystemDefault()
-    private val today = Clock.System.todayIn(zone)
+    private val zone = DemoDay.ZONE
+    private val today = DemoDay.TODAY
     private val todayIso = today.toString()
     private val directory = File("build/tmp/today-queries-test")
     private val files = mutableListOf<File>()
@@ -48,12 +48,15 @@ class TodayQueriesTest {
     fun installMain() {
         directory.mkdirs()
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        // Card F7: the fixed demo day, so the recap and the strap's row do not move with the hour.
+        ScreenClock.pinDemo()
     }
 
     @AfterTest
     fun removeMain() {
         queries?.close()
         Dispatchers.resetMain()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()

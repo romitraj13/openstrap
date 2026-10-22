@@ -8,7 +8,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.Narrative
 import org.openstrap.app.data.Recovery
@@ -20,6 +19,7 @@ import org.openstrap.app.data.Summaries
 import org.openstrap.app.data.db.OpenStrapIosDatabase
 import org.openstrap.app.data.db.SleepStage
 import org.openstrap.app.data.settings.SettingsRepository
+import org.openstrap.shared.clock.ScreenClock
 import kotlin.math.abs
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -167,9 +167,9 @@ class HealthQueries(private val databasePath: String) {
 
     /** Today: Recovery's score and state, the night's sleep, resting HR, SpO2, steps and last sync. */
     fun today(date: String, onResult: (TodaySnapshot) -> Unit) = query(date, onResult, ::emptyToday) { day ->
-        val zone = TimeZone.currentSystemDefault()
+        val zone = ScreenClock.zone()
         val window = DayWindow.of(day, zone)
-        val result = RecoveryEngine(healthDao).compute(day, settings.profile(), zone)
+        val result = RecoveryEngine(healthDao).compute(day, settings.profile(), zone, ScreenClock.nowEpochSeconds())
         val night = result.tonight
         val stages = night?.let { healthDao.sleepStagesOnce(it.start) }.orEmpty()
         val totals = totals(stages)
@@ -196,8 +196,8 @@ class HealthQueries(private val databasePath: String) {
 
     /** The main sleep that ended on [date]: start, end, and its stages in order. */
     fun sleep(date: String, onResult: (SleepSnapshot) -> Unit) = query(date, onResult, ::emptySleep) { day ->
-        val zone = TimeZone.currentSystemDefault()
-        val result = RecoveryEngine(healthDao).compute(day, settings.profile(), zone)
+        val zone = ScreenClock.zone()
+        val result = RecoveryEngine(healthDao).compute(day, settings.profile(), zone, ScreenClock.nowEpochSeconds())
         val night = result.tonight
         if (night == null) {
             emptySleep(date)
@@ -224,7 +224,7 @@ class HealthQueries(private val databasePath: String) {
 
     /** The day's heart rate as five-minute averages, and the resting HR it is compared with. */
     fun heart(date: String, onResult: (HeartSnapshot) -> Unit) = query(date, onResult, ::emptyHeart) { day ->
-        val window = DayWindow.of(day, TimeZone.currentSystemDefault())
+        val window = DayWindow.of(day, ScreenClock.zone())
         val series = Summaries.bucketAverage(daySeries(window))
         val stored = healthDao.restingHrOnce(window.from, window.to).lastOrNull()?.bpm
         val estimated = if (stored != null) null else if (series.size >= MIN_MINUTES_FOR_ESTIMATE) Summaries.estimateRestingHr(series) else null
@@ -239,8 +239,8 @@ class HealthQueries(private val databasePath: String) {
 
     /** The Android Recovery screen: score, sentence, what drove it, the week, Charge, explanation. */
     fun recovery(date: String, onResult: (RecoverySnapshot) -> Unit) = query(date, onResult, ::emptyRecovery) { day ->
-        val zone = TimeZone.currentSystemDefault()
-        val result = RecoveryEngine(healthDao).compute(day, settings.profile(), zone)
+        val zone = ScreenClock.zone()
+        val result = RecoveryEngine(healthDao).compute(day, settings.profile(), zone, ScreenClock.nowEpochSeconds())
         val readiness = result.readiness
         val score = readiness.score
         RecoverySnapshot(

@@ -8,20 +8,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.SampleData
 import org.openstrap.app.data.db.HealthDao
 import org.openstrap.app.data.db.OpenStrapIosDatabase
-import kotlin.time.Clock
+import org.openstrap.shared.clock.DemoDay
+import org.openstrap.shared.clock.ScreenClock
 
 /**
  * `SampleData.load`: the demo month the `-demoData` launch argument writes. Card U5 relaunches the
  * app once per screen state, so a second launch must not write the month a second time.
+ *
+ * Card F7: the tests read the fixed demo day, exactly as a `-demoData` run does, so they do not
+ * depend on the hour or the zone of the machine running them.
  */
 class SampleDataTest {
-    private val zone = TimeZone.currentSystemDefault()
+    private val zone = DemoDay.ZONE
     private val directory = File("build/tmp/sample-data-test")
     private val files = mutableListOf<File>()
     private var database: OpenStrapIosDatabase? = null
@@ -29,11 +31,13 @@ class SampleDataTest {
     @BeforeTest
     fun makeDirectory() {
         directory.mkdirs()
+        ScreenClock.pinDemo()
     }
 
     @AfterTest
     fun close() {
         database?.close()
+        ScreenClock.unpin()
         for (file in files) {
             file.delete()
             File(file.path + "-wal").delete()
@@ -49,7 +53,7 @@ class SampleDataTest {
     }
 
     private suspend fun todayMinutes(dao: HealthDao): Int {
-        val today = Clock.System.todayIn(zone)
+        val today = DemoDay.TODAY
         val day = DayWindow.of(today, zone)
         return dao.activity(day.from, day.to).first().size
     }

@@ -4,6 +4,10 @@ import SwiftUI
 
 /// Debug only: `-demoData` on the command line seeds the database so the screens can be seen without
 /// a strap. A release build ignores the argument however it is launched.
+///
+/// Card F7: demo mode also pins the shared clock to one fixed day (`DemoDay`), so a CI run at 03:00
+/// and one at 13:00 seed the same month and draw the same verdicts. Release builds and real data
+/// never pin it.
 enum DemoData {
     static var isEnabled: Bool {
         #if DEBUG
@@ -78,7 +82,10 @@ final class HealthModel: ObservableObject {
     private static let tilesKey = "today.tiles"
 
     init(databasePath: String) {
-        date = HealthModel.isoToday()
+        // Card F7: a demo launch pins the one clock the shared code reads, before the first query and
+        // before the seed, so nothing on any screen follows the runner's wall clock.
+        if DemoData.isEnabled { ScreenClock.shared.pinDemo() }
+        date = HealthModel.todayIso
         path = databasePath
         queries = HealthQueries(databasePath: databasePath)
     }
@@ -274,13 +281,16 @@ final class HealthModel: ObservableObject {
         return formatter.date(from: value)
     }
 
-    private static func isoToday() -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+    /// The day the app opens on, at the start of that local day: the phone's today, or the fixed
+    /// demo day when `-demoData` has pinned it (card F7). The header, the calendar's ring and the
+    /// selected day all read this, so they agree with the data the shared code returns.
+    static var today: Date {
+        if DemoData.isEnabled, let day = day(fromIso: DemoDay.shared.isoDate) { return day }
+        return Calendar.current.startOfDay(for: Date())
     }
+
+    /// [today] as the `yyyy-MM-dd` the shared screens take.
+    static var todayIso: String { iso(today) }
 }
 
 // MARK: - Formatting shared by the screens

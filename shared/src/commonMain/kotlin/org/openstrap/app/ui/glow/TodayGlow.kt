@@ -28,6 +28,7 @@ import org.openstrap.app.ui.components.ChartPoint
 import org.openstrap.app.ui.components.StageSpan
 import org.openstrap.app.ui.dashboard.DayUiState
 import org.openstrap.app.ui.dashboard.Metric
+import org.openstrap.shared.clock.ScreenClock
 
 /*
  * What Compose's Today computes, in one place Swift can call.
@@ -401,7 +402,7 @@ object TodayGlow {
 
     /** The touch readout on a heart-rate point: "62 bpm · 07:35". */
     fun heartReadout(dayStart: Long, index: Int, value: Float): String =
-        heartReadout(dayStart, index, value, TimeZone.currentSystemDefault())
+        heartReadout(dayStart, index, value, ScreenClock.zone())
 
     /** [heartReadout] in [zone], for the tests. */
     fun heartReadout(dayStart: Long, index: Int, value: Float, zone: TimeZone): String =
@@ -421,7 +422,7 @@ object TodayGlow {
         score?.let { listOf("Score $it", Narrative.sleepHeadline(it)) } ?: emptyList()
 
     /** "2 naps · 1h 0m · 13:00, 16:10", or empty without naps. */
-    fun napsLine(naps: List<SleepSession>): String = napsLine(naps, TimeZone.currentSystemDefault())
+    fun napsLine(naps: List<SleepSession>): String = napsLine(naps, ScreenClock.zone())
 
     /** [napsLine] in [zone], for the tests. */
     fun napsLine(naps: List<SleepSession>, zone: TimeZone): String {
@@ -432,7 +433,7 @@ object TodayGlow {
     }
 
     /** The sleep card's header note: "23:00 – 07:00" (GlowTodayScreen.kt:492). */
-    fun sleepRange(session: SleepSession): String = sleepRange(session, TimeZone.currentSystemDefault())
+    fun sleepRange(session: SleepSession): String = sleepRange(session, ScreenClock.zone())
 
     /** [sleepRange] in [zone], for the tests. */
     fun sleepRange(session: SleepSession, zone: TimeZone): String =
@@ -443,7 +444,7 @@ object TodayGlow {
      * (with the day when [showDate]), how long it ran, its average rate and its calories.
      */
     fun workoutDetail(analysis: WorkoutAnalysis, showDate: Boolean): String =
-        workoutDetail(analysis, showDate, TimeZone.currentSystemDefault())
+        workoutDetail(analysis, showDate, ScreenClock.zone())
 
     /** [workoutDetail] in [zone], for the tests. */
     fun workoutDetail(analysis: WorkoutAnalysis, showDate: Boolean, zone: TimeZone): String {
@@ -469,7 +470,7 @@ object TodayGlow {
      * block's touch readout: "REM · 01:20–01:34 · 14 min".
      */
     fun sleepStageChart(spans: List<StageSpan>): SleepStageChart =
-        sleepStageChart(spans, TimeZone.currentSystemDefault())
+        sleepStageChart(spans, ScreenClock.zone())
 
     /** [sleepStageChart] in [zone], for the tests. */
     fun sleepStageChart(spans: List<StageSpan>, zone: TimeZone): SleepStageChart {
@@ -500,7 +501,7 @@ object TodayGlow {
 
     /** The strap's alerts this day, newest first, in the same words as its notification. */
     fun alertLines(alerts: List<HealthAlertRow>): List<AlertLine> =
-        alertLines(alerts, TimeZone.currentSystemDefault())
+        alertLines(alerts, ScreenClock.zone())
 
     /** [alertLines] in [zone], for the tests. */
     fun alertLines(alerts: List<HealthAlertRow>, zone: TimeZone): List<AlertLine> =
@@ -533,7 +534,7 @@ object TodayGlow {
         recovery: RecoveryResult?,
         workouts: List<WorkoutAnalysis>,
         steps: List<DayStat>,
-    ): WeeklyRecap = weeklyRecap(state, recovery, workouts, steps, TimeZone.currentSystemDefault())
+    ): WeeklyRecap = weeklyRecap(state, recovery, workouts, steps, ScreenClock.zone())
 
     /** [weeklyRecap] in [zone], for the tests. */
     fun weeklyRecap(
@@ -625,7 +626,7 @@ object TodayGlow {
     private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
     /** "HH:mm" of [epochSeconds] in the phone's zone. */
-    fun clock(epochSeconds: Long): String = clock(epochSeconds, TimeZone.currentSystemDefault())
+    fun clock(epochSeconds: Long): String = clock(epochSeconds, ScreenClock.zone())
 
     /** "HH:mm" of [epochSeconds] in [zone]. */
     fun clock(epochSeconds: Long, zone: TimeZone): String {

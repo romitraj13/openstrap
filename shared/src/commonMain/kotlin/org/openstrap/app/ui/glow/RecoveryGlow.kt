@@ -22,6 +22,7 @@ import org.openstrap.app.data.minusDays
 import org.openstrap.app.ui.components.ChartPoint
 import org.openstrap.app.ui.dashboard.DayUiState
 import org.openstrap.app.ui.dashboard.Metric
+import org.openstrap.shared.clock.ScreenClock
 
 /*
  * What Compose's Recovery tab computes, in one place Swift can call (card U6).
@@ -316,7 +317,7 @@ object RecoveryGlow {
 
     /** The touch readout on a charge point: "62 · 07:35" (:211-213). */
     fun chargeReadout(dayStart: Long, index: Int, value: Float): String =
-        chargeReadout(dayStart, index, value, TimeZone.currentSystemDefault())
+        chargeReadout(dayStart, index, value, ScreenClock.zone())
 
     /** [chargeReadout] in [zone], for the tests. */
     fun chargeReadout(dayStart: Long, index: Int, value: Float, zone: TimeZone): String =

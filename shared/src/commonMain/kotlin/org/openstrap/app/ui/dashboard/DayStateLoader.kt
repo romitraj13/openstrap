@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.DayStat
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.HealthRepository
@@ -24,7 +23,7 @@ import org.openstrap.app.ui.components.ChartPoint
 import org.openstrap.app.ui.components.StageSpan
 import org.openstrap.app.ui.components.TrendPoint
 import org.openstrap.protocol.services.StepTotals
-import kotlin.time.Clock
+import org.openstrap.shared.clock.ScreenClock
 
 /**
  * The body of `DayViewModel` (`app/src/main/kotlin/org/openstrap/app/ui/dashboard/DayViewModel.kt`
@@ -47,7 +46,7 @@ class DayStateLoader(
     suspend fun load(
         date: LocalDate,
         todaySteps: StepTotals?,
-        zone: TimeZone = TimeZone.currentSystemDefault(),
+        zone: TimeZone = ScreenClock.zone(),
     ): DayUiState {
         val day = DayWindow.of(date, zone)
         val night = DayWindow.nightEndingOn(date, zone)
@@ -145,7 +144,7 @@ class DayStateLoader(
             .map { ChartPoint(it.first, it.second.toFloat()) }
 
         // The strap's own running total covers steps whose minute records were already taken by another app.
-        val live = if (date == Clock.System.todayIn(zone)) todaySteps else null
+        val live = if (date == ScreenClock.today()) todaySteps else null
         val liveCounter = LiveSteps()
         val series = Summaries.heartRateSeries(hr, act)
         val hourly = Summaries.hourlySteps(act, day.from)
@@ -214,7 +213,7 @@ class DayStateLoader(
         metric: Metric,
         range: Range,
         date: LocalDate,
-        zone: TimeZone = TimeZone.currentSystemDefault(),
+        zone: TimeZone = ScreenClock.zone(),
     ): List<DayStat> {
         val from = date.minusDays(maxOf(range.days, History.NORMAL_DAYS) - 1L)
         val start = date.minusDays(range.days - 1L)
@@ -222,7 +221,7 @@ class DayStateLoader(
     }
 
     /** Local days that have any heart rate, steps or sleep, for the calendar. */
-    suspend fun daysWithData(zone: TimeZone = TimeZone.currentSystemDefault()): Set<LocalDate> =
+    suspend fun daysWithData(zone: TimeZone = ScreenClock.zone()): Set<LocalDate> =
         repository.daysWithData(zone).first()
 
     private companion object {

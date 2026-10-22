@@ -12,8 +12,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.DayStat
 import org.openstrap.app.data.HealthRepository
 import org.openstrap.app.data.RecoveryResult
@@ -30,7 +28,7 @@ import org.openstrap.app.ui.dashboard.Metric
 import org.openstrap.app.ui.dashboard.Range
 import org.openstrap.app.ui.glow.SignalHistories
 import org.openstrap.app.ui.workout.WorkoutsLoader
-import kotlin.time.Clock
+import org.openstrap.shared.clock.ScreenClock
 
 /** The morning check-in for a day: [feeling] is 1-5, null until the user answered. */
 data class CheckInAnswer(val date: String, val feeling: Int?) {
@@ -104,7 +102,7 @@ class ScreenQueries(private val databasePath: String) {
      * read: it stands in as "Strap's estimate" while OpenStrap's own score is withheld.
      */
     fun strapReadiness(date: String, onResult: (StrapReadinessRow?) -> Unit) = read(date, { null }, onResult) { d ->
-        val day = d.atStartOfDay(TimeZone.currentSystemDefault()).epochSeconds
+        val day = d.atStartOfDay(ScreenClock.zone()).epochSeconds
         healthDao.strapReadinessOnce(day, day).firstOrNull()
     }
 
@@ -182,7 +180,7 @@ class ScreenQueries(private val databasePath: String) {
 
     // ---- Plumbing --------------------------------------------------------------------------------
 
-    private fun todayIso(): String = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
+    private fun todayIso(): String = ScreenClock.today().toString()
 
     /** Runs [block] on the worker for a read that takes a date, and hands its answer to [onResult] on the main thread. */
     private fun <T> read(date: String, empty: () -> T, onResult: (T) -> Unit, block: suspend (LocalDate) -> T) {

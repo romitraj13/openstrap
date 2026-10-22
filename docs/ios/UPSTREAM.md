@@ -999,3 +999,43 @@ Two local measurements worth recording, because they cost time to find:
   `date(…, 'localtime')` and `Clock.System.todayIn` then disagree by a day after 18:30 UTC. The same
   six tests fail. `Asia/Kolkata` or `UTC` keeps them in step.
 
+
+## Card F7 (the demo day followed the CI clock)
+
+### Authored for iOS, not copied (no upstream source)
+
+| File | Why it is new |
+|---|---|
+| `shared/src/commonMain/kotlin/org/openstrap/shared/clock/AppClock.kt` | `AppClock`, `PhoneClock`, `DemoDay` and `ScreenClock`. Android reads `LocalDate.now()`, `ZoneId.systemDefault()` and `System.currentTimeMillis()` inline because its only clock is the phone's; the iPhone screens are also photographed by a CI runner, so the reads that decide "what day is it" and "how far into it are we" needed one seam. `DemoDay` is the fixed instant: Wednesday 2026-10-21T09:30Z in UTC |
+| `shared/src/jvmTest/kotlin/org/openstrap/shared/screens/DemoDayTest.kt` | The card's step-2 test: the demo month ends at the fixed mid-morning, and two loads with different wall clocks give an equal `DayUiState` |
+
+### What changed in the copied Kotlin
+
+Every read of `Clock.System`, `kotlinx.datetime.todayIn(TimeZone.currentSystemDefault())` and
+`TimeZone.currentSystemDefault()` on the screen path now reads `ScreenClock`: `SampleData.load`
+(`today` and `nowEpoch`, so the seed ends at the fixed instant), `HealthQueries` (all four screens and
+`seedDemoData`), `ScreenQueries` (`todayIso`, `strapReadiness`), `DayStateLoader` (zone defaults, the
+`live` steps' "is this today" test), `HealthRepository` (zone defaults, `saveCheckIn`, `logNight`), the
+`RecoveryEngine.compute` / `maxHeartRate` defaults, `DayUiState`'s default date, and the zone-less
+overloads in `TodayGlow` and `RecoveryGlow`. `RecoveryEngine.compute` keeps its `zone` and `now`
+parameters — they were already there; what changed is who supplies them.
+
+`ScreenClock.pinDemo()` is the only switch. `HealthModel.init` calls it when `-demoData` is on in a
+debug build, so the pin is in place before the seed and before the first query. A release build
+returns `false` from `DemoData.isEnabled` however it is launched, so it keeps the phone's clock. Real
+data on a debug build without `-demoData` is unaffected for the same reason.
+
+Swift reads the same day for its own chrome: `HealthModel.today` (the header, the calendar's ring, the
+initial selected day) and `TodayFlags.now` (the `-todayMorning` / `-todayEvening` hours, now applied
+to the pinned date) come from `DemoDay.shared` in demo mode and from `Date()` otherwise.
+
+### The JVM suite no longer depends on the hour
+
+Six tests in `HealthQueriesTest`, `DayStateLoaderTest`, `ScreenQueriesTest` and `RecoveryQueriesTest`
+used to seed "today" from the machine's clock and then assert on it, so they failed between midnight
+and waking (card U6 recorded this at 01:00 and 19:20 UTC). They now pin the demo day like the app
+does, via `ScreenClock.pinDemo()` in their setup and `DemoDay.TODAY` / `DemoDay.ZONE`. Run at 03:10
+UTC — the hour that used to be red — `:shared:jvmTest` is 363 tests, 0 failures.
+
+`SleepGlowTest.kt` (card U7's, untracked and mid-flight) was moved aside for the local runs and
+restored byte-for-byte; it references `hasAverage` / `hasSleep`, which no shared class has yet.

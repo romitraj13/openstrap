@@ -30,13 +30,20 @@ enum TodayRoute: Hashable {
 /// A normal launch reads the phone's clock. The UI test pins both states (`-todayMorning`,
 /// `-todayEvening`, `-todayMonday`) so every run captures the morning order and the later order
 /// rather than whichever the CI machine's clock happened to be at. Debug builds only.
+///
+/// Card F7: a `-demoData` launch starts from the fixed demo instant instead of the runner's clock,
+/// so the pinned hours land on the same day the shared code seeded — a run at 03:00 and one at
+/// 13:00 photograph the same Wednesday.
 enum TodayFlags {
     static var now: Date {
+        let base = DemoData.isEnabled
+            ? Date(timeIntervalSince1970: TimeInterval(DemoDay.shared.epochSeconds))
+            : Date()
         #if DEBUG
-        if CommandLine.arguments.contains("-todayMorning") { return at(hour: 8) }
-        if CommandLine.arguments.contains("-todayEvening") { return at(hour: 20) }
+        if CommandLine.arguments.contains("-todayMorning") { return at(hour: 8, of: base) }
+        if CommandLine.arguments.contains("-todayEvening") { return at(hour: 20, of: base) }
         #endif
-        return Date()
+        return base
     }
 
     /// Treats the selected day as a Monday, so the recap shows in a run that is not on one.
@@ -49,8 +56,8 @@ enum TodayFlags {
     }
 
     #if DEBUG
-    private static func at(hour: Int) -> Date {
-        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+    private static func at(hour: Int, of day: Date) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
     }
     #endif
 }

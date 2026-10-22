@@ -59,7 +59,8 @@ struct RootView: View {
 
     @State private var tab: AppTab = .today
     /// The day Today, Recovery, Sleep and Activity all show, as Android's shared `DayViewModel` does.
-    @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    /// Card F7: the fixed demo day when `-demoData` is on, so the header and the seeded rows agree.
+    @State private var selectedDate = HealthModel.today
     /// The You tab's own stack, held here so the header's watch chip can open You › Your strap.
     @State private var youPath: [YouRoute] = []
 
@@ -148,7 +149,8 @@ struct DayTab<Content: View>: View {
     @State private var path = NavigationPath()
 
     private var calendar: Calendar { Calendar.current }
-    private var today: Date { calendar.startOfDay(for: Date()) }
+    /// The last day the header may step forward to: the phone's today, or the pinned demo day.
+    private var today: Date { HealthModel.today }
     private var battery: Int? {
         // The chip only carries a battery while the strap is connected, as Compose's
         // `(connection as? Connected)?.batteryPercent` does.

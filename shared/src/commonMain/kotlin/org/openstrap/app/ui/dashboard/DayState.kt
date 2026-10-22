@@ -1,8 +1,6 @@
 package org.openstrap.app.ui.dashboard
 
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.todayIn
 import org.openstrap.app.data.SleepHistory
 import org.openstrap.app.data.Summaries
 import org.openstrap.app.data.db.HealthAlertRow
@@ -13,14 +11,15 @@ import org.openstrap.app.data.db.SleepSession
 import org.openstrap.app.ui.components.ChartPoint
 import org.openstrap.app.ui.components.StageSpan
 import org.openstrap.app.ui.components.TrendPoint
-import kotlin.time.Clock
+import org.openstrap.shared.clock.ScreenClock
 
 /*
  * `DayViewModel.kt`'s state classes (lines 42-110 and 342-352), copied into `shared/` with the same
  * package and the same fields so the iPhone screens read what the Android screens read.
  *
  * What changed: `java.time.LocalDate` became `kotlinx.datetime.LocalDate`, and `LocalDate.now()`
- * became `Clock.System.todayIn(TimeZone.currentSystemDefault())` — the same day, read without a JVM.
+ * became `ScreenClock.today()` — the same day, read without a JVM, and the fixed demo day when
+ * `-demoData` has pinned it (card F7).
  */
 
 /** Nights of sleep loaded for the week view and the in-sleep vitals' usual values. */
@@ -37,7 +36,7 @@ data class Baselines(
 )
 
 data class DayUiState(
-    val date: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()),
+    val date: LocalDate = ScreenClock.today(),
     val steps: Int = 0,
     /** Steps summed from the per-minute records; [steps] can be higher today from the strap's own running total. */
     val minuteSteps: Int = 0,

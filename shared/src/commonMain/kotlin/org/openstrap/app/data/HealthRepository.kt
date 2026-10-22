@@ -11,8 +11,8 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 import kotlin.time.Instant
+import org.openstrap.shared.clock.ScreenClock
 import org.openstrap.app.data.db.ActivityExtendedMinute
 import org.openstrap.app.data.db.ActivityMinute
 import org.openstrap.app.data.db.DailyAggregate
@@ -39,14 +39,14 @@ import org.openstrap.app.data.db.StressSample
 /** A [from, to] window in epoch seconds covering one local calendar day. */
 data class DayWindow(val from: Long, val to: Long) {
     companion object {
-        fun of(date: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): DayWindow {
+        fun of(date: LocalDate, zone: TimeZone = ScreenClock.zone()): DayWindow {
             val from = date.atStartOfDayIn(zone).epochSeconds
             val to = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone).epochSeconds - 1
             return DayWindow(from, to)
         }
 
         /** Sleep that *ended* on [date]: from 18:00 the previous evening until 18:00 on [date]. */
-        fun nightEndingOn(date: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): DayWindow {
+        fun nightEndingOn(date: LocalDate, zone: TimeZone = ScreenClock.zone()): DayWindow {
             val to = LocalDateTime(date, LocalTime(18, 0)).toInstant(zone).epochSeconds
             return DayWindow(to - 24 * 3600, to)
         }
@@ -61,24 +61,24 @@ class HealthRepository(private val dao: HealthDao) {
      * the strap's ([NightMetricsRow]) for the calibration review.
      */
     suspend fun recovery(date: LocalDate, profile: org.openstrap.app.data.settings.UserProfile): RecoveryResult {
-        val r = recoveryEngine.compute(date, profile)
+        val r = recoveryEngine.compute(date, profile, ScreenClock.zone(), ScreenClock.nowEpochSeconds())
         r.tonight?.let { logNight(it) }
         return r
     }
 
     private suspend fun logNight(n: Recovery.Night) {
         val strap = dao.strapReadinessOnce(n.day, n.day).firstOrNull()
-        dao.insertNightMetrics(listOf(NightMetrics.row(n, strap, Clock.System.now().epochSeconds)))
+        dao.insertNightMetrics(listOf(NightMetrics.row(n, strap, ScreenClock.nowEpochSeconds())))
     }
 
     /** The morning check-in for [date], 1-5, or null before the user answered. */
-    fun checkIn(date: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): Flow<CheckInRow?> = dao.checkIn(DayWindow.of(date, zone).from)
+    fun checkIn(date: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<CheckInRow?> = dao.checkIn(DayWindow.of(date, zone).from)
 
     /** Saves the check-in for [date]; null clears it. */
-    suspend fun saveCheckIn(date: LocalDate, feeling: Int?, zone: TimeZone = TimeZone.currentSystemDefault()) {
+    suspend fun saveCheckIn(date: LocalDate, feeling: Int?, zone: TimeZone = ScreenClock.zone()) {
         val day = DayWindow.of(date, zone).from
         if (feeling == null) dao.deleteCheckIn(day)
-        else dao.insertCheckIns(listOf(CheckInRow(day, feeling.coerceIn(CheckIn.MIN, CheckIn.MAX), Clock.System.now().epochSeconds)))
+        else dao.insertCheckIns(listOf(CheckInRow(day, feeling.coerceIn(CheckIn.MIN, CheckIn.MAX), ScreenClock.nowEpochSeconds())))
     }
 
 
@@ -86,7 +86,7 @@ class HealthRepository(private val dao: HealthDao) {
     fun changes(): Flow<Unit> = kotlinx.coroutines.flow.combine(dao.latestHeartRateTime(), dao.latestStressTime(), dao.latestSleepEnd()) { _, _, _ -> }
 
     /** Local days that have any heart rate, steps or sleep, for the calendar. */
-    fun daysWithData(zone: TimeZone = TimeZone.currentSystemDefault()): Flow<Set<LocalDate>> = dao.hoursWithData().map { hours ->
+    fun daysWithData(zone: TimeZone = ScreenClock.zone()): Flow<Set<LocalDate>> = dao.hoursWithData().map { hours ->
         hours.mapTo(HashSet()) { Instant.fromEpochSeconds(it * 3600).toLocalDateTime(zone).date }
     }
 
@@ -110,13 +110,13 @@ class HealthRepository(private val dao: HealthDao) {
     fun dailyMaxHr(w: DayWindow): Flow<DailyMaxHr?> = dao.dailyMaxHr(w.from, w.to).map { it.lastOrNull() }
 
     /** The strap's sleep-apnea summary for the night ending on [date]: its belongTime + 2 h falls on that date. */
-    fun osaResult(date: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): Flow<OsaResultRow?> {
+    fun osaResult(date: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<OsaResultRow?> {
         val d = DayWindow.of(date, zone)
         return dao.osaResults(d.from - 2 * 3600, d.to - 2 * 3600).map { it.lastOrNull() }
     }
 
     /** One value per local day from [from] to [to], for week, month and year views. Days without data are absent. */
-    fun daily(metric: DailyMetric, from: LocalDate, to: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): Flow<List<DayStat>> {
+    fun daily(metric: DailyMetric, from: LocalDate, to: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<List<DayStat>> {
         val a = DayWindow.of(from, zone).from
         val b = DayWindow.of(to, zone).to
         // The strap stores one resting HR per day already, keyed by local midnight.
@@ -142,7 +142,7 @@ class HealthRepository(private val dao: HealthDao) {
     }
 
     /** Each day's PAI (earned that day, and the 7-day total), keyed by local date. */
-    fun dailyPai(from: LocalDate, to: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): Flow<Map<LocalDate, DailyPai>> =
+    fun dailyPai(from: LocalDate, to: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<Map<LocalDate, DailyPai>> =
         dao.dailyPai(DayWindow.of(from, zone).from, DayWindow.of(to, zone).to).map { rows ->
             rows.mapNotNull { r -> DayStat.parseDay(r.day)?.let { it to r } }.toMap()
         }
