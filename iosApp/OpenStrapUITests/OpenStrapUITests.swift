@@ -249,7 +249,8 @@ final class OpenStrapUITests: XCTestCase {
     ///
     /// Unlike F4's screens, a tab has no single row to name as its last: the panel at the bottom is
     /// whichever one this day's data draws last. So the walk measures the lowest text on the screen
-    /// instead, which at the end of the scroll is the bottom of what the tab is drawing.
+    /// instead, which at the end of the scroll is the bottom of what the tab is drawing. The drag
+    /// count is printed with it, so the line says how far the walk had to go to reach that end.
     private func clearsNavBarAtEnd(_ app: XCUIApplication, screen: String) -> String? {
         let bar = app.descendants(matching: .any)["navBar.top"]
         guard bar.waitForExistence(timeout: 30) else {
@@ -257,9 +258,12 @@ final class OpenStrapUITests: XCTestCase {
             return "\(screen): the floating bar never reported its top edge"
         }
         let barTop = bar.frame.minY
-        scrollToEndOfTab(app, barTop: barTop)
+        let drags = scrollToEndOfTab(app)
         let bottom = lowestText(app, above: barTop)
-        print("F4 \(screen): \(bottom.label) maxY=\(bottom.maxY) barTop=\(barTop) window=\(app.windows.firstMatch.frame)")
+        print(
+            "F4 \(screen): \(bottom.label) maxY=\(bottom.maxY) barTop=\(barTop) "
+                + "window=\(app.windows.firstMatch.frame) drags=\(drags)"
+        )
         guard bottom.maxY <= barTop else {
             return "\(screen): the screen's last text, \"\(bottom.label)\", ends at \(bottom.maxY), under "
                 + "the floating bar whose top is \(barTop), so it cannot be scrolled clear of it"
@@ -273,11 +277,12 @@ final class OpenStrapUITests: XCTestCase {
 
     /// Card F10: the lowest text a dated tab is drawing, with the label it carries.
     ///
-    /// A SwiftUI stack's off-screen children report frames clamped into the viewport (card F2's
-    /// note), so this only means "the end of the content" once the walk has reached the end: there
-    /// the tree holds nothing below the fold but the bar. The bar's labels are dropped by name —
-    /// dropping anything below `barTop` instead would also drop a row hidden entirely under the
-    /// glass, which is the defect this looks for.
+    /// This is only meaningful once the walk has reached the end: a SwiftUI stack's off-screen
+    /// children report frames clamped into the viewport (card F2's note), so before then the lowest
+    /// frame in the tree can be a row the window never showed. At the end, the tree holds nothing
+    /// below the fold but the bar. The bar's own labels are dropped by name — dropping everything
+    /// below `barTop` instead would also drop a row hidden entirely under the glass, which is the
+    /// defect this looks for.
     private func lowestText(_ app: XCUIApplication, above barTop: CGFloat) -> (label: String, maxY: CGFloat) {
         let drawn = app.staticTexts.allElementsBoundByIndex
             .map { (label: $0.label, frame: $0.frame) }
@@ -289,22 +294,33 @@ final class OpenStrapUITests: XCTestCase {
         return (label: lowest.label, maxY: lowest.frame.maxY)
     }
 
-    /// Card F10: drag a dated tab until its lowest text stops moving up — twice, so one stale frame
-    /// cannot end the walk early. That is the scroll view saying it has reached its end, the same
-    /// stop condition F4's `scrollToEnd` uses on a single row.
-    private func scrollToEndOfTab(_ app: XCUIApplication, barTop: CGFloat) {
-        var previous = CGFloat.greatestFiniteMagnitude
+    /// Card F10: drag a dated tab until two drags in a row change nothing on screen.
+    ///
+    /// The stop condition cannot be a frame: card F2's note is that a SwiftUI stack's off-screen
+    /// children report frames clamped into the viewport, and a clamped frame does not move with the
+    /// scroll — the first draft of this walk read Today's last row as 819 pt down the window and
+    /// stopped after four drags, well short of the end (run 39842589519). Bytes cannot lie about
+    /// it: with `-glowStill` the cards hold still, so two captures of one scroll position are the
+    /// same PNG, which is how the design lab's own walk finds the bottom of a section. Returns the
+    /// number of drags it took.
+    private func scrollToEndOfTab(_ app: XCUIApplication) -> Int {
+        var previous = app.screenshot().pngRepresentation
         var still = 0
-        // A held drag moves about half a window, and the tallest dated tab is a little over six
-        // screenfuls (card U7's walk), so twenty-four drags reach the end of any of them.
-        for _ in 0..<24 {
+        var drags = 0
+        // A held drag moves a little over half a window and the tallest dated tab is about six
+        // screenfuls (card U7's walk), so twenty-eight is past the end of any of them.
+        for _ in 0..<28 {
             drag(app, from: 0.78, to: 0.22)
-            Thread.sleep(forTimeInterval: 0.3)
-            let bottom = lowestText(app, above: barTop).maxY
-            still = bottom >= previous - 1 ? still + 1 : 0
-            previous = bottom
-            if still == 2 { return }
+            drags += 1
+            // Long enough for the scroll indicator to finish fading, which is the one thing left
+            // moving on a still screen.
+            Thread.sleep(forTimeInterval: 0.7)
+            let shot = app.screenshot().pngRepresentation
+            still = shot == previous ? still + 1 : 0
+            previous = shot
+            if still == 2 { return drags }
         }
+        return drags
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
@@ -455,11 +471,11 @@ final class OpenStrapUITests: XCTestCase {
     ///
     /// The committed `U6-recovery-7` and `U7-sleep-6` screenshots show content under the bar. That
     /// is either a screenful short of the end or a real defect, and only a walk to the end can say
-    /// which: this one stops when the lowest text on the screen stops moving up, then measures it
-    /// against `navBar.top`, the bar's own top edge.
+    /// which: this one drags until two captures in a row are identical, then measures the lowest
+    /// text on the screen against `navBar.top`, the bar's own top edge.
     ///
-    /// `-glowStill` holds the cards' cores still: the walk asks for the screen's whole text tree on
-    /// every drag, and a card that animates for ever makes such a query wait (card F5's lesson).
+    /// `-glowStill` holds the cards' cores still: the walk compares one capture with the next, and a
+    /// card that animates for ever would never give two identical ones (card F5's lesson).
     func testEveryDatedTabScrollsClearOfTheBar() {
         let app = XCUIApplication()
         app.launchArguments = ["-demoData", "-glowStill"]
