@@ -14,6 +14,70 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(app.secureTextFields["authKeyField"].exists)
     }
 
+    /// Card R1: the name a person reads is OpenHealth, from the wordmark down to the You footer and
+    /// the licence notice, and the icon behind the home screen's label is the new dot-matrix "OH.".
+    ///
+    /// The identifiers this card must *not* have changed are pinned by `RenameTests` in the unit
+    /// test bundle; this walks the screens and attaches `R1-today-header`, `R1-you`, `R1-licences`
+    /// and, when springboard answers, `R1-homescreen`.
+    func testRename() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData"]
+        app.launch()
+
+        // The wordmark, with the red full stop still after it.
+        let wordmark = app.staticTexts["app.wordmark"]
+        XCTAssertTrue(wordmark.waitForExistence(timeout: 120), "Today never drew its header")
+        XCTAssertEqual(wordmark.label, "OpenHealth.", "the wordmark is not the new name plus its red full stop")
+        attach(app, "R1-today-header")
+
+        // The You footer: "OpenHealth <version> · local-first, no cloud". Matched by prefix because
+        // the version comes from the bundle.
+        app.buttons["You"].tap()
+        XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
+        // Scroll to the bottom, which is where the footer and the Licences row sit.
+        if let problem = clearsNavBar(app, lastRow: "you.licences", screen: "You") { XCTFail(problem) }
+        let footer = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "OpenHealth ")
+        ).firstMatch
+        XCTAssertTrue(footer.exists, "the You footer does not start with OpenHealth")
+        attach(app, "R1-you")
+
+        // The licence notice: upstream's row is first, above the fonts and icons, and it opens the
+        // MIT text with the Apache text below it.
+        tap(app, "you.licences")
+        XCTAssertTrue(app.buttons["licences.back"].waitForExistence(timeout: 30), "The licence texts never opened")
+        let upstream = app.buttons["licence.OpenStrap"]
+        XCTAssertTrue(upstream.waitForExistence(timeout: 30), "the licence list has no OpenStrap row")
+        attach(app, "R1-licences")
+
+        upstream.tap()
+        XCTAssertTrue(
+            app.buttons["upstream.back"].waitForExistence(timeout: 30),
+            "the OpenStrap row opened no licence text"
+        )
+        let mit = app.staticTexts["licence.OpenStrap-MIT"]
+        XCTAssertTrue(mit.waitForExistence(timeout: 30), "there is no MIT text under the OpenStrap row")
+        XCTAssertTrue(mit.label.contains("MIT License"), "the OpenStrap MIT panel does not carry the MIT licence")
+        XCTAssertTrue(
+            app.staticTexts["licence.OpenStrap-Apache-2.0"].exists,
+            "the Apache text is not below the MIT text"
+        )
+        app.buttons["upstream.back"].tap()
+        XCTAssertTrue(app.buttons["licences.back"].waitForExistence(timeout: 30), "Back from the licence texts never returned")
+
+        // The home screen's label is springboard's to draw, so it is read from springboard. That is
+        // a different process and may refuse to be driven; a refusal skips the shot and says so
+        // rather than failing the rename the app itself got right.
+        XCUIDevice.shared.press(.home)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.wait(for: .runningForeground, timeout: 20) {
+            attach(springboard, "R1-homescreen")
+        } else {
+            print("R1-homescreen skipped: springboard never came to the foreground")
+        }
+    }
+
     /// Card U4: five tabs, the shared header, the calendar and every You screen. `-demoData`
     /// seeds the sample month, so each tab has something to draw without a strap.
     ///

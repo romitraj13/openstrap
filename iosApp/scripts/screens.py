@@ -4,8 +4,9 @@
   screens.py [SHA]     default: git HEAD
 
 Finds the newest successful iOS workflow run for the commit, downloads its `screens`
-artifact and writes every `U*-*.png` into docs/ios/screenshots/ as `<name>.png`
-(`U1-designlab-1`, `U2-designlab-3`, …). Standard library only.
+artifact and writes every `U*-*.png` and `R*-*.png` into docs/ios/screenshots/ as
+`<name>.png` (`U1-designlab-1`, `U2-designlab-3`, `R1-today-header`, …). Standard library
+only.
 
 Environment:
   OPENSTRAP_REPO   owner/name (default romitraj13/openstrap)
@@ -29,9 +30,10 @@ API = "https://api.github.com"
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "docs/ios/screenshots"
 
-# U1-designlab-1, U2-designlab-12, ... The trailing parts of an exported attachment name are
-# dropped: xcresulttool writes `U1-designlab-1_0_<uuid>.png`.
-SHOT = re.compile(r"^(U\d+-[A-Za-z0-9]+-\d+)")
+# U1-designlab-1, U2-designlab-12, R1-today-header, R1-homescreen ... The trailing parts of an
+# exported attachment name are dropped: xcresulttool writes `U1-designlab-1_0_<uuid>.png`, and card
+# R1's names carry a second word (`R1-today-header`) where the U cards carry a number.
+SHOT = re.compile(r"^((?:U|R)\d+-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)")
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
