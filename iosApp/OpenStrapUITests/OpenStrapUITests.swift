@@ -242,6 +242,71 @@ final class OpenStrapUITests: XCTestCase {
         )
     }
 
+    /// Card F10: F4's assertion, for one of the four dated tabs. Today, Recovery, Sleep and
+    /// Activity scroll their content under the floating bar (`RootView`'s `DayTab`), so once the
+    /// list ends its last text must come fully clear of the bar, the same bound F4 measures for the
+    /// You screens and F9's workout screens.
+    ///
+    /// Unlike F4's screens, a tab has no single row to name as its last: the panel at the bottom is
+    /// whichever one this day's data draws last. So the walk measures the lowest text on the screen
+    /// instead, which at the end of the scroll is the bottom of what the tab is drawing.
+    private func clearsNavBarAtEnd(_ app: XCUIApplication, screen: String) -> String? {
+        let bar = app.descendants(matching: .any)["navBar.top"]
+        guard bar.waitForExistence(timeout: 30) else {
+            print("F4 \(screen): there is no navBar.top. Tree:\n\(app.debugDescription)")
+            return "\(screen): the floating bar never reported its top edge"
+        }
+        let barTop = bar.frame.minY
+        scrollToEndOfTab(app, barTop: barTop)
+        let bottom = lowestText(app, above: barTop)
+        print("F4 \(screen): \(bottom.label) maxY=\(bottom.maxY) barTop=\(barTop) window=\(app.windows.firstMatch.frame)")
+        guard bottom.maxY <= barTop else {
+            return "\(screen): the screen's last text, \"\(bottom.label)\", ends at \(bottom.maxY), under "
+                + "the floating bar whose top is \(barTop), so it cannot be scrolled clear of it"
+        }
+        return nil
+    }
+
+    /// The floating bar's own labels, which sit in the glass below `navBar.top`. They are the only
+    /// text at the bottom of the window that is not the tab's content.
+    private static let tabBarLabels: Set<String> = ["Today", "Recovery", "Sleep", "Activity", "You"]
+
+    /// Card F10: the lowest text a dated tab is drawing, with the label it carries.
+    ///
+    /// A SwiftUI stack's off-screen children report frames clamped into the viewport (card F2's
+    /// note), so this only means "the end of the content" once the walk has reached the end: there
+    /// the tree holds nothing below the fold but the bar. The bar's labels are dropped by name —
+    /// dropping anything below `barTop` instead would also drop a row hidden entirely under the
+    /// glass, which is the defect this looks for.
+    private func lowestText(_ app: XCUIApplication, above barTop: CGFloat) -> (label: String, maxY: CGFloat) {
+        let drawn = app.staticTexts.allElementsBoundByIndex
+            .map { (label: $0.label, frame: $0.frame) }
+            .filter { $0.frame.height > 0 }
+            .filter { !(Self.tabBarLabels.contains($0.label) && $0.frame.minY >= barTop) }
+        guard let lowest = drawn.max(by: { $0.frame.maxY < $1.frame.maxY }) else {
+            return (label: "(no text)", maxY: 0)
+        }
+        return (label: lowest.label, maxY: lowest.frame.maxY)
+    }
+
+    /// Card F10: drag a dated tab until its lowest text stops moving up — twice, so one stale frame
+    /// cannot end the walk early. That is the scroll view saying it has reached its end, the same
+    /// stop condition F4's `scrollToEnd` uses on a single row.
+    private func scrollToEndOfTab(_ app: XCUIApplication, barTop: CGFloat) {
+        var previous = CGFloat.greatestFiniteMagnitude
+        var still = 0
+        // A held drag moves about half a window, and the tallest dated tab is a little over six
+        // screenfuls (card U7's walk), so twenty-four drags reach the end of any of them.
+        for _ in 0..<24 {
+            drag(app, from: 0.78, to: 0.22)
+            Thread.sleep(forTimeInterval: 0.3)
+            let bottom = lowestText(app, above: barTop).maxY
+            still = bottom >= previous - 1 ? still + 1 : 0
+            previous = bottom
+            if still == 2 { return }
+        }
+    }
+
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
     /// of it. `navBar.top` is the bar's own top edge (`FloatingNavBar`), so the bound is the bar's
     /// real frame and not a number copied into the test. Each screen's numbers are printed as they
@@ -381,6 +446,53 @@ final class OpenStrapUITests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts[title].exists,
             "the detail with the range switch is not the \(label) tile's metric (\(title))"
+        )
+    }
+
+    /// Card F10: every dated tab — Today, Recovery, Sleep and Activity — lets the last thing it
+    /// draws come clear of the floating bar once its scroll has reached the end, as card F4's You
+    /// screens and card F9's workout screens already do.
+    ///
+    /// The committed `U6-recovery-7` and `U7-sleep-6` screenshots show content under the bar. That
+    /// is either a screenful short of the end or a real defect, and only a walk to the end can say
+    /// which: this one stops when the lowest text on the screen stops moving up, then measures it
+    /// against `navBar.top`, the bar's own top edge.
+    ///
+    /// `-glowStill` holds the cards' cores still: the walk asks for the screen's whole text tree on
+    /// every drag, and a card that animates for ever makes such a query wait (card F5's lesson).
+    func testEveryDatedTabScrollsClearOfTheBar() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData", "-glowStill"]
+        app.launch()
+
+        var failures: [String] = []
+        // The four dated tabs, in the bar's order, each with a mark only that tab's own screen
+        // draws: a tab that never drew fails here instead of being measured as an empty list.
+        let tabs: [(name: String, drawn: String)] = [
+            ("Today", "What changed"),
+            ("Recovery", "recovery.title"),
+            ("Sleep", "sleep.title"),
+            ("Activity", "Steps"),
+        ]
+        for (index, tab) in tabs.enumerated() {
+            if index > 0 {
+                app.buttons[tab.name].tap()
+            }
+            // The steps card renders its blurred layers behind a lock on first appearance, and the
+            // first query after the switch is the one that waits for it (card F5, run 39737184826).
+            if tab.name == "Activity" {
+                Thread.sleep(forTimeInterval: 5)
+            }
+            XCTAssertTrue(
+                app.staticTexts[tab.drawn].firstMatch.waitForExistence(timeout: 120),
+                "The \(tab.name) tab never drew \(tab.drawn)"
+            )
+            if let problem = clearsNavBarAtEnd(app, screen: tab.name) { failures.append(problem) }
+        }
+
+        XCTAssertTrue(
+            failures.isEmpty,
+            "the floating tab bar still covers the end of:\n" + failures.joined(separator: "\n")
         )
     }
 
