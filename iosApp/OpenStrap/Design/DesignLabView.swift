@@ -165,7 +165,13 @@ struct DesignLabView: View {
 
     private var cardSection: some View {
         section("Glow cards", identifier: "lab.cards") {
-            VStack(spacing: 14) {
+            // Card F5: lazy, so a launch renders the two or three cards the window shows instead of
+            // all nine at once. An XCUITest query has to wait for the app to answer, and the whole
+            // section's Core Image renders held that answer for 9.6 s in one green run (`F2
+            // lab.cards` arrived 9.6 s after the query started) and past the 30 s snapshot timeout
+            // in run 39706541852. The cards are the same; only when a set of layers is rendered is
+            // not.
+            LazyVStack(spacing: 14) {
                 ForEach(GlowStyle.presets) { preset in
                     glowCard(preset.style, title: preset.name)
                 }
@@ -200,7 +206,9 @@ struct DesignLabView: View {
 
     private var motionSection: some View {
         section("Motion", identifier: "lab.motions") {
-            VStack(spacing: 14) {
+            // Lazy for the reason `cardSection` is (card F5): five glow renders at once is five
+            // times the wait before a query is answered.
+            LazyVStack(spacing: 14) {
                 ForEach(motions) { motion in
                     glowCard(motion.style, title: motion.name)
                 }

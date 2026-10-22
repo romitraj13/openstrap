@@ -507,13 +507,19 @@ final class OpenStrapUITests: XCTestCase {
             app.launchArguments = ["-designLab", "-designLabStill", "-designLabSection", section]
             app.launch()
 
+            // Card F5: the first query of a launch is the one that times out. A query waits for the
+            // app to answer, the glow cards render on first appearance (one at a time, behind a
+            // lock), and a query issued into that render waited 9.6 s in one green run and past the
+            // 30 s snapshot timeout in run 39706541852, at the cards launch. The sections only
+            // render the cards the window shows now (`LazyVStack`), and this pause lets those few
+            // finish before the first query: `wait(for:)` reads the app's state, not its tree.
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 60), "the app never reached the foreground")
+            Thread.sleep(forTimeInterval: 4)
             XCTAssertTrue(
                 app.staticTexts["lab.title"].waitForExistence(timeout: 120),
                 "the design lab did not open for -designLabSection \(section)"
             )
-            // The glow layers are rendered once on first appearance, one card at a time (the
-            // renderer holds a lock). Let the section settle before asking it anything.
-            Thread.sleep(forTimeInterval: 2)
+            Thread.sleep(forTimeInterval: 1)
             let window = app.windows.firstMatch
             XCTAssertTrue(window.waitForExistence(timeout: 60), "the app never drew a window")
             let windowFrame = window.frame
