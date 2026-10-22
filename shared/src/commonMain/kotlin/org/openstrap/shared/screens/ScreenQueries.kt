@@ -17,7 +17,9 @@ import org.openstrap.app.data.HealthRepository
 import org.openstrap.app.data.RecoveryResult
 import org.openstrap.app.data.WorkoutAnalysis
 import org.openstrap.app.data.atStartOfDay
+import org.openstrap.app.data.db.DailyPai
 import org.openstrap.app.data.db.OpenStrapIosDatabase
+import org.openstrap.app.data.db.SportEffectRow
 import org.openstrap.app.data.db.StrapReadinessRow
 import org.openstrap.app.data.settings.Goals
 import org.openstrap.app.data.settings.SettingsRepository
@@ -135,6 +137,24 @@ class ScreenQueries(private val databasePath: String) {
         workoutList.workout(start)
     }
 
+    /**
+     * The strap's sport-effect records, newest last: recovery time, VO2 max and weekly load after each
+     * workout (`WorkoutsViewModel.effects`). The Activity tab's load and fitness panels read them.
+     */
+    fun sportEffects(onResult: (List<SportEffectRow>) -> Unit) = readAll({ emptyList() }, onResult) {
+        workoutList.effects()
+    }
+
+    /**
+     * Each day's PAI between [from] and [to] inclusive, oldest first: `dailyPai`'s `Map<LocalDate,
+     * DailyPai>` flattened so the Activity tab's seven-day bar can read it from Swift
+     * (GlowActivityScreen.kt:84). A malformed date is an empty week.
+     */
+    fun paiWeek(from: String, to: String, onResult: (List<DailyPai>) -> Unit) =
+        readRange(from, to, { emptyList() }, onResult) { start, end ->
+            repository.dailyPai(start, end).first().toList().sortedBy { it.first }.map { it.second }
+        }
+
     // ---- Profile, goals and the check-in ---------------------------------------------------------
 
     fun profile(onResult: (UserProfile) -> Unit) = readAll({ UserProfile() }, onResult) { settings.profile() }
@@ -196,6 +216,16 @@ class ScreenQueries(private val databasePath: String) {
     private fun <T> readAll(empty: () -> T, onResult: (T) -> Unit, block: suspend () -> T) {
         scope.launch {
             val value = guarded(empty) { block() }
+            withContext(Dispatchers.Main) { onResult(value) }
+        }
+    }
+
+    /** Runs [block] for two dates on the worker; a malformed date is an empty answer. */
+    private fun <T> readRange(from: String, to: String, empty: () -> T, onResult: (T) -> Unit, block: suspend (LocalDate, LocalDate) -> T) {
+        scope.launch {
+            val start = runCatching { LocalDate.parse(from) }.getOrNull()
+            val end = runCatching { LocalDate.parse(to) }.getOrNull()
+            val value = if (start == null || end == null) empty() else guarded(empty) { block(start, end) }
             withContext(Dispatchers.Main) { onResult(value) }
         }
     }

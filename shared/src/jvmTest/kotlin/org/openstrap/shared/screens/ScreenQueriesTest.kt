@@ -18,8 +18,12 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.TimeZone
 import org.openstrap.app.data.DayWindow
 import org.openstrap.app.data.SampleData
+import org.openstrap.app.data.atStartOfDay
 import org.openstrap.app.data.db.OpenStrapIosDatabase
+import org.openstrap.app.data.db.PaiSample
+import org.openstrap.app.data.db.SportEffectRow
 import org.openstrap.app.data.db.Workout
+import org.openstrap.app.data.minusDays
 import org.openstrap.app.data.settings.Goals
 import org.openstrap.app.data.settings.UserProfile
 import org.openstrap.app.ui.dashboard.Metric
@@ -173,6 +177,50 @@ class ScreenQueriesTest {
         assertEquals("Outdoor run", list.last().sportName)
         assertEquals(older, assertNotNull(queries.workoutNow(older)).workout.start)
         assertNull(queries.workoutNow(older + 1))
+    }
+
+    // ---- The Activity tab's own reads (card U8) ---------------------------------------------------
+
+    @Test
+    fun paiWeekIsOneRowPerDayOldestFirst() = runTest {
+        val path = seed(7)
+        val days = (6 downTo 0).map { today.minusDays(it.toLong()) }
+        val db = OpenStrapIosDatabase.open(path)
+        try {
+            db.healthDao().insertPai(
+                days.mapIndexed { i, d ->
+                    // Midday, so the day SQLite's `localtime` grouping sees is the same one this asks for.
+                    PaiSample(DayWindow.of(d, zone).from + 12 * 3600, daily = (i + 1) * 2f, total = 40f, restingHeartRate = 52, maxHeartRate = 180)
+                },
+            )
+        } finally {
+            db.close()
+        }
+        val queries = open(path)
+        val week = ask<List<org.openstrap.app.data.db.DailyPai>> { callback -> queries.paiWeek(today.minusDays(6).toString(), iso, callback) }
+        assertEquals(days.map { it.toString() }, week.map { it.day })
+        assertEquals(listOf(2f, 4f, 6f, 8f, 10f, 12f, 14f), week.map { it.daily })
+        // A malformed date is an empty week rather than an answer for some other range.
+        assertTrue(ask<List<org.openstrap.app.data.db.DailyPai>> { callback -> queries.paiWeek("nope", iso, callback) }.isEmpty())
+    }
+
+    @Test
+    fun sportEffectsAreTheStrapsRecordsNewestLast() = runTest {
+        val path = seed(7)
+        val day = DayWindow.of(today, zone)
+        val morning = SportEffectRow(day.from + 9 * 3600, 30, 41f, null, 120f, null, 100, 180, 175)
+        val evening = SportEffectRow(day.from + 18 * 3600, 80, null, null, 210f, null, 180, 260, 181)
+        val db = OpenStrapIosDatabase.open(path)
+        try {
+            db.healthDao().insertSportEffects(listOf(evening, morning))
+        } finally {
+            db.close()
+        }
+        val queries = open(path)
+        val effects = ask<List<SportEffectRow>> { callback -> queries.sportEffects(callback) }
+        assertEquals(2, effects.size)
+        assertEquals(listOf(morning.end, evening.end), effects.map { it.end })
+        assertEquals(210f, assertNotNull(effects.last().weeklyLoad))
     }
 
     // ---- The calendar, profile, goals and check-in ------------------------------------------------
