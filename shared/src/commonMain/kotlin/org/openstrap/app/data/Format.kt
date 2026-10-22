@@ -29,10 +29,12 @@ fun String.format(vararg args: Any?): String {
         var j = i + 1
         var zeroPad = false
         var group = false
+        var plus = false
         while (j < length && (this[j] == '0' || this[j] == ',' || this[j] == '-' || this[j] == '+')) {
             when (this[j]) {
                 '0' -> zeroPad = true
                 ',' -> group = true
+                '+' -> plus = true
             }
             j++
         }
@@ -62,10 +64,12 @@ fun String.format(vararg args: Any?): String {
             's' -> arg?.toString() ?: "null"
             else -> arg?.toString() ?: "null"
         }
-        if (text.length < width) {
-            repeat(width - text.length) { out.append(if (zeroPad) '0' else ' ') }
+        // `+`: Java puts the sign on a non-negative number too, and a negative one keeps its own.
+        val signed = if (plus && (conversion == 'f' || conversion == 'd') && !text.startsWith('-')) "+$text" else text
+        if (signed.length < width) {
+            repeat(width - signed.length) { out.append(if (zeroPad) '0' else ' ') }
         }
-        out.append(text)
+        out.append(signed)
         i = j + 1
     }
     return out.toString()
