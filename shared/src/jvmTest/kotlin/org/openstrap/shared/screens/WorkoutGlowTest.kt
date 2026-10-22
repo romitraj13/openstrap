@@ -209,6 +209,7 @@ class WorkoutGlowTest {
         // maxHr 180: the ranges are printed in bpm, so zone 1 is "90–107" and zone 5 "162+" (:159-166).
         val model = WorkoutGlow.zones(analysis(zoneSeconds = listOf(600, 900, 300, 120, 60), maxHeartRate = 180))
         assertEquals("Max 180 bpm", model.trailing)
+        assertTrue(model.hasZones)
         assertEquals(listOf("Maximum", "Anaerobic", "Aerobic", "Fat burn", "Warm-up"), model.rows.map { it.name })
         assertEquals(listOf("162+", "144–161", "126–143", "108–125", "90–107"), model.rows.map { it.range })
         // 1980 s in total: 60 -> 1m, 120 -> 2m, 300 -> 5m, 900 -> 15m, 600 -> 10m.

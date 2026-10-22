@@ -92,7 +92,7 @@ struct RootView: View {
                     }
                 case .activity:
                     DayTab(tab: .activity, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
-                        InterimRecoveryPanel(title: "Activity", recovery: health.recovery)
+                        ActivityScreen(health: health)
                     }
                 case .you:
                     YouTab(controller: controller, health: health, path: $youPath)
@@ -218,37 +218,6 @@ struct YouTab: View {
                 case .licences:
                     LicencesView()
                 }
-            }
-        }
-    }
-}
-
-/// The Activity tab until card U8 builds it: the recovery data the app already has, in a quiet panel.
-struct InterimRecoveryPanel: View {
-    var title: String
-    var recovery: RecoverySnapshot?
-
-    var body: some View {
-        DotPanel {
-            DotHeader(title)
-            if let recovery {
-                if let score = recovery.score {
-                    GlowHeroNumber("\(score.intValue)", unit: "/ 100")
-                    Text(recovery.headline)
-                        .appTextStyle(GlowType.headline)
-                        .foregroundStyle(glowInk)
-                    Text(recovery.body)
-                        .appTextStyle(AppTypography.bodyMedium)
-                        .foregroundStyle(glowInk.opacity(0.7))
-                } else {
-                    Text(recovery.emptyText)
-                        .appTextStyle(AppTypography.bodyMedium)
-                        .foregroundStyle(glowInk.opacity(0.7))
-                }
-            } else {
-                Text("Calculating…")
-                    .appTextStyle(AppTypography.bodyMedium)
-                    .foregroundStyle(glowInk.opacity(0.7))
             }
         }
     }

@@ -377,6 +377,64 @@ final class OpenStrapUITests: XCTestCase {
         walk(app, prefix: "U7-sleepempty", milestones: [], screenfuls: 2)
     }
 
+    /// Card U8: the Activity tab, every panel in `GlowActivityScreen.kt:87-97`'s order.
+    /// Screenshots: `U8-activity-1..n`.
+    ///
+    /// The seeded month writes no PAI row, no profile and no workout (`SampleData.kt`), so this
+    /// card's panels draw their own missing-data states here: PAI's "after the strap's next sync",
+    /// the energy row that asks for the profile, the workouts panel's empty note, the withheld VO2
+    /// max and the effort/trend notes under the load. Each is asserted, so a panel that silently
+    /// vanished fails here rather than quietly leaving the screenshots.
+    ///
+    /// The workout detail and the all-workouts list cannot be reached from `-demoData` at all -
+    /// there is no workout row to open. The card's own note on demo data covers that.
+    func testActivity() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demoData"]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["What changed"].waitForExistence(timeout: 120),
+            "Today never drew its What changed panel from the seeded month"
+        )
+        app.buttons["Activity"].tap()
+        XCTAssertTrue(
+            app.staticTexts["Steps"].waitForExistence(timeout: 60),
+            "The Activity tab never drew its steps card"
+        )
+
+        // Every section `GlowActivityScreen.kt:87-97` draws, in its order.
+        let sections = ["Steps", "Active minutes", "Energy", "PAI", "Training load", "Fitness", "Workouts"]
+        let missing = sections.filter { !app.staticTexts[$0].exists }
+        XCTAssertTrue(missing.isEmpty, "Activity never drew: \(missing)")
+
+        // The state each panel is in for this data.
+        let notes = [
+            (
+                "PAI",
+                "PAI shows after the strap's next sync. It counts minutes your heart rate is raised, harder minutes counting more."
+            ),
+            ("Energy", "Add age, weight and height to estimate the energy you use."),
+            (
+                "Workouts",
+                "Workouts you start on the strap show up here after a sync, with your heart rate every second and how fast it recovered."
+            ),
+            ("Training load", "Fitness and fatigue are 42- and 7-day averages of your daily load; form is fitness minus fatigue."),
+        ]
+        for (panel, text) in notes {
+            XCTAssertTrue(app.staticTexts[text].exists, "\(panel) is not drawing its own note")
+        }
+        for (panel, prefix) in [
+            ("Fitness", "Estimated fitness: "),
+            ("Training load", "Each minute counts by how hard your heart works between resting "),
+        ] {
+            let match = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", prefix)).firstMatch
+            XCTAssertTrue(match.exists, "\(panel) is not drawing its \(prefix) sentence")
+        }
+
+        walk(app, prefix: "U8-activity", milestones: sections, screenfuls: 6)
+    }
+
     /// A medium sheet has no close button: drag it down, as a finger would.
     private func dismissSheet(_ app: XCUIApplication) {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))

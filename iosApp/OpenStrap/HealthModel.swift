@@ -42,6 +42,15 @@ final class HealthModel: ObservableObject {
     @Published private(set) var recoveryResult: RecoveryResult?
     /// Every workout OpenStrap knows, newest first: Today picks the selected day's out of it.
     @Published private(set) var workoutList: [WorkoutAnalysis] = []
+    /// The strap's sport-effect records, newest last: Activity's load and fitness panels read them
+    /// (`ScreenQueries.sportEffects`, Android's `WorkoutsViewModel.effects`).
+    @Published private(set) var sportEffects: [SportEffectRow] = []
+    /// Each day's PAI for the seven days ending on the selected one, oldest first
+    /// (`ScreenQueries.paiWeek`; GlowActivityScreen.kt:84).
+    @Published private(set) var paiWeek: [DailyPai] = []
+    /// The workout the detail screen shows, with its whole heart-rate stream
+    /// (`ScreenQueries.workout`). The list's copy carries only its last sample.
+    @Published private(set) var openWorkout: WorkoutAnalysis?
     /// The selected day's morning check-in, 1-5; nil until it is answered.
     @Published private(set) var checkIn: Int?
     /// The strap's own Readiness score for the selected day, when it reported one.
@@ -144,6 +153,15 @@ final class HealthModel: ObservableObject {
         screens.workouts { [weak self] list in
             self?.workoutList = list
         }
+        // The Activity tab's two reads (card U8): the seven days of PAI ending on this day, and the
+        // strap's sport effects, which its load and fitness panels need.
+        screens.sportEffects { [weak self] list in
+            self?.sportEffects = list
+        }
+        screens.paiWeek(from: HealthModel.isoDaysBefore(date, 6), to: date) { [weak self] week in
+            guard let self, self.date == date else { return }
+            self.paiWeek = week
+        }
         screens.checkIn(date: date) { [weak self] answer in
             guard let self, self.date == date else { return }
             self.checkIn = answer.feeling?.intValue
@@ -184,6 +202,22 @@ final class HealthModel: ObservableObject {
     /// Today's own pass already fetches both; this only runs it when Sleep is the first tab drawn.
     func reloadSleep() {
         if dayState == nil { reloadToday() }
+    }
+
+    /// The Activity tab's own reads (card U8). Everything it shows - the day, Readiness, the
+    /// workouts, the sport effects and the week of PAI - comes from Today's pass, which this runs
+    /// when Activity is the first tab drawn.
+    func reloadActivity() {
+        if dayState == nil { reloadToday() }
+    }
+
+    /// One workout with its whole heart-rate stream, for the detail screen (card U8). Keeps the
+    /// workout already loaded, so opening the same one twice does not read the database again.
+    func loadWorkout(_ start: Int64) {
+        if let open = openWorkout, open.workout.start == start { return }
+        screens.workout(start: start) { [weak self] analysis in
+            self?.openWorkout = analysis
+        }
     }
 
     /// Answers - or clears, with nil - the selected day's check-in (`CheckIn.save`, GlowCheckIn.kt).
@@ -270,6 +304,13 @@ final class HealthModel: ObservableObject {
 
     /// The day's `yyyy-MM-dd` in the phone's own zone: the currency the shared screens read.
     static func isoDay(_ day: Date) -> String { iso(day) }
+
+    /// [iso] moved back by [days] local days, still as `yyyy-MM-dd`; [iso] itself when it will not parse.
+    static func isoDaysBefore(_ iso: String, _ days: Int) -> String {
+        guard let day = day(fromIso: iso),
+              let earlier = Calendar.current.date(byAdding: .day, value: -days, to: day) else { return iso }
+        return Self.iso(earlier)
+    }
 
     private static func iso(_ day: Date) -> String {
         let formatter = DateFormatter()

@@ -120,6 +120,8 @@ data class WorkoutZonesModel(
     val trailing: String,
     /** Zone 5 first, as Compose draws them (:158). */
     val rows: List<WorkoutZoneRow>,
+    /** `a.zoneSeconds.sum() > 0`: without any zone time Compose draws no panel at all (:59). */
+    val hasZones: Boolean,
 )
 
 // MARK: - Training effect (EffectPanel, GlowWorkoutScreen.kt:175-193)
@@ -303,7 +305,11 @@ object WorkoutGlow {
                 accent = ZONE_ACCENTS[z],
             )
         }
-        return WorkoutZonesModel(trailing = "Max ${a.maxHeartRate} bpm", rows = rows)
+        return WorkoutZonesModel(
+            trailing = "Max ${a.maxHeartRate} bpm",
+            rows = rows,
+            hasZones = a.zoneSeconds.sum() > 0,
+        )
     }
 
     // ---- EffectPanel, GlowWorkoutScreen.kt:175-193 -----------------------------------------------
