@@ -282,7 +282,8 @@ final class OpenStrapUITests: XCTestCase {
             return "\(place): \"\(text)\" carries no line count"
         }
         let words = String(text[range])
-        let count = Int(words.split(separator: " ").first.map(String.init) ?? "") ?? -1
+        let first = words.split(separator: " ").first.map { String($0) } ?? ""
+        let count = Int(first) ?? -1
         let expected = count == 1 ? "1 line" : "\(count) lines"
         guard words == expected else {
             return "\(place): says \"\(words)\" for \(count) line(s), not \"\(expected)\""
@@ -647,7 +648,9 @@ final class OpenStrapUITests: XCTestCase {
             navBarFailures.append(problem)
         }
 
-        // Back to the Activity tab, then the whole list.
+        // Back to the Activity tab, then the whole list. The header scrolls with the list, so the
+        // walk's end-of-scroll check left it above the fold.
+        scrollToTop(app, until: app.buttons["Back"])
         app.buttons["Back"].tap()
         XCTAssertTrue(
             app.staticTexts["Steps"].waitForExistence(timeout: 60),

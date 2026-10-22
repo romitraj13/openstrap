@@ -107,6 +107,9 @@ struct MetricDetailScreen: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
+        // Card F9: built after F4, so it never took the bar's clearance; its last panel's last row
+        // is now measured by the end-of-scroll walk.
+        .glowClearsNavBar()
     }
 
     /// Asks for the series this range needs, and drops an answer for a range already left.

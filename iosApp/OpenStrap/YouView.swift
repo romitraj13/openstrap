@@ -131,7 +131,9 @@ struct YouView: View {
                             Text("Diagnostics")
                                 .appTextStyle(AppTypography.titleMedium)
                                 .foregroundStyle(glowInk)
-                            Text("\(controller.logLines.count) lines")
+                            // Card F9: "1 line" for one, "N lines" otherwise, the third allowed
+                            // exception to standing instruction 4 (Android prints "1 lines").
+                            Text(controller.logLineCountText)
                                 .appTextStyle(AppTypography.bodySmall)
                                 .foregroundStyle(ThemeColors.onSurfaceVariant)
                         }

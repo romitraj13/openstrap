@@ -66,6 +66,16 @@ class DemoDayTest {
     }
 
     @Test
+    fun `the demo day's zone id names the zone the seed writes in`() {
+        // Card F9: Swift builds its Foundation TimeZone from this string, so it has to be the very
+        // zone `DemoDay` answers with — UTC, whatever the runner's own zone is.
+        assertEquals(DemoDay.ZONE.id, DemoDay.zoneId)
+        assertEquals(TimeZone.UTC.id, DemoDay.zoneId)
+        assertEquals(DemoDay.TODAY, DemoDay.today())
+        assertEquals(DemoDay.epochSeconds, DemoDay.nowEpochSeconds())
+    }
+
+    @Test
     fun `the demo data ends at the demo mid morning`() = runTest {
         ScreenClock.pinDemo()
         val database = database()

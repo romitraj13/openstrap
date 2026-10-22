@@ -57,6 +57,9 @@ struct WorkoutScreen: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
+        // Card F9: this screen was built after F4 and never took the bar's clearance, so the end of
+        // its scroll (the training effect's footnote) sat under the floating bar.
+        .glowClearsNavBar()
         .background(ThemeColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .onAppear { health.loadWorkout(start) }

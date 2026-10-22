@@ -258,8 +258,8 @@ final class HealthModel: ObservableObject {
             recapSteps = []
             return
         }
-        let selected = HealthModel.day(fromIso: date) ?? Date()
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: selected) ?? selected
+        let selected = HealthModel.day(fromIso: date) ?? ScreenNow.startOfToday
+        let yesterday = ScreenNow.calendar.date(byAdding: .day, value: -1, to: selected) ?? selected
         screens.monthHistory(metric: Metric.steps, date: HealthModel.iso(yesterday)) { [weak self] list in
             guard let self, self.date == date else { return }
             self.recapSteps = list
@@ -316,7 +316,7 @@ final class HealthModel: ObservableObject {
     /// [iso] moved back by [days] local days, still as `yyyy-MM-dd`; [iso] itself when it will not parse.
     static func isoDaysBefore(_ iso: String, _ days: Int) -> String {
         guard let day = day(fromIso: iso),
-              let earlier = Calendar.current.date(byAdding: .day, value: -days, to: day) else { return iso }
+              let earlier = ScreenNow.calendar.date(byAdding: .day, value: -days, to: day) else { return iso }
         return Self.iso(earlier)
     }
 
@@ -324,6 +324,9 @@ final class HealthModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
+        // Card F9: format the day in the zone the screens measure it in, so the pinned demo day is
+        // "2026-10-21" on a runner in any zone (the shared code reads it in UTC).
+        formatter.timeZone = ScreenNow.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: day)
     }
@@ -332,6 +335,8 @@ final class HealthModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
+        // The same zone `iso` formats in, so a day round-trips whatever the runner's zone is.
+        formatter.timeZone = ScreenNow.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.date(from: value)
     }
@@ -339,9 +344,12 @@ final class HealthModel: ObservableObject {
     /// The day the app opens on, at the start of that local day: the phone's today, or the fixed
     /// demo day when `-demoData` has pinned it (card F7). The header, the calendar's ring and the
     /// selected day all read this, so they agree with the data the shared code returns.
+    ///
+    /// Card F9: the instant and the zone both come from `ScreenNow`, so a demo run is pinned to
+    /// `DemoDay` (09:30 UTC on 21 October 2026) in `DemoDay`'s zone. Before this, the start of the
+    /// day came from the phone's clock and zone, so the header called the pinned day Yesterday.
     static var today: Date {
-        if DemoData.isEnabled, let day = day(fromIso: DemoDay.shared.isoDate) { return day }
-        return Calendar.current.startOfDay(for: Date())
+        ScreenNow.startOfToday
     }
 
     /// [today] as the `yyyy-MM-dd` the shared screens take.

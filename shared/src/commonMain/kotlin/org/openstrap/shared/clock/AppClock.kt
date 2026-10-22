@@ -56,6 +56,12 @@ object DemoDay : AppClock {
     /** UTC: the one zone the sample month is written and read in, whatever TZ the runner sets. */
     val ZONE: TimeZone = TimeZone.UTC
 
+    /**
+     * [ZONE]'s identifier (`"UTC"`), so Swift can build a Foundation `TimeZone` from the pinned zone
+     * without importing a kotlinx type (card F9). It mirrors [isoDate], which Swift already reads.
+     */
+    val zoneId: String = ZONE.id
+
     override fun nowEpochSeconds(): Long = epochSeconds
     override fun zone(): TimeZone = ZONE
     override fun today(): LocalDate = TODAY

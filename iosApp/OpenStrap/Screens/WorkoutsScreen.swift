@@ -56,6 +56,9 @@ struct WorkoutsScreen: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
+        // Card F9: built after F4, so it never took the bar's clearance; its last day's last row is
+        // now measured by the end-of-scroll walk.
+        .glowClearsNavBar()
         .background(ThemeColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $openStart) { start in

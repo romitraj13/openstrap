@@ -141,11 +141,12 @@ struct DateHeader: View {
 
     @State private var calendarOpen = false
 
-    private let calendar = Calendar.current
+    /// Card F9: the phone's calendar, or the pinned demo day's while `-demoData` is on.
+    private var calendar: Calendar { ScreenNow.calendar }
     private let wordmarkDot = Color(hex: 0xFFFF4D5E)
 
-    /// The phone's today, or the fixed demo day while `-demoData` is pinned (card F7).
-    private var today: Date { HealthModel.today }
+    /// The phone's today, or the fixed demo day while `-demoData` is pinned (card F7/F9).
+    private var today: Date { ScreenNow.startOfToday }
     private var isToday: Bool { calendar.isDate(date, inSameDayAs: today) }
 
     var body: some View {
@@ -271,11 +272,25 @@ struct DateHeader: View {
 
     /// "Today", "Yesterday", or the date ("EEE d MMM"), as `DateHeader` formats it before
     /// `SectionLabel` uppercases it.
-    static func label(for date: Date, calendar: Calendar = .current) -> String {
-        if calendar.isDateInToday(date) { return "Today" }
-        if calendar.isDateInYesterday(date) { return "Yesterday" }
+    ///
+    /// Card F9: the two words compare the day against the day the app is showing as today, not
+    /// against the system clock. `Calendar.isDateInToday` / `isDateInYesterday` ask the wall clock,
+    /// so on a CI run at a later real date they called the pinned demo day "Yesterday" while every
+    /// shared date said Today.
+    static func label(
+        for date: Date,
+        today: Date = ScreenNow.startOfToday,
+        calendar: Calendar = ScreenNow.calendar
+    ) -> String {
+        let day = calendar.startOfDay(for: date)
+        if day == today { return "Today" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: today), day == yesterday {
+            return "Yesterday"
+        }
         let formatter = DateFormatter()
         formatter.locale = Locale.current
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "EEE d MMM"
         return formatter.string(from: date)
     }

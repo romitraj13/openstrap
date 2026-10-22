@@ -257,6 +257,19 @@ final class StrapController: ObservableObject {
         logLines.joined(separator: "\n")
     }
 
+    /// The log's length in words: "1 line" for one, "N lines" otherwise. Android prints
+    /// `"${lines.size} lines"` (`DeviceScreen.kt:453`, :456), so a one-line log reads "1 lines"
+    /// there; the product decision of 2026-10-22 makes the singular iOS's third allowed exception to
+    /// standing instruction 4. Both places the count is shown read this.
+    static func lineCountText(_ count: Int) -> String {
+        count == 1 ? "1 line" : "\(count) lines"
+    }
+
+    /// [`lineCountText`] for the log as it stands.
+    var logLineCountText: String {
+        Self.lineCountText(logLines.count)
+    }
+
     /// What the Copy button puts on the clipboard: the sync log rows first, then the engine's lines.
     /// No key, token or cookie ever reaches either; the auth key lives in the Keychain only.
     var diagnosticsText: String {

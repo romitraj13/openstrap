@@ -35,10 +35,10 @@ enum TodayRoute: Hashable {
 /// so the pinned hours land on the same day the shared code seeded — a run at 03:00 and one at
 /// 13:00 photograph the same Wednesday.
 enum TodayFlags {
+    /// Card F9: the base is `ScreenNow.date` — the pinned `DemoDay` instant under `-demoData`, the
+    /// phone's clock otherwise — so the hour overrides land on the day the shared code seeded.
     static var now: Date {
-        let base = DemoData.isEnabled
-            ? Date(timeIntervalSince1970: TimeInterval(DemoDay.shared.epochSeconds))
-            : Date()
+        let base = ScreenNow.date
         #if DEBUG
         if CommandLine.arguments.contains("-todayMorning") { return at(hour: 8, of: base) }
         if CommandLine.arguments.contains("-todayEvening") { return at(hour: 20, of: base) }
@@ -212,7 +212,7 @@ struct TodayScreen: View {
 
     private var todayIso: String { HealthModel.isoDay(TodayFlags.now) }
 
-    private var hour: Int { Calendar.current.component(.hour, from: TodayFlags.now) }
+    private var hour: Int { ScreenNow.calendar.component(.hour, from: TodayFlags.now) }
 
     private var isMorning: Bool {
         TodayGlow.shared.isMorning(iso: health.date, todayIso: todayIso, hour: Int32(hour))

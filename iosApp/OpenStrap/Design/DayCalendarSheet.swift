@@ -33,7 +33,9 @@ struct DayCalendarSheet: View {
     @State private var month: Date
     @State private var direction: Int = 0
 
-    private let calendar = Calendar.current
+    /// Card F9: the same calendar the header and the selected day use, so the grid lights the day
+    /// the header is showing. Outside a demo run it is `Calendar.current`, the phone's own.
+    private var calendar: Calendar { ScreenNow.calendar }
 
     init(selected: Date, available: Set<Date>, onPick: @escaping (Date) -> Void, onDismiss: @escaping () -> Void) {
         self.selected = selected
@@ -41,12 +43,12 @@ struct DayCalendarSheet: View {
         self.onPick = onPick
         self.onDismiss = onDismiss
         // The sheet opens on the month of the day it shows.
-        let start = Calendar.current.dateInterval(of: .month, for: selected)?.start ?? selected
+        let start = ScreenNow.calendar.dateInterval(of: .month, for: selected)?.start ?? selected
         _month = State(initialValue: start)
     }
 
-    /// The phone's today, or the fixed demo day while `-demoData` is pinned (card F7).
-    private var today: Date { HealthModel.today }
+    /// The phone's today, or the fixed demo day while `-demoData` is pinned (card F7/F9).
+    private var today: Date { ScreenNow.startOfToday }
     private var firstMonth: Date {
         let earliest = available.min().map { min($0, today) } ?? today
         return calendar.dateInterval(of: .month, for: earliest)?.start ?? today

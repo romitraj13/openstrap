@@ -641,7 +641,7 @@ thing exists yet or why not.
 | `PullSyncReveal()` under the wordmark (151) | `PullSyncReveal()` (DateHeader.swift:162) | ported |
 | `"Previous day"` (153) | `date.previous` (DateHeader.swift:168-175) | ported |
 | `"Pick a day"` (155) | `date.pick` (DateHeader.swift:177-193) | ported |
-| `"Today"` (161) | `label(for:)` (DateHeader.swift:268) | ported |
+| `"Today"` (161) | `label(for:today:calendar:)` (DateHeader.swift:280) | ported: the day is compared with the day the app shows as today (`ScreenNow`, card F9) in the day's own zone — not with the system clock, which called the pinned demo day "Yesterday" |
 | `"Yesterday"` (162) | same | ported |
 | `date.format("EEE d MMM")` (163) | same, via `Locale.current` | ported |
 | caret-down 14 pt beside the date (168) | same (DateHeader.swift:184) | ported |
@@ -683,10 +683,10 @@ thing exists yet or why not.
 | `Group("Support")` (115) | `GroupLabel("Support")` (YouView.swift:124) | ported |
 | `DiagnosticsPanel(log, asRow = true)` (116, 441-482) | `you.diagnostics` row (YouView.swift:126-142) | ported as a row that opens the existing Diagnostics screen |
 | `"Diagnostics"` (453) | same (YouView.swift:132) | ported |
-| `"${lines.size} lines"` (453) | `"\(controller.logLines.count) lines"` (YouView.swift:137) | ported |
+| `"${lines.size} lines"` (453) | `"1 line"` / `"N lines"`, `StrapController.lineCountText` (StrapController.swift:264), on the You row (YouView.swift:136) and the Diagnostics log's heading (DiagnosticsView.swift:32-43) | ported with the **third** allowed exception to standing instruction 4 (product decision, 2026-10-22): iOS pluralises the count — "1 line" for one, "N lines" otherwise, wherever it is shown. Android's `${lines.size} lines` is a plural bug, not wording, so there is no string to copy |
 | `"Tap to hide"` / `"Hide"` (453, 456) | — | not ported: the row opens a screen instead of expanding in place |
 | `"Copy log"` (461) | `Copy` in DiagnosticsView's toolbar (DiagnosticsView.swift:47) | ported (pre-existing screen) |
-| `"No events yet."` (475) | `"Nothing logged yet."` (DiagnosticsView.swift:34) | not ported: the existing iOS diagnostics screen keeps its own wording |
+| `"No events yet."` (475) | `"Nothing logged yet."` (DiagnosticsView.swift:44) | not ported: the existing iOS diagnostics screen keeps its own wording |
 | sample-data button (118-120) | — | not ported: `-demoData` is the iOS debug seed (card C6) |
 | `"OpenStrap ${BuildConfig.VERSION_NAME} · local-first, no cloud"` (124) | `"OpenStrap \(appVersion) · local-first, no cloud"` (YouView.swift:161) | ported: the version comes from `CFBundleShortVersionString` |
 | `"Licences"` row | `you.licences` (YouView.swift:145-158) | ported: the card's own exception; opens `LicencesView` (LicencesView.swift:6) with the three texts U1 put in `Design/Licenses/` |

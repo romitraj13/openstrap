@@ -151,9 +151,11 @@ struct DayTab<Content: View>: View {
 
     @State private var path = NavigationPath()
 
-    private var calendar: Calendar { Calendar.current }
+    /// Card F9: the phone's calendar, or the pinned demo day's while `-demoData` is on, so a day
+    /// step lands on the same midnight the header and the shared queries measure.
+    private var calendar: Calendar { ScreenNow.calendar }
     /// The last day the header may step forward to: the phone's today, or the pinned demo day.
-    private var today: Date { HealthModel.today }
+    private var today: Date { ScreenNow.startOfToday }
     private var battery: Int? {
         // The chip only carries a battery while the strap is connected, as Compose's
         // `(connection as? Connected)?.batteryPercent` does.

@@ -29,8 +29,18 @@ struct DiagnosticsView: View {
                     }
                 }
                 Divider()
-                Text("Log")
-                    .font(.headline)
+                HStack(spacing: 0) {
+                    Text("Log")
+                        .font(.headline)
+                    Spacer(minLength: 8)
+                    // Card F9: Android prints the log's length beside the panel's title
+                    // (`PanelHeader`, `DeviceScreen.kt:453`); here the log's own heading carries it,
+                    // and one line reads "1 line", not "1 lines".
+                    Text(controller.logLineCountText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("log.lineCount")
+                }
                 Text(controller.logText.isEmpty ? "Nothing logged yet." : controller.logText)
                     .font(.system(.footnote, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
