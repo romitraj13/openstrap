@@ -270,6 +270,9 @@ struct GlowCard<Content: View>: View {
             shape
                 .fill(GlowPalette(style).slab.color)
                 .offset(y: style.depth)
+                // Drawing only, as Compose's `drawBehind` is: the band must not grow the card's
+                // tap area by the 6 pt it shows in the gap.
+                .allowsHitTesting(false)
         }
     }
 
