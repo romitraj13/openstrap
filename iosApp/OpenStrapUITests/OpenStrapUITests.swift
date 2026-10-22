@@ -263,7 +263,19 @@ final class OpenStrapUITests: XCTestCase {
             return "\(screen): the dated tab has no wordmark to walk by"
         }
         let walk = scrollToEndOfTab(app, wordmark: wordmark)
-        let drawn = lowestTexts(app, above: barTop)
+        // The list can grow after it has ended — demo rows whose analysis finishes late land below
+        // the fold and lengthen it without moving the wordmark — so the end is only the end once the
+        // measurement holds still. Two settled readings, or a walk that takes up the new room.
+        var drawn = lowestTexts(app, above: barTop)
+        for _ in 0..<2 {
+            Thread.sleep(forTimeInterval: 1.5)
+            let after = lowestTexts(app, above: barTop)
+            let before = drawn.first?.frame.maxY ?? 0
+            if abs((after.first?.frame.maxY ?? 0) - before) < 1 { break }
+            print("F10 \(screen): the list grew under the measurement (\(before) -> \(after.first?.frame.maxY ?? 0)); walking again")
+            _ = scrollToEndOfTab(app, wordmark: wordmark)
+            drawn = lowestTexts(app, above: barTop)
+        }
         for one in drawn.prefix(6) {
             print("F10 \(screen) lowest: \(one.label.prefix(44)) minY=\(one.frame.minY) maxY=\(one.frame.maxY)")
         }
@@ -311,26 +323,37 @@ final class OpenStrapUITests: XCTestCase {
     /// near the bottom cannot be followed (card F2's note: a SwiftUI stack's off-screen children
     /// report frames clamped into the viewport, and a clamped frame never moves with the scroll —
     /// the first draft of this walk stopped after four drags on Today for that reason), and a
-    /// capture cannot either while a card still animates (run 39842589519's successor ran its whole
-    /// drag budget on captures that never settled). When two drags in a row leave the wordmark
-    /// where it is, the scroll view has nothing left to give.
+    /// capture cannot either while a card still animates (the draft before this one ran its whole
+    /// drag budget on captures that never settled).
+    ///
+    /// Two passes, with a pause between them: a card whose demo rows are analysed after the first
+    /// paint takes its place below the fold, which lengthens the list without moving the wordmark.
+    /// The second pass takes up the room it added, and costs two drags when there is none.
     private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat) {
         let start = wordmark.frame.minY
-        var previous = start
+        let first = walkDown(app, wordmark: wordmark)
+        Thread.sleep(forTimeInterval: 2.5)
+        let second = walkDown(app, wordmark: wordmark)
+        return (first + second, start - wordmark.frame.minY)
+    }
+
+    /// One pass to the bottom: drag until two drags in a row leave the wordmark where it is.
+    private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement) -> Int {
+        var previous = wordmark.frame.minY
         var still = 0
         var drags = 0
         // A held drag moves about half a window; the tallest dated tab is six screenfuls (card U7),
-        // so twenty-four is past the end of any of them.
-        for _ in 0..<24 {
+        // so sixteen is past the end of any of them.
+        for _ in 0..<16 {
             drag(app, from: 0.78, to: 0.22)
             drags += 1
             Thread.sleep(forTimeInterval: 0.4)
             let top = wordmark.frame.minY
             still = top < previous - 1 ? 0 : still + 1
             previous = top
-            if still == 2 { return (drags, start - top) }
+            if still == 2 { return drags }
         }
-        return (drags, start - previous)
+        return drags
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
