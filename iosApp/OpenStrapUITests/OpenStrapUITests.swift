@@ -308,12 +308,14 @@ final class OpenStrapUITests: XCTestCase {
         // score needs, so the card says what it is waiting for (GlowRecoveryScreen.kt:135-137).
         scrollToTop(app)
         let learning = "OpenStrap scores Recovery once it has 7 good nights of your own HRV and resting heart rate."
-        let body = app.staticTexts["recovery.body"].firstMatch
+        // `firstMatch.exists` raises when the query matches nothing (run 39696188876: "Failed to get
+        // matching snapshot"), so the matches are read as a list instead.
+        let bodies = app.staticTexts.matching(identifier: "recovery.body")
         let previous = app.buttons["date.previous"]
         XCTAssertTrue(previous.waitForExistence(timeout: 30), "The header has no previous-day button")
         var found = false
         for _ in 0..<30 {
-            if body.exists && body.label == learning {
+            if bodies.allElementsBoundByIndex.contains(where: { $0.label == learning }) {
                 found = true
                 break
             }
