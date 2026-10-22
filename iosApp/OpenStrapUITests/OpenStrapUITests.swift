@@ -35,12 +35,23 @@ final class OpenStrapUITests: XCTestCase {
             "Today never drew its What changed panel from the seeded sample data"
         )
         XCTAssertEqual(wordmark.label, "OpenHealth.", "the wordmark is not the new name plus its red full stop")
+        // Card F9: the pinned demo day must read TODAY, in the header and in every R1 screenshot.
+        XCTAssertTrue(
+            app.staticTexts["TODAY"].waitForExistence(timeout: 30),
+            "the date navigator does not read TODAY on the pinned demo day"
+        )
         attach(app, "R1-today-header")
 
         // The You footer: "OpenHealth <version> · local-first, no cloud". Matched by prefix because
         // the version comes from the bundle.
         app.buttons["You"].tap()
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
+        // Card F9: R1-you carries the Diagnostics row, whose count must read "1 line" for one line.
+        let diagnosticsRow = app.buttons["you.diagnostics"]
+        XCTAssertTrue(diagnosticsRow.waitForExistence(timeout: 30), "The You list has no Diagnostics row")
+        if let problem = lineCountProblem(diagnosticsRow.label, where: "the You Diagnostics row") {
+            XCTFail(problem)
+        }
         // Scroll to the bottom, which is where the footer and the Licences row sit.
         if let problem = clearsNavBar(app, lastRow: "you.licences", screen: "You") { XCTFail(problem) }
         let footer = app.staticTexts.matching(
@@ -98,6 +109,17 @@ final class OpenStrapUITests: XCTestCase {
             app.staticTexts["What changed"].waitForExistence(timeout: 120),
             "Today never drew its What changed panel from the seeded sample data"
         )
+        // Card F9: `-demoData` pins the shared clock to 2026-10-21 (AppClock.kt `DemoDay`), and the
+        // header must call that day Today whatever date the runner's calendar is at. Every U5–U9
+        // screenshot showed YESTERDAY here before the Swift side read the pinned clock.
+        XCTAssertTrue(
+            app.staticTexts["TODAY"].waitForExistence(timeout: 30),
+            "the date navigator does not read TODAY on the pinned demo day"
+        )
+        XCTAssertFalse(
+            app.staticTexts["YESTERDAY"].exists,
+            "the date navigator calls the pinned demo day yesterday"
+        )
         // The header the four date tabs share.
         XCTAssertTrue(app.staticTexts["app.wordmark"].exists, "The header never drew its wordmark")
         attach(app, "U4-today-1")
@@ -143,6 +165,13 @@ final class OpenStrapUITests: XCTestCase {
         // hub's own rows carry the same words.
         app.buttons["You"].tap()
         XCTAssertTrue(app.staticTexts["you.title"].waitForExistence(timeout: 30), "The You tab never drew")
+        // Card F9: the row carries the log's length, and one line reads "1 line" (the third allowed
+        // exception to standing instruction 4; Android prints "1 lines").
+        let diagnosticsRow = app.buttons["you.diagnostics"]
+        XCTAssertTrue(diagnosticsRow.waitForExistence(timeout: 30), "The You list has no Diagnostics row")
+        if let problem = lineCountProblem(diagnosticsRow.label, where: "the You Diagnostics row") {
+            XCTFail(problem)
+        }
         // Card F4: every screen that scrolls under the floating bar must let its last row come clear
         // of it. Each screen's numbers are measured as the walk goes, and asserted together at the end
         // so one run names every screen whose last row is still under the bar.
@@ -185,6 +214,12 @@ final class OpenStrapUITests: XCTestCase {
 
         tap(app, "you.diagnostics")
         XCTAssertTrue(app.navigationBars["Diagnostics"].waitForExistence(timeout: 30), "Diagnostics never opened")
+        // Card F9: the log's own heading carries the count, and one line reads "1 line".
+        let logCount = app.staticTexts["log.lineCount"]
+        XCTAssertTrue(logCount.waitForExistence(timeout: 30), "The Diagnostics screen never drew its log's line count")
+        if let problem = lineCountProblem(logCount.label, where: "the Diagnostics log heading") {
+            XCTFail(problem)
+        }
         // The log is the last thing here, and it can be thousands of points long.
         if let problem = clearsNavBar(app, lastRow: "logText", screen: "Diagnostics") { navBarFailures.append(problem) }
         attach(app, "U4-diagnostics-1")
@@ -235,6 +270,22 @@ final class OpenStrapUITests: XCTestCase {
         guard rowBottom <= barTop else {
             return "\(screen): \(identifier) ends at \(rowBottom), under the floating bar whose top is "
                 + "\(barTop), so the last row cannot be scrolled clear of it"
+        }
+        return nil
+    }
+
+    /// Card F9's rule for a log's length: one line reads "1 line", any other count "N lines" — the
+    /// only wording iOS does not copy from Android, whose `"${lines.size} lines"` prints "1 lines"
+    /// (`DeviceScreen.kt:453`, :456). Returns what is wrong with `text`, or nil.
+    private func lineCountProblem(_ text: String, where place: String) -> String? {
+        guard let range = text.range(of: #"[0-9]+ lines?"#, options: .regularExpression) else {
+            return "\(place): \"\(text)\" carries no line count"
+        }
+        let words = String(text[range])
+        let count = Int(words.split(separator: " ").first.map(String.init) ?? "") ?? -1
+        let expected = count == 1 ? "1 line" : "\(count) lines"
+        guard words == expected else {
+            return "\(place): says \"\(words)\" for \(count) line(s), not \"\(expected)\""
         }
         return nil
     }
@@ -587,6 +638,14 @@ final class OpenStrapUITests: XCTestCase {
         let missing = detail.filter { !drawn.contains($0) }
         XCTAssertTrue(missing.isEmpty, "the workout detail never drew: \(missing)")
         walk(app, prefix: "U8-workout", milestones: detail, screenfuls: 3)
+        // Card F9: this screen was built after F4 and never took the bar's clearance, so the end of
+        // its scroll sat under the floating bar — U8-workout-3.png shows the training effect's
+        // footnote with its second line behind the glass. The measurement is F4's: the last row's
+        // bottom against the bar's own top edge.
+        var navBarFailures: [String] = []
+        if let problem = clearsNavBar(app, lastRow: "workout.footnote", screen: "Workout detail") {
+            navBarFailures.append(problem)
+        }
 
         // Back to the Activity tab, then the whole list.
         app.buttons["Back"].tap()
@@ -607,6 +666,16 @@ final class OpenStrapUITests: XCTestCase {
             "The all-workouts list never drew"
         )
         walk(app, prefix: "U8-workouts", milestones: ["Workouts", "Outdoor run"], screenfuls: 4)
+        // Card F9: the all-workouts list is the second screen U8 built after F4; its last row must
+        // clear the floating bar too.
+        if let problem = clearsNavBar(app, lastRow: "workouts.last", screen: "All workouts") {
+            navBarFailures.append(problem)
+        }
+        XCTAssertTrue(
+            navBarFailures.isEmpty,
+            "the floating tab bar still covers the last row of:\n"
+                + navBarFailures.joined(separator: "\n")
+        )
     }
 
     /// Card U9: the metric detail, every state the card touches.
@@ -632,6 +701,12 @@ final class OpenStrapUITests: XCTestCase {
         )
         assertPanels(heart, about: "About heart rate")
         attach(heart, "U9-detail-heartrate-day")
+        // Card F9: the third screen U9 built after F4. Heart rate's last row is the Related panel's
+        // last metric, and the whole detail must scroll clear of the floating bar like F4's screens.
+        if let problem = clearsNavBar(heart, lastRow: "metric.detail.related.Stress", screen: "Metric detail") {
+            XCTFail(problem)
+        }
+        scrollToTop(heart, until: heart.buttons["detail.range.Day"])
 
         selectRange(heart, "Week", showing: "Last 7 days")
         XCTAssertTrue(heart.staticTexts["Lowest"].exists, "the week has no lowest and highest")

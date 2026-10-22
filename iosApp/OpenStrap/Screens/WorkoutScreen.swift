@@ -217,7 +217,10 @@ private struct EffectPanel: View {
                 Fact(label: "Recovery time", value: model.recoveryTime)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // The last row of the screen, and the row card F9's end-of-scroll walk measures: the
+            // footnote's second line is what U8-workout-3.png showed behind the floating bar.
             QuietNote(text: model.note)
+                .accessibilityIdentifier("workout.footnote")
         }
     }
 }

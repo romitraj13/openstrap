@@ -29,7 +29,7 @@ struct WorkoutsScreen: View {
                         QuietNote(text: note)
                     }
                 } else {
-                    ForEach(Array(model.groups.enumerated()), id: \.offset) { _, group in
+                    ForEach(Array(model.groups.enumerated()), id: \.offset) { groupIndex, group in
                         DotPanel {
                             DotHeader(group.title, trailing: group.trailing)
                             ForEach(Array(group.workouts.enumerated()), id: \.offset) { index, analysis in
@@ -39,6 +39,14 @@ struct WorkoutsScreen: View {
                                 WorkoutLine(analysis: analysis, showDate: false) {
                                     openStart = analysis.workout.start
                                 }
+                                // The list's last row, and the row card F9's end-of-scroll walk
+                                // measures: the newest group comes first, so the oldest workout in
+                                // the last group is the bottom of the screen.
+                                .identified(
+                                    groupIndex == model.groups.count - 1
+                                        && index == group.workouts.count - 1,
+                                    as: "workouts.last"
+                                )
                             }
                         }
                     }
@@ -52,6 +60,19 @@ struct WorkoutsScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $openStart) { start in
             WorkoutScreen(health: health, start: start)
+        }
+    }
+}
+
+private extension View {
+    /// Sets `identifier` on the row it names and leaves every other row unlabelled: an empty
+    /// identifier on all but one row would put a nameless element in the tree for each of them.
+    @ViewBuilder
+    func identified(_ on: Bool, as identifier: String) -> some View {
+        if on {
+            accessibilityIdentifier(identifier)
+        } else {
+            self
         }
     }
 }
