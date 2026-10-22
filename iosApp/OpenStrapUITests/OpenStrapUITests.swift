@@ -258,14 +258,28 @@ final class OpenStrapUITests: XCTestCase {
             return "\(screen): the floating bar never reported its top edge"
         }
         let barTop = bar.frame.minY
+        // The header's wordmark travels with the content, so its offset says how far the walk moved
+        // the screen; a walk that never scrolled would leave it where it started.
+        let wordmark = app.staticTexts["app.wordmark"]
+        let start = wordmark.exists ? wordmark.frame.minY : .nan
         let drags = scrollToEndOfTab(app)
-        let bottom = lowestText(app, above: barTop)
+        let end = wordmark.exists ? wordmark.frame.minY : .nan
         print(
-            "F4 \(screen): \(bottom.label) maxY=\(bottom.maxY) barTop=\(barTop) "
+            "F10 \(screen): wordmark minY \(start) -> \(end) in \(drags) drags, "
+                + "scrollView=\(app.scrollViews.firstMatch.frame)"
+        )
+        let drawn = lowestTexts(app, above: barTop)
+        for one in drawn.prefix(6) {
+            print("F10 \(screen) lowest: \(one.label.prefix(44)) minY=\(one.frame.minY) maxY=\(one.frame.maxY)")
+        }
+        attach(app, "F10-\(screen)-end")
+        let bottom = drawn.first ?? (label: "(no text)", frame: .zero)
+        print(
+            "F4 \(screen): \(bottom.label) maxY=\(bottom.frame.maxY) barTop=\(barTop) "
                 + "window=\(app.windows.firstMatch.frame) drags=\(drags)"
         )
-        guard bottom.maxY <= barTop else {
-            return "\(screen): the screen's last text, \"\(bottom.label)\", ends at \(bottom.maxY), under "
+        guard bottom.frame.maxY <= barTop else {
+            return "\(screen): the screen's last text, \"\(bottom.label)\", ends at \(bottom.frame.maxY), under "
                 + "the floating bar whose top is \(barTop), so it cannot be scrolled clear of it"
         }
         return nil
@@ -275,7 +289,7 @@ final class OpenStrapUITests: XCTestCase {
     /// text at the bottom of the window that is not the tab's content.
     private static let tabBarLabels: Set<String> = ["Today", "Recovery", "Sleep", "Activity", "You"]
 
-    /// Card F10: the lowest text a dated tab is drawing, with the label it carries.
+    /// Card F10: every text a dated tab is drawing, lowest first.
     ///
     /// This is only meaningful once the walk has reached the end: a SwiftUI stack's off-screen
     /// children report frames clamped into the viewport (card F2's note), so before then the lowest
@@ -283,27 +297,26 @@ final class OpenStrapUITests: XCTestCase {
     /// below the fold but the bar. The bar's own labels are dropped by name — dropping everything
     /// below `barTop` instead would also drop a row hidden entirely under the glass, which is the
     /// defect this looks for.
-    private func lowestText(_ app: XCUIApplication, above barTop: CGFloat) -> (label: String, maxY: CGFloat) {
+    private func lowestTexts(_ app: XCUIApplication, above barTop: CGFloat) -> [(label: String, frame: CGRect)] {
         let drawn = app.staticTexts.allElementsBoundByIndex
             .map { (label: $0.label, frame: $0.frame) }
             .filter { $0.frame.height > 0 }
             .filter { !(Self.tabBarLabels.contains($0.label) && $0.frame.minY >= barTop) }
-        guard let lowest = drawn.max(by: { $0.frame.maxY < $1.frame.maxY }) else {
-            return (label: "(no text)", maxY: 0)
-        }
-        return (label: lowest.label, maxY: lowest.frame.maxY)
+        return drawn.sorted { $0.frame.maxY > $1.frame.maxY }
     }
 
-    /// Card F10: drag a dated tab until two drags in a row change nothing on screen.
+    /// Card F10: drag a dated tab to its end, and then a few drags past it.
     ///
     /// The stop condition cannot be a frame: card F2's note is that a SwiftUI stack's off-screen
     /// children report frames clamped into the viewport, and a clamped frame does not move with the
     /// scroll — the first draft of this walk read Today's last row as 819 pt down the window and
-    /// stopped after four drags, well short of the end (run 39842589519). Bytes cannot lie about
-    /// it: with `-glowStill` the cards hold still, so two captures of one scroll position are the
-    /// same PNG, which is how the design lab's own walk finds the bottom of a section. Returns the
-    /// number of drags it took.
+    /// stopped after four drags, well short of the end (run 39842589519). Bytes are better: with
+    /// `-glowStill` the cards hold still, so two captures of one scroll position are the same PNG,
+    /// which is how the design lab's own walk finds the bottom of a section. The walk always takes
+    /// at least `least` drags first, because a tab whose first two captures match for another
+    /// reason would otherwise be measured where it started. Returns the number of drags it took.
     private func scrollToEndOfTab(_ app: XCUIApplication) -> Int {
+        let least = 10
         var previous = app.screenshot().pngRepresentation
         var still = 0
         var drags = 0
@@ -318,7 +331,7 @@ final class OpenStrapUITests: XCTestCase {
             let shot = app.screenshot().pngRepresentation
             still = shot == previous ? still + 1 : 0
             previous = shot
-            if still == 2 { return drags }
+            if drags >= least && still == 2 { return drags }
         }
         return drags
     }
