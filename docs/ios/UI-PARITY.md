@@ -1081,6 +1081,123 @@ which lives in `GlowRecoveryScreen.kt:434` and is filed under that section above
 | `DotHeader(title, trailing, chevron, warning, expanded)` (88-109) | `DotHeader` (GlowQuiet.swift:88) | ported by U2; Recovery uses `trailing`, `warning` and `expanded` |
 | `glowInk`-based text colours: title white, trailing 70%, group label 55% (94-95, 314) | `glowInk`, `.opacity(0.7)`, `.opacity(0.55)` (RecoveryScreen.swift:244, 248-250) | ported |
 
+## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowSleepScreen.kt` (card U7)
+
+The Sleep tab. Every string and every section of the Compose file, in the order `:81-101` builds
+them. The numbers, sentences, shares and words come from `SleepGlow` and `SleepPanels` in shared
+Kotlin (both with JVM tests in `SleepGlowTest`); `SleepScreen.swift` draws them.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `GlowScreenList` with `LocalGlowPaused` (81) | DayTab's `PullSyncScroll` (RootView.swift:160) | ported by U4; pause comes from `GlowScrollPhasePause` in GlowCard.swift |
+| `full { DateHeader(...) }` (82) | `DateHeader` (RootView.swift:164) | ported by U4 |
+| `left { NightCard(state) }` (85) | `NightCard` (SleepScreen.swift:125), first section (SleepScreen.swift:85) | ported |
+| `state.sleepBreakdown?.let { left { StagesPanel(b) } }` (87) | `StagesPanel` (SleepScreen.swift:179), drawn when `day.sleepBreakdown != nil` (SleepScreen.swift:87-89) | ported |
+| `session.score != null && contributors.isNotEmpty() → ContributorsPanel` (92) | `SleepContributorsPanel` (SleepScreen.swift:214), drawn when `SleepGlow.contributors` is non-nil (SleepScreen.swift:90-92) | ported; not reachable from `-demoData` (see below) |
+| `sleepVitals(state).isNotEmpty() → left { VitalsPanel }` (93-94) | `SleepVitalsPanel` (SleepScreen.swift:243), drawn when the list is non-empty (SleepScreen.swift:93-97) | ported |
+| `right { NightChartsPanel(state, session) }` (95) | `NightChartsPanel` (SleepScreen.swift:295), drawn when `SleepGlow.nightCharts` is non-nil (SleepScreen.swift:98-100) | ported |
+| `if (rec?.regularity != null) right { SleepHealthPanel }` (97) | `SleepHealthPanel` (SleepScreen.swift:326) behind `rec.regularity` (SleepScreen.swift:101-103) | ported |
+| `rec?.breathingDisturbances?.let { right { BreathingCard } }` (98) | `SleepBreathingPanel` (SleepScreen.swift:361) (SleepScreen.swift:104-106) | ported |
+| `if (state.naps.isNotEmpty()) right { NapsPanel }` (99) | `SleepNapsPanel` (SleepScreen.swift:381) behind `!day.naps.isEmpty` (SleepScreen.swift:107-111) | ported; not reachable from `-demoData` |
+| `full { WeekPanel(state) }` (100) | `SleepWeekPanel` (SleepScreen.swift:474) (SleepScreen.swift:112) | ported |
+| `SleepGlow = GlowStyle.Midnight.copy(...)`, breathing at 5/min (108-112) | `GlowStyle.sleep` (GlowSleepStages.swift:15) | ported by U5 (Today's sleep card shares it) |
+| `GlowCard(SleepGlow, fillMaxWidth)` + `GlowHeader("Sleep", trailing = "${clock(start)} – ${clock(end)}")` (125-127) | `GlowCard(GlowStyle.sleep, sizesToContent: true)` + `GlowHeader("Sleep", trailing:)` (SleepScreen.swift:130-133) | ported |
+| `"No sleep recorded for this night. Wear the strap to bed and sync in the morning."` (131) | `SleepGlow.hero.emptyText` (SleepGlow.kt:150), drawn at SleepScreen.swift:136 | ported |
+| `"No night sleep recorded, only naps."` (132) | `SleepGlow.hero.emptyText` (SleepGlow.kt:152) | ported |
+| `Spacer(Modifier.height(GlowLayout.TitleGap))` before the empty sentence (129) | `Color.clear.frame(height: GlowLayout.titleGap)` (SleepScreen.swift:135) | ported |
+| `Box(fillMaxWidth, padding top 6, BottomCenter) { GlowHorizon(score/100 ?: asleep/goal, White, 100.dp); DotMatrixText(score ?: "H:MM", bottom 6, dot 5.5, gap 2) }` (140-146) | `ZStack(alignment: .bottom)` + `GlowHorizon(progress:color:height: 100)` + `DotMatrixText(_, dot: 5.5, gap: 2)` (SleepScreen.swift:142-149) | ported |
+| `"Sleep score"` / `"asleep · goal ${formatDuration(goal)}"` (147-150) | `SleepGlow.hero.label` (SleepGlow.kt:157), drawn at SleepScreen.swift:150 | ported |
+| `Spacer(Modifier.height(14.dp))` (151) | `Color.clear.frame(height: 14)` (SleepScreen.swift:157) | ported |
+| `Narrative.sleepHeadline(score)` / `"${formatDuration(asleep)} asleep"` (152-155) | `SleepGlow.hero.headline` (SleepGlow.kt:158), drawn at SleepScreen.swift:158 | ported |
+| `"${asleep} asleep · ${in bed} in bed · woke N×"` (156-163) | `SleepGlow.hero.facts` (SleepGlow.kt:161-165), drawn at SleepScreen.swift:162 | ported |
+| `GlowChartGap()` + `GlowSleepStages(state.sleepStages, GlowLayout.ChartHeight)` (165-168) | `GlowChartGap()` + `GlowSleepStages(spans:height:)` (SleepScreen.swift:167-168) | ported by U5 |
+| `StagesPanel` → `DotPanel` + `DotHeader("Stages")` (192-198) | `StagesPanel` → `DotPanel` + `DotHeader("Stages")` (SleepScreen.swift:179-184) | ported |
+| `SLEEP_NAMES.forEach` in Awake, REM, Light, Deep order, `SLEEP_COLORS[stage]` dot (203-208) | `SleepGlow.stageRows` order and accents (SleepGlow.kt:227-241), dot at SleepScreen.swift:188 | ported |
+| `formatDuration(secs)` and `"${secs * 100 / total}%"` (210-214) | `SleepStageRow.value` / `.percent` (SleepGlow.kt:238-239), drawn at SleepScreen.swift:196-203 | ported |
+| `GlowBar(secs / total, color)` (216) | `GlowBar(fraction:color:)` (SleepScreen.swift:205) | ported |
+| `ContributorsPanel`: `DotHeader("What shaped the score")` (222-224) | `SleepContributorsPanel` (SleepScreen.swift:214-219) | ported |
+| `Text(c.label)` + `Text(c.rating.label)` in the rating's colour (226-230) | SleepScreen.swift:222-229, colour from `MetricColors.rating` (Theme.swift:178) | ported |
+| `Note(c.detail)` + `GlowBar(c.fraction, rating colour)` (231-232) | `QuietNote(text: row.detail)` + `GlowBar` (SleepScreen.swift:231-232) | ported |
+| `Note("Ratings use general sleep guidance (7+ hours, …)")` (235) | `SleepContributorsModel.note` (SleepGlow.kt:265-266), drawn at SleepScreen.swift:235 | ported |
+| `VitalsPanel`: `DotHeader("Sleep vitals", trailing = "During sleep")` + `TileGrid` (240-246) | `SleepVitalsPanel` (SleepScreen.swift:243-257) | ported |
+| `VitalTile`: value `titleLarge` padding top 8 (249-251) | `Text(vital.value)` (SleepScreen.swift:276-278) | ported |
+| `if (v.isOff) StatusPill(note.removeSuffix(" than usual"), TrendBad)` else `Text(note, 55%)` (252-255) | `vital.pill` → `StatusPill(_, color: trendBad)` / `vital.note` (SleepScreen.swift:279-285) | ported |
+| `NightChartsPanel`: `DotHeader("Heart rate", trailing = "Lowest X · avg Y bpm")` (269) | `SleepGlow.nightCharts` trailing (SleepGlow.kt:296), drawn at SleepScreen.swift:304 | ported |
+| `GlowLineChart(values, height = 110.dp, labels, MetricColors.heart)` (271) | `GlowLineChart(... height: 110, color: heart)` (SleepScreen.swift:307-318) | ported |
+| `if (hr.isNotEmpty() && breath.isNotEmpty()) DotDivider()` (275) | `if index > 0 { DotDivider() }` (SleepScreen.swift:299-301) | ported |
+| `DotHeader("Breathing", trailing = "avg %.1f br/min")` (277) | `SleepGlow.nightCharts` trailing (SleepGlow.kt:305), drawn at SleepScreen.swift:304 | ported |
+| `GlowLineChart(values, height = 90.dp, MetricColors.sleepLight)` (279) | `GlowLineChart(... height: 90, color: sleepLight)` (SleepScreen.swift:307-318) | ported |
+| readouts `"${v} bpm · ${clock}"` / `"${v} br/min · ${clock}"` (272, 280) | `SleepGlow.readout(from:index:value:unit:)` (SleepGlow.kt:337), called at SleepScreen.swift:315 | ported |
+| `evenly(points, range, 5 * 60)` (286-296) | `SleepGlow.evenly` (SleepGlow.kt:392-406) | ported |
+| `NapsPanel` here (not the dashboard's): `DotHeader("Naps", trailing = total)` (300-303) | `SleepNapsPanel` + `DotHeader("Naps", trailing: model?.total)` (SleepScreen.swift:381-392) | ported |
+| `if (i > 0) DotDivider()` (305) | `if index > 0 { DotDivider() }` (SleepScreen.swift:394-396) | ported |
+| glass nap row, `"${clock(start)} – ${clock(end)} · ${formatDuration}"` (307-314) | `Button` + `.glass(glassRowShape)` + `nap.line` (SleepScreen.swift:397-420) | ported |
+| caret 16.dp, rotated 180° when open, label "Hide"/"Details" (315-316) | `PhosphorIcon.caretDown`, `.rotationEffect` + accessibility label (SleepScreen.swift:411-415) | ported; the turn is instant, standing instruction 7 |
+| `Note("The strap didn't record stages for this nap.")` (320) | `nap.stagesNote` (SleepGlow.kt:351), drawn at SleepScreen.swift:446 | ported |
+| `GlowSleepStages(stages, 110.dp)` (322) | `GlowSleepStages(spans: nap.stages, height: 110)` (SleepScreen.swift:423) | ported |
+| `state.napBreakdowns[start]?.let { StageRows(it) }` (323) | `nap.stageRows` (SleepGlow.kt:350), drawn at SleepScreen.swift:425-444 | ported |
+| `Note("Heart rate · lowest N bpm")` (329) | `nap.hrNote` (SleepGlow.kt:355), drawn at SleepScreen.swift:450 | ported |
+| `GlowLineChart(values, height = 80.dp, color = heart)` (330) | `GlowLineChart(... height: 80, color: heart)` (SleepScreen.swift:452-462) | ported |
+| `WeekPanel`: `DotHeader("This week", trailing = "Last 7 nights")` (337-344) | `SleepWeekPanel` + `DotHeader` (SleepScreen.swift:474-477) | ported |
+| `Note("No sleep recorded in the last 7 nights.")` (346) | `SleepWeekModel.emptyNote` (SleepGlow.kt:373), drawn at SleepScreen.swift:479 | ported |
+| `SleepWindows(w.nights, w.regularity, zone)` (349) | `GlowSleepWindows(model:)` (SleepScreen.swift:480) | ported (GlowSleepWindows.swift) |
+| `Fact("Avg. asleep")`, `Fact("Avg. score")`, `Fact("Reached ${formatDuration(goal)}")` (350-354) | `SleepWeekModel.facts` (SleepGlow.kt:380-384), drawn at SleepScreen.swift:482-487 | ported |
+| `if (r == null) Note(w.learningNote)` (356) | `SleepWeekModel.learningNote` (SleepGlow.kt:404), drawn at SleepScreen.swift:508-509 | ported |
+| `Fact("Regularity", "${r.score}%")` + band in `bandColor` (359-363) | `SleepRegularityModel.score/.band/.accent` (SleepGlow.kt:386-397), drawn at SleepScreen.swift:490-505 | ported |
+| `Note("Fall asleep ${minutesClock(r.bedtime)}")`, `Note("Wake up ${minutesClock(r.wake)}")` (365-366) | `SleepRegularityModel.fallAsleep/.wakeUp` (SleepGlow.kt:392-394), drawn at SleepScreen.swift:502-504 | ported |
+| `GlowBar(r.score / 100f, bandColor(r.band))` (369) | `GlowBar(fraction: regularity.fraction, color:)` (SleepScreen.swift:506) | ported |
+| `Note(w.regularityNote.orEmpty())` (370) | `SleepRegularityModel.note` (SleepGlow.kt:396), drawn at SleepScreen.swift:507 | ported |
+| `BreathingCard`: `DotHeader("Breathing", trailing = "vs. your nights")` (379-382) | `SleepBreathingPanel` (SleepScreen.swift:361-366) | ported |
+| `Fact("Disturbances", "%.1f /h")`, `Fact("Your usual", … ?: "—")` (383-386) | `SleepBreathingModel.disturbances/.usual` (SleepGlow.kt:413-415), drawn at SleepScreen.swift:368-370 | ported |
+| `"Your usual builds after ${Recovery.SCORED_NIGHTS} nights with a breathing summary."` (388) | `SleepGlow.breathing` (SleepGlow.kt:417) | ported |
+| `"Dips in blood oxygen during sleep, … " + BodySignalsCopy.DISCLAIMER` (389-390) | `SleepGlow.breathing` (SleepGlow.kt:419-420), drawn at SleepScreen.swift:372 | ported |
+| `SleepHealthPanel`: `DotHeader("Sleep health", trailing = "N of 3 good")` (399-402) | `SleepHealthPanel` + `DotHeader` (SleepScreen.swift:326-331) | ported |
+| `Fact("Regularity", sri ?: ±SD ?: "—")`, `Fact("Band", …)` (403-406) | `SleepHealthModel.regularityValue/.bandValue` (SleepGlow.kt:428-431), drawn at SleepScreen.swift:333-335 | ported |
+| the three `note` branches (407-413) | `SleepHealthModel.note` (SleepGlow.kt:432-439), drawn at SleepScreen.swift:337 | ported |
+| `DotDivider()` + `HealthRow("Duration"/"Continuity"/"Regularity", word(v))` (415-419) | `SleepHealthModel.rows` (SleepGlow.kt:441-449), drawn at SleepScreen.swift:341-350 | ported |
+| `Note("Midpoint of your sleep … , outside 01:30–04:30. …")` (420-423) | `SleepHealthModel.midpointNote` (SleepGlow.kt:451-459), drawn at SleepScreen.swift:352 | ported |
+| `HealthRow(label, value)` (428-434) | the inline `HStack` at SleepScreen.swift:341-350 | ported |
+| `LocalGoals.current.sleepSeconds` (124, 341) | `health.goals.sleepSeconds` (SleepScreen.swift:80, 112) | ported; both read the same stored goal |
+| `onOpenMetric(v.metric)` (94, 244) | `route = .metric(metric.name)` (SleepScreen.swift:95-97) | ported to Today's detail route, as card U6's tiles do (card U9 fills it) |
+
+Two sections cannot be reached from `-demoData` and so have no screenshot: the scored hero with its
+"What shaped the score" panel, and "Naps". `SampleData.kt:73` inserts `SleepSession(start, end)` with
+no `score`, no `nap` and no stage totals, and the seed writes no naps at all, so every seeded night
+is the no-score state the card asks for and the demo day has no nap. The screenshots say exactly
+that; no rows were invented for them.
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/SleepPanels.kt` (card U7)
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `class SleepVital(metric, label, value, note, accent)` (31-37) | `SleepVital` (SleepPanels.kt:23-36), with `off` and `pill` folded in (:33-36) | ported |
+| `sleepVitals(state)`: lowest and average HR, then HRV, blood oxygen, breathing, skin temperature (44-84) | `sleepVitals` (SleepPanels.kt:44-101) | ported |
+| `"Lowest heart rate"`, `"${bpm} bpm"`, `"at ${clockOf(x)}"` (64) | SleepPanels.kt:71-76 | ported |
+| `"Average heart rate"`, `"while asleep"` (65) | SleepPanels.kt:75 | ported |
+| `"HRV"`, `"${v} ms"`; `"Blood oxygen"`, `"${v} %"`; `"Breathing"`, `"%.1f br/min"`; `"Skin temperature"`, `"%+.1f °C"` (66-81) | SleepPanels.kt:76-100 | ported |
+| `"Higher than usual"` / `"Lower than usual"` / `"Usual"` / `"Learning n/7 nights"` (50-55) | SleepPanels.kt:52-58 | ported |
+| skin temperature as a deviation once there is a normal, `-` printed `−` (77) | SleepPanels.kt:97-98 | ported; `%+` was missing from shared `String.format` and was added with `FormatTest` |
+| `SleepVital.isOff` (87) | `SleepVital.off` / `.pill` (SleepPanels.kt:33-36) | ported |
+| `class SleepWeek` + `learningNote` + `regularityNote` (93-107) | `SleepWeek` (SleepPanels.kt:120-139) | ported |
+| `sleepWeek(state, goalSeconds, zone)` (110-124) | `sleepWeek` (SleepPanels.kt:142-164) | ported |
+| `bandColor(band)` (126-130) | `bandAccent` (SleepPanels.kt:167-171) | ported |
+| `SleepWindows` canvas: 200.dp, 40.dp gutter, 18.dp label bands, hour marks every 3 h, dashed averages, 0.42-slot bars, value over each bar (137-210) | `GlowSleepWindows` (GlowSleepWindows.swift:34-160) | ported; the axis is Funnel Sans 11 where Compose's bare `TextStyle` falls back to the platform font |
+| `"No sleep recorded in the last 7 nights."` is GlowSleepScreen's (346) | — | see the screen's table |
+| `minutesClock(minutes)` (212) | `minutesClock` (SleepPanels.kt:105) | ported |
+| `clockOf(epochSeconds)` (214-215) | `clockOf(epoch, zone)` (SleepPanels.kt:257-260) | ported |
+
+## `app/src/main/kotlin/org/openstrap/app/ui/dashboard/NapsPanel.kt` (card U7)
+
+This is the dashboard's panel, with a moon icon and a chevron; the Sleep tab draws
+`GlowSleepScreen.kt`'s own `NapsPanel` (:298-335), which is the one `sleep.png` shows, so that is
+what Swift ports. The file is listed here because the card names it.
+
+| Compose element or string (file:line) | Swift (file:line) | Status |
+|---|---|---|
+| `NapsPanel(naps, onClick)` → `Panel` + `PanelHeader("Naps", Moon, sleepLight, chevron)` (21-23) | `SleepNapsPanel` (SleepScreen.swift:381) draws GlowSleepScreen's `DotHeader("Naps", trailing: total)` instead | not ported: the dashboard's icon-and-chevron header is a different panel from the Sleep tab's, which the reference screenshot shows |
+| `Text("${clock(start)} – ${clock(end)} · ${formatDuration(end - start)}")` (25) | `SleepNap.line` (SleepGlow.kt:345-347) | ported (in the Sleep tab's panel) |
+| `clock(epochSeconds)` (16-17) | `clockOf` (SleepPanels.kt:257) | ported |
+
 ## Not in this card
 
 The debug Design lab (`DesignLabView.swift`, `-designLab`) has no Compose counterpart: Android has

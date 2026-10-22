@@ -1039,3 +1039,61 @@ UTC — the hour that used to be red — `:shared:jvmTest` is 363 tests, 0 failu
 
 `SleepGlowTest.kt` (card U7's, untracked and mid-flight) was moved aside for the local runs and
 restored byte-for-byte; it references `hasAverage` / `hasSleep`, which no shared class has yet.
+
+(Card U7 landed those classes in the commits after this one: `SleepWindowNight.hasSleep` and
+`SleepWindowsModel.hasAverage` are on `ios` now, and `SleepGlowTest` is committed with them.)
+
+## Card U7 (Sleep)
+
+Three copies, all under standing instruction 5 ("if a Compose screen computes a number, date or
+sentence beyond plain formatting, copy that function into shared Kotlin … with a JVM test").
+
+### `ui/dashboard/SleepPanels.kt` -> `shared/.../app/ui/dashboard/SleepPanels.kt`
+
+Same package and the same names as the Compose file, so the two read side by side: `SleepVital`,
+`sleepVitals(state[, zone])`, `SleepWeek`, `sleepWeek`, `SleepWindowHour`, `SleepWindowNight`,
+`SleepWindowsModel`, `sleepWindows`, `minutesClock`, `clockOf`. What changed:
+
+- `java.time` became `kotlinx.datetime` (`Instant.ofEpochSecond(…).atZone(zone)` became
+  `Instant.fromEpochSeconds(…).toLocalDateTime(zone)`, `Math.floorMod` is a local helper).
+- `Color` became a `SleepAccent` name (`bandColor` -> `bandAccent`), because shared Kotlin has no
+  colour type; `Theme.swift` maps the name back.
+- `SleepWindows`' `@Composable` canvas stayed in Swift (`GlowSleepWindows.swift`) and its
+  arithmetic — minutes since noon, the chart's top and bottom, the hour marks, each bar's span —
+  moved into `sleepWindows()`, because where a bar starts is not drawing.
+- The vitals' `isOff` extension and the pill's word (`note.removeSuffix(" than usual")`) became
+  properties on `SleepVital`, so Swift does not repeat the string surgery.
+- The windows' optional fields became `hasSleep` / `hasAverage` flags beside non-optional numbers:
+  Kotlin's `Int?` reaches Swift as a boxed `KotlinInt`, and the canvas has no place for that.
+
+Tests: `shared/src/jvmTest/.../screens/SleepGlowTest.kt`.
+
+### `ui/glow/GlowSleepScreen.kt` -> `shared/.../app/ui/glow/SleepGlow.kt`
+
+New file, same package as its source. It holds everything the screen computes: the hero's number,
+label, sentence, facts line and arc progress (`hero`); the stage rows with their shares
+(`stageRows`); the contributors and their ratings (`contributors`, which also applies
+`recovery?.takeIf { it.date == state.date }`, `Recovery.wasoMinutes` and `Narrative.sleepContributors`);
+the vitals (`vitals`, a pass-through to `sleepVitals`); the night's two charts and their five-minute
+buckets (`nightCharts`, with the private `evenly` copied verbatim); the naps and what opening one
+adds (`naps`, `defaultOpenNap`); the week with its regularity row and windows (`week`); the breathing
+card (`breathing`); the sleep-health panel (`sleepHealth`); and the chart readout (`readout`).
+
+Unchanged apart from `java.time` -> `kotlinx.datetime`, `Color` -> `SleepAccent`, and no-overload
+wrappers that read `TimeZone.currentSystemDefault()` so Swift never has to name a kotlinx-datetime
+type (the same shape `RecoveryGlow.chargeReadout` already had). Tests: `SleepGlowTest.kt`, 24 cases.
+
+### `app/.../data/Format.kt` -> `shared/.../app/data/Format.kt` (one flag)
+
+`sleepVitals` prints the skin temperature as `"%+.1f °C"`, and shared `String.format` parsed the `+`
+flag without honouring it, so the iPhone would have printed "1.5 °C" where Android prints
+"+1.5 °C". The flag is now applied to `%f` and `%d` (Java's rule: a non-negative number gets the
+sign, a negative one keeps its own). `FormatTest.kt` (3 cases) pins it. Nothing else in `shared/`
+uses `+`, so no other output moved.
+
+### Swift
+
+`iosApp/OpenStrap/Screens/SleepScreen.swift` draws the tab; `iosApp/OpenStrap/Design/GlowSleepWindows.swift`
+draws the week's clock. `SleepView.swift`, `HeartView.swift`, `StageBar` and `Stat` are deleted: the
+first was card U4's interim Sleep tab, the second was never routed, and the two helpers existed only
+for them.
