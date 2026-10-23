@@ -263,16 +263,23 @@ final class OpenStrapUITests: XCTestCase {
             return "\(screen): the dated tab has no wordmark to walk by"
         }
         let walk = scrollToEndOfTab(app, wordmark: wordmark)
-        // The list can grow after it has ended — demo rows whose analysis finishes late land below
-        // the fold and lengthen it without moving the wordmark — so the end is only the end once the
-        // measurement holds still. Two settled readings, or a walk that takes up the new room.
+        // The end is only the end once the content is inside the window and holds still: a list whose
+        // panels are still arriving ends the scroll early (run 39873446048 walked Recovery to the end
+        // of a half-drawn screen, 454 pt of travel, and measured its last text 1705 pt down a 874 pt
+        // window), and a card that lands afterwards lengthens the list under the measurement. Each
+        // round walks again and measures again.
+        let windowBottom = app.windows.firstMatch.frame.maxY
         var drawn = lowestTexts(app, above: barTop)
-        for _ in 0..<2 {
+        for _ in 0..<3 {
+            let bottom = drawn.first?.frame.maxY ?? 0
             Thread.sleep(forTimeInterval: 1.5)
             let after = lowestTexts(app, above: barTop)
-            let before = drawn.first?.frame.maxY ?? 0
-            if abs((after.first?.frame.maxY ?? 0) - before) < 1 { break }
-            print("F10 \(screen): the list grew under the measurement (\(before) -> \(after.first?.frame.maxY ?? 0)); walking again")
+            let settled = abs((after.first?.frame.maxY ?? 0) - bottom) < 1
+            if settled && bottom <= windowBottom { break }
+            print(
+                "F10 \(screen): not the end yet (last text \(bottom), window bottom \(windowBottom), "
+                    + "settled \(settled)); walking again"
+            )
             _ = scrollToEndOfTab(app, wordmark: wordmark)
             drawn = lowestTexts(app, above: barTop)
         }
@@ -537,9 +544,11 @@ final class OpenStrapUITests: XCTestCase {
                 app.staticTexts[tab.drawn].firstMatch.waitForExistence(timeout: 120),
                 "The \(tab.name) tab never drew \(tab.drawn)"
             )
-            // One more moment for the cards' first render to finish before the walk starts asking
-            // for frames (card F5's rule for the first query after a tab switch).
-            Thread.sleep(forTimeInterval: 1)
+            // Give the tab's own data a moment to land before the walk starts asking for frames:
+            // `RecoveryScreen` and the others read their panels on appear, and a walk that starts
+            // too early ends on a half-drawn screen (run 39873446048). Card F5's rule for the first
+            // query after a tab switch, with room for the queries behind the panels.
+            Thread.sleep(forTimeInterval: 6)
             if let problem = clearsNavBarAtEnd(app, screen: tab.name) { failures.append(problem) }
         }
 
