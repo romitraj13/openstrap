@@ -164,32 +164,57 @@ struct DayTab<Content: View>: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            PullSyncScroll(syncing: controller.syncRunning) {
-                controller.syncNow()
-            } content: {
-                VStack(alignment: .leading, spacing: 12) {
-                    DateHeader(
-                        date: selectedDate,
-                        battery: battery,
-                        charging: battery != nil && controller.charging,
-                        picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
-                        onPrev: { step(-1) },
-                        onNext: { step(1) },
-                        onOpenStrap: onOpenStrap
-                    )
-                    content()
+            Group {
+                if ready {
+                    PullSyncScroll(syncing: controller.syncRunning) {
+                        controller.syncNow()
+                    } content: {
+                        VStack(alignment: .leading, spacing: 12) {
+                            DateHeader(
+                                date: selectedDate,
+                                battery: battery,
+                                charging: battery != nil && controller.charging,
+                                picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
+                                onPrev: { step(-1) },
+                                onNext: { step(1) },
+                                onOpenStrap: onOpenStrap
+                            )
+                            content()
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .glowClearsNavBar()
+                } else {
+                    // Card F11: Today's scroll view is not built until the reads that feed its list have
+                    // all answered, so the list it lays out first is the list it keeps. A scroll view that
+                    // exists while its content is still arriving clamps its gestures to a height short of
+                    // the cards it ends up drawing (measured: a range ending at 1444.67, drags stopping
+                    // dead at 1309.0), which left Today's last card under the floating bar. The other
+                    // three tabs are built when the bar switches to them, with their data already read;
+                    // this is the same rule for the one tab that is on screen from launch.
+                    Color.clear
                 }
-                .padding(.horizontal, 16)
             }
-            .glowClearsNavBar()
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear { health.reload() }
+            .onAppear {
+                // Today's own reads, asked for here rather than by the screen, because the screen is not
+                // built until they have answered.
+                if tab == .today && health.dayState == nil { health.reloadToday() }
+                health.reload()
+            }
             .onChange(of: controller.lastSyncEpochSeconds) { _, _ in
                 health.reload()
                 health.reloadDaysWithData()
             }
         }
+    }
+
+    /// Card F11: a dated tab may draw its list once every read that puts a card on it has answered.
+    /// Only Today can be waiting: the other three are built when the bar switches to them, after the
+    /// same reads have already landed.
+    private var ready: Bool {
+        tab != .today || (health.dayState != nil && health.todayWorkoutsRead)
     }
 
     /// One day back or forward, never past today (`DayViewModel.previousDay`/`nextDay`).

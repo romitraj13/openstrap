@@ -1469,15 +1469,19 @@ which is why the last card could not be dragged clear of the bar however far the
 Today's workouts card is the one card Today draws from a second read (`ScreenQueries.workouts`, not the
 day), which is what made it the one tab that could grow after the first layout.
 
-The fix is that Today draws its list once, from one complete read: `HealthModel.reloadToday` clears a
-`todayWorkoutsRead` flag and sets it when the workouts — the last read that puts a card on that list —
-have answered, and `TodayScreen` draws nothing until then. The list's first layout is therefore its
-final shape, so nothing is ever drawn past the end of the range. `PullSyncScroll` also gives its content
-its own height (`.fixedSize(horizontal: false, vertical: true)`, DateHeader.swift), so the stack reports
-the height of the cards it is drawing rather than accepting a stale proposal. On the run that carried
-the fix the content host measured its full 2172 pt, the drags reached 1444.67, and Today's last card came
-to rest at 690.99 against the bar's 754.0; Recovery, Sleep and Activity draw every card at first layout
-and measure exactly as they did before.
+The fix is that Today is not given a scroll view until the reads that feed its list have all answered:
+`HealthModel.reloadToday` clears a `todayWorkoutsRead` flag and sets it when the workouts — the last
+read that puts a card on that list — have answered, and `DayTab` builds its `PullSyncScroll` only when
+that flag and the day's own read are both in. The list's first layout is therefore its final shape, so
+no card is ever drawn past the end of the range. That is also how the other three tabs have always
+measured right: the bar builds them when it switches to them, with the same reads already landed. The
+`todayWorkoutsRead` flag is what Today, the one tab on screen from launch, was missing.
+
+`PullSyncScroll` also gives its content its own height (`.fixedSize(horizontal: false, vertical: true)`,
+DateHeader.swift) as insurance, so a stack reports the height of the cards it is drawing rather than
+accepting a stale proposal. On the run that carried the earlier half of this work the content host
+measured its full 2172 pt, the drags reached 1444.67, and Today's last card came to rest at 690.99
+against the bar's 754.0.
 
 The cost is that Today's first paint waits for that read too, as it already waited for the day's. With
 `-lateWorkouts 20` — the test seam — it waits twenty seconds; on a real launch it is the same local
