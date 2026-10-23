@@ -49,9 +49,12 @@ struct PullSyncScroll<Content: View>: View {
     static var pullDistance: CGFloat { 80 }
 
     var syncing: Bool
-    /// Card F11: the identity of the scrolled content. When it changes the content is built again, which
-    /// is the only thing that makes a SwiftUI scroll view measure a list that grew after its last layout
-    /// (`HealthModel.todayListKey`). Empty for a screen whose cards never arrive after the first layout.
+    /// Card F11: the identity of the scrolled content. When it changes the scroll view is built again,
+    /// which is what makes it take the list's new height into its scroll range: today's workouts card
+    /// arrives after the list has laid out, and a scroll view that has already measured its content
+    /// keeps the range it had (measured: 2172.67 pt of content, drags stopping at offset 1308.0 with
+    /// the range's end at 1444.67). See `HealthModel.todayListKey`. Empty — one identity for the life
+    /// of the tab — for a screen whose cards are all there at first layout.
     var contentKey: String = ""
     var onSync: () -> Void
     @ViewBuilder var content: () -> Content
@@ -75,7 +78,6 @@ struct PullSyncScroll<Content: View>: View {
                     .frame(width: 1, height: 1)
                 #endif
             }
-            .id(contentKey)
         }
         .coordinateSpace(name: space)
         .onPreferenceChange(PullOffsetKey.self) { offset in
@@ -85,6 +87,7 @@ struct PullSyncScroll<Content: View>: View {
         }
         .environment(\.pullSync, PullSyncState(fraction: fraction, syncing: syncing))
         .refreshable { onSync() }
+        .id(contentKey)
     }
 
     /// The fraction the header draws with: the pull, or a full one while a sync runs.

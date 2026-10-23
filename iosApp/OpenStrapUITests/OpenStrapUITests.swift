@@ -415,6 +415,8 @@ final class OpenStrapUITests: XCTestCase {
             let top = wordmark.frame.minY
             still = top < previous - 1 ? 0 : still + 1
             previous = top
+            // Card F11, temporary: where the scroll view's range ended after each drag.
+            print("F11 drag \(drags): wordmark=\(top) geometry: \(scrollGeometry(app))")
             if still == 2 { return drags }
         }
         return drags
