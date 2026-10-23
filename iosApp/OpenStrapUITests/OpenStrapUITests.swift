@@ -584,7 +584,12 @@ final class OpenStrapUITests: XCTestCase {
         defer { continueAfterFailure = previousContinue }
 
         let app = XCUIApplication()
-        app.launchArguments = ["-demoData", "-glowStill"]
+        // Card F11: `-lateWorkouts 3` holds the workouts card back for three seconds, so it lands after
+        // Today's list has laid out for the first time on every run. That is the condition the card is
+        // about — the read that draws that card is a second database query, and whether it answered
+        // before or after the day's first paint used to decide whether Today's last card could be
+        // scrolled clear of the bar (nine runs in ten it could not).
+        app.launchArguments = ["-demoData", "-glowStill", "-lateWorkouts", "3"]
         app.launch()
 
         var failures: [String] = []

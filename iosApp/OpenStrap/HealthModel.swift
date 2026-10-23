@@ -32,6 +32,25 @@ enum DemoData {
         return false
         #endif
     }
+
+    /// Debug only: `-lateWorkouts <seconds>` holds Today's workouts read back for that many seconds,
+    /// so the workouts card lands after the list's first layout on every run.
+    ///
+    /// Card F11: whether that card is in Today's list when the scroll view first lays it out is a race
+    /// between two database reads (`reloadToday` asks for the day and for the workouts separately), and
+    /// the card arriving afterwards is what left Today's last card under the floating bar on nine runs
+    /// in ten. A test that wants that condition should not wait for luck: this makes it every run. A
+    /// release build ignores the argument, and a run without it keeps the race.
+    static var lateWorkoutsSeconds: Double {
+        #if DEBUG
+        let arguments = CommandLine.arguments
+        guard let flag = arguments.firstIndex(of: "-lateWorkouts"), flag + 1 < arguments.count,
+              let seconds = Double(arguments[flag + 1]) else { return 0 }
+        return max(seconds, 0)
+        #else
+        return 0
+        #endif
+    }
 }
 
 /// The screens' data, read from the shared Kotlin `ScreenQueries` (U4's calendar, profile and goals;
@@ -152,7 +171,17 @@ final class HealthModel: ObservableObject {
             self.recoveryResult = result
         }
         screens.workouts { [weak self] list in
-            self?.workoutList = list
+            guard let self else { return }
+            // Card F11's test seam: `-lateWorkouts` holds the card back so it is certain to arrive
+            // after Today's first layout. A run without the flag assigns at once.
+            let late = DemoData.lateWorkoutsSeconds
+            if late > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + late) { [weak self] in
+                    self?.workoutList = list
+                }
+            } else {
+                self.workoutList = list
+            }
         }
         // The Activity tab's two reads (card U8): the seven days of PAI ending on this day, and the
         // strap's sport effects, which its load and fitness panels need.
@@ -253,8 +282,13 @@ final class HealthModel: ObservableObject {
 
     /// A Monday's recap compares the seven days before the selected day with the seven before them,
     /// so it reads a month of steps: the same two weeks Compose's history call covers.
+    ///
+    /// Card F11: `-todayMonday` makes Today draw the recap on a day that is not a Monday (it exists so a
+    /// UI test does not depend on the weekday it runs on), so the steps behind it follow the same flag.
+    /// Without it the forced recap said "Steps a day —": the card was drawn with no history loaded.
+    /// Release builds read `forcesRecapDay` as false and this is the plain Monday check.
     private func reloadRecapSteps(date: String) {
-        guard TodayGlow.shared.isRecapDay(iso: date) else {
+        guard TodayGlow.shared.isRecapDay(iso: date) || TodayFlags.forcesRecapDay else {
             recapSteps = []
             return
         }
