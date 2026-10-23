@@ -79,7 +79,16 @@ struct RootView: View {
             Group {
                 switch tab {
                 case .today:
-                    DayTab(tab: .today, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
+                    // Card F11: Today's cards arrive one read at a time (the day, Readiness and Charge,
+                    // the workouts), so its scroll content is re-identified as each card joins the list.
+                    DayTab(
+                        tab: .today,
+                        controller: controller,
+                        health: health,
+                        selectedDate: $selectedDate,
+                        onOpenStrap: openStrap,
+                        contentKey: health.todayListKey
+                    ) {
                         TodayScreen(controller: controller, health: health, onOpenTab: openTab)
                     }
                 case .recovery:
@@ -147,6 +156,10 @@ struct DayTab<Content: View>: View {
     @ObservedObject var health: HealthModel
     @Binding var selectedDate: Date
     var onOpenStrap: () -> Void
+    /// Card F11: the identity of this tab's scroll content, for a tab whose cards arrive after the list
+    /// has laid out (`HealthModel.todayListKey`). A tab that draws everything at first layout leaves it
+    /// empty, and its content keeps one identity for the life of the tab.
+    var contentKey: String = ""
     @ViewBuilder var content: () -> Content
 
     @State private var path = NavigationPath()
@@ -164,7 +177,7 @@ struct DayTab<Content: View>: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            PullSyncScroll(syncing: controller.syncRunning) {
+            PullSyncScroll(syncing: controller.syncRunning, contentKey: contentKey) {
                 controller.syncNow()
             } content: {
                 VStack(alignment: .leading, spacing: 12) {

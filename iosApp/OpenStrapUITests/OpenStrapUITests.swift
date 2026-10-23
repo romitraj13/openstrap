@@ -563,9 +563,9 @@ final class OpenStrapUITests: XCTestCase {
     /// Card F11 made Today the fourth tab that passes: the workouts card, drawn by a second read,
     /// landed after Today's list had laid out, and the scroll view clamped its gestures to the height
     /// it had laid the content out at, so the last card sat under the bar on nine runs in ten.
-    /// `PullSyncScroll` gives its content its own height now (`fixedSize` vertical), and the walk
-    /// launches with `-lateWorkouts` so it measures that late card on every run instead of one run in
-    /// ten.
+    /// `PullSyncScroll` now gives its content its own height (`fixedSize` vertical) and builds it again
+    /// when Today's cards change, and the walk launches with `-lateWorkouts` so it measures that late
+    /// card on every run instead of one run in ten.
     ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).
@@ -578,12 +578,12 @@ final class OpenStrapUITests: XCTestCase {
         defer { continueAfterFailure = previousContinue }
 
         let app = XCUIApplication()
-        // Card F11: `-lateWorkouts 3` holds the workouts card back for three seconds, so it lands after
-        // Today's list has laid out for the first time on every run. That is the condition the card is
-        // about — the read that draws that card is a second database query, and whether it answered
-        // before or after the day's first paint used to decide whether Today's last card could be
-        // scrolled clear of the bar (nine runs in ten it could not).
-        app.launchArguments = ["-demoData", "-glowStill", "-lateWorkouts", "3"]
+        // Card F11: `-lateWorkouts 20` holds the workouts card back for twenty seconds, so it cannot be
+        // in Today's list when the list lays out for the first time — that is the condition the card is
+        // about, and it used to decide whether Today's last card could be scrolled clear of the bar (nine
+        // runs in ten it could not). Twenty seconds is well past the day's own read and the first paint,
+        // so this is the late card on every run, not a race that sometimes goes the other way.
+        app.launchArguments = ["-demoData", "-glowStill", "-lateWorkouts", "20"]
         app.launch()
 
         var failures: [String] = []

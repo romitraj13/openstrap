@@ -1469,16 +1469,19 @@ which is why the last card could not be dragged clear of the bar however far the
 Today's workouts card is the one card Today draws from a second read (`ScreenQueries.workouts`, not the
 day), which is what made it the one tab that could grow after the first layout.
 
-The fix is one modifier: `PullSyncScroll` gives its content its own height
-(`.fixedSize(horizontal: false, vertical: true)`, DateHeader.swift), so the stack reports the height of
-the cards it is drawing instead of accepting the stale proposal. On the run that carried it the content
-host measured its full 2172 pt, the drags reached 1444.67, and Today's last card came to rest at 690.99
-against the bar's 754.0. Recovery, Sleep and Activity draw every card at first layout and measure
-exactly as they did before.
+The fix has two parts, both in `PullSyncScroll` (DateHeader.swift). The content takes its own height
+(`.fixedSize(horizontal: false, vertical: true)`), so the stack reports the height of the cards it is
+drawing instead of accepting the stale proposal; and Today's scroll view is built again when a card
+joins the list (`HealthModel.todayListKey` -> `DayTab.contentKey` -> `.id`), which is what makes the
+scroll view lay the list out again at all. On the run that carried both the content host measured its
+full 2172 pt, the drags reached 1444.67, and Today's last card came to rest at 690.99 against the bar's
+754.0. Either part alone still failed: without the rebuild nothing laid the grown list out, and without
+`fixedSize` the fresh layout was again the height measured before the card. Recovery, Sleep and Activity
+draw every card at first layout, pass no key, and measure exactly as they did before.
 
-`-lateWorkouts 3` (DEBUG only, `HealthModel.reloadToday`) holds that second read back so the card lands
-after the first layout on every run: the defect was a race between two database reads, and the test
-now measures the late card every time rather than one run in ten.
+`-lateWorkouts 20` (DEBUG only, `HealthModel.reloadToday`) holds that second read back for twenty
+seconds, so the card cannot be in the list when it first lays out: the defect was a race between two
+database reads, and the test now measures the late card every time rather than one run in ten.
 
 `-todayMonday` forces the recap card on a day that is not a Monday; `HealthModel.reloadRecapSteps`
 honours the same flag, so a forced recap reads its steps (the row read "Steps a day —" without them,

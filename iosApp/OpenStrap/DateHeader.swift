@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /*
  * The top of every date screen: the OpenHealth wordmark and the strap chip, the gap a pull opens,
@@ -48,6 +49,14 @@ struct PullSyncScroll<Content: View>: View {
     static var pullDistance: CGFloat { 80 }
 
     var syncing: Bool
+    /// Card F11: the identity of the scrolled content. When it changes the scroll view is built again —
+    /// which is what makes it lay the list out afresh and take its height into the range that its
+    /// gestures are clamped to. Today's workouts card is drawn by a second read and lands after the list
+    /// has laid out; without this the card was drawn past the end of the list the scroll view had
+    /// measured (2172.67 pt of content, a range ending at 1444.67, drags stopping dead at 1309.0). See
+    /// `HealthModel.todayListKey`. Empty — one identity for the life of the tab — for a screen whose
+    /// cards are all there at first layout.
+    var contentKey: String = ""
     var onSync: () -> Void
     @ViewBuilder var content: () -> Content
 
@@ -64,16 +73,9 @@ struct PullSyncScroll<Content: View>: View {
                 .frame(height: 0)
                 content()
             }
-            // Card F11: the content takes its own height, whatever height the scroll view proposes.
-            //
-            // A card that joins the list after it has laid out (Today's workouts card comes from a second
-            // read) used to be drawn but never added to the scroll range: the content was laid out 135 pt
-            // shorter than its own content size, and the scroll view clamps its gestures to the layout,
-            // so the last card stayed under the floating bar however far the list was dragged (measured:
-            // 2172.67 pt of content, a range ending at 1444.67, drags stopping dead at 1309.0). Under
-            // `fixedSize` the stack reports the height of the cards it is drawing, so the range follows
-            // the list. The four dated tabs all scroll under the bar; the other three draw every card at
-            // first layout, and this leaves them exactly as they were.
+            // Card F11: the content takes its own height, whatever height the scroll view proposes. A
+            // stack that accepts a proposal is laid out at the height measured before the last card
+            // arrived, and the scroll view's range follows the layout, not the content size.
             .fixedSize(horizontal: false, vertical: true)
         }
         .coordinateSpace(name: space)
@@ -84,6 +86,7 @@ struct PullSyncScroll<Content: View>: View {
         }
         .environment(\.pullSync, PullSyncState(fraction: fraction, syncing: syncing))
         .refreshable { onSync() }
+        .id(contentKey)
     }
 
     /// The fraction the header draws with: the pull, or a full one while a sync runs.
