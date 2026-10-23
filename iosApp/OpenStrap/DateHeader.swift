@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /*
  * The top of every date screen: the OpenHealth wordmark and the strap chip, the gap a pull opens,
@@ -63,6 +64,12 @@ struct PullSyncScroll<Content: View>: View {
                 }
                 .frame(height: 0)
                 content()
+                #if DEBUG
+                // Card F11, temporary: the probe the UI test reads to see this scroll view's own
+                // geometry. Removed before the card's final commit.
+                ScrollGeometryProbe()
+                    .frame(width: 1, height: 1)
+                #endif
             }
         }
         .coordinateSpace(name: space)
@@ -295,3 +302,43 @@ struct DateHeader: View {
         return formatter.string(from: date)
     }
 }
+
+#if DEBUG
+/// Card F11, temporary probe (removed before this card's final commit): the enclosing scroll view's
+/// own geometry, read by `testEveryDatedTabScrollsClearOfTheBar`.
+///
+/// The label is computed when the test takes its accessibility snapshot rather than when the view is
+/// laid out, so the offset it reports is the offset at the end of the walk. `rangeEndY` is the largest
+/// content offset the scroll view will accept (`contentSize + bottom inset - bounds`): the number the
+/// walk's end is supposed to reach.
+private final class ScrollGeometryView: UIView {
+    override var accessibilityLabel: String? {
+        get {
+            var ancestor = superview
+            while let candidate = ancestor, !(candidate is UIScrollView) {
+                ancestor = candidate.superview
+            }
+            guard let scroll = ancestor as? UIScrollView else { return "no enclosing scroll view" }
+            let inset = scroll.adjustedContentInset
+            let content = scroll.contentSize.height
+            let height = scroll.bounds.height
+            return "contentH=\(content) boundsH=\(height) insetTop=\(inset.top) "
+                + "insetBottom=\(inset.bottom) offsetY=\(scroll.contentOffset.y) "
+                + "rangeEndY=\(content + inset.bottom - height)"
+        }
+        set { }
+    }
+}
+
+struct ScrollGeometryProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = ScrollGeometryView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "debug.scrollGeom"
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) { }
+}
+#endif

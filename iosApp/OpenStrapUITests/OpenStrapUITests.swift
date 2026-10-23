@@ -269,6 +269,8 @@ final class OpenStrapUITests: XCTestCase {
             return nil
         }
         let walk = scrollToEndOfTab(app, wordmark: wordmark)
+        // Card F11, temporary: the scroll view's own geometry before and after the walk.
+        print("F11 \(screen) geometry at start: \(scrollGeometry(app))")
         // The end is only the end once the content is inside the window and holds still: a list whose
         // panels are still arriving ends the scroll early (run 39873446048 walked Recovery to the end
         // of a half-drawn screen, 454 pt of travel, and measured its last text 1705 pt down a 874 pt
@@ -293,6 +295,7 @@ final class OpenStrapUITests: XCTestCase {
             print("F10 \(screen) lowest: \(one.label.prefix(44)) minY=\(one.frame.minY) maxY=\(one.frame.maxY)")
         }
         attach(app, "F10-\(screen)-end")
+        print("F11 \(screen) geometry at end: \(scrollGeometry(app))")
         let bottom = drawn.first ?? (label: "(no text)", frame: .zero)
         let window = app.windows.firstMatch.frame
         print(
@@ -314,6 +317,15 @@ final class OpenStrapUITests: XCTestCase {
             drags: walk.drags,
             scrolled: walk.moved
         )
+    }
+
+    /// Card F11, temporary: the scroll view's own geometry, as the DEBUG probe
+    /// (`ScrollGeometryProbe`, DateHeader.swift) reports it — contentSize, the bottom inset the bar's
+    /// clearance becomes, the viewport, the offset, and the largest offset the scroll view accepts.
+    private func scrollGeometry(_ app: XCUIApplication) -> String {
+        let probe = app.descendants(matching: .any)["debug.scrollGeom"].firstMatch
+        guard probe.waitForExistence(timeout: 10) else { return "no debug.scrollGeom in the tree" }
+        return probe.label
     }
 
     /// What one dated tab's walk measured.
