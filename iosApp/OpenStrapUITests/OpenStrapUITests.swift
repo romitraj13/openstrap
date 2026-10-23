@@ -268,7 +268,12 @@ final class OpenStrapUITests: XCTestCase {
             XCTFail("\(screen): the dated tab has no wordmark to walk by")
             return nil
         }
-        let walk = scrollToEndOfTab(app, wordmark: wordmark)
+        let walk = scrollToEndOfTab(
+            app,
+            wordmark: wordmark,
+            screen: screen,
+            probe: screen == "Today" ? app.descendants(matching: .any)["debug.scrollGeom"] : nil
+        )
         // The end is only the end once the content is inside the window and holds still: a list whose
         // panels are still arriving ends the scroll early (run 39873446048 walked Recovery to the end
         // of a half-drawn screen, 454 pt of travel, and measured its last text 1705 pt down a 874 pt
@@ -293,6 +298,7 @@ final class OpenStrapUITests: XCTestCase {
             print("F10 \(screen) lowest: \(one.label.prefix(44)) minY=\(one.frame.minY) maxY=\(one.frame.maxY)")
         }
         attach(app, "F10-\(screen)-end")
+        print("F11 \(screen) geometry at its end: \(app.descendants(matching: .any)["debug.scrollGeom"].label)")
         let bottom = drawn.first ?? (label: "(no text)", frame: .zero)
         let window = app.windows.firstMatch.frame
         print(
@@ -370,15 +376,23 @@ final class OpenStrapUITests: XCTestCase {
     /// lengthens the list without moving the wordmark until the next round takes up the room it
     /// added. The round that finds no new room costs two drags. Without this Today was read 140 pt
     /// short of its end on some runs and at its end on others (runs 39877626154 and 39882557206).
-    private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat) {
+    private func scrollToEndOfTab(
+        _ app: XCUIApplication,
+        wordmark: XCUIElement,
+        screen: String,
+        probe: XCUIElement? = nil
+    ) -> (drags: Int, moved: CGFloat) {
         let start = wordmark.frame.minY
         var drags = 0
         var lastEnd = CGFloat.greatestFiniteMagnitude
+        if let probe {
+            print("F11 \(screen) geometry at the start: \(probe.label)")
+        }
         // Three rounds at most. A round that ends where the previous round ended is the end: the list
         // has not grown since that round. A round that ends higher has taken up room a card added
         // after the last one (Today's workouts card is the one that lands late), and needs another.
         for _ in 0..<3 {
-            drags += walkDown(app, wordmark: wordmark)
+            drags += walkDown(app, wordmark: wordmark, screen: screen, probe: probe)
             let end = wordmark.frame.minY
             if abs(end - lastEnd) < 1 {
                 return (drags, start - end)
@@ -390,7 +404,12 @@ final class OpenStrapUITests: XCTestCase {
     }
 
     /// One pass to the bottom: drag until two drags in a row leave the wordmark where it is.
-    private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement) -> Int {
+    private func walkDown(
+        _ app: XCUIApplication,
+        wordmark: XCUIElement,
+        screen: String,
+        probe: XCUIElement? = nil
+    ) -> Int {
         var previous = wordmark.frame.minY
         var still = 0
         var drags = 0
@@ -401,6 +420,9 @@ final class OpenStrapUITests: XCTestCase {
             drags += 1
             Thread.sleep(forTimeInterval: 0.4)
             let top = wordmark.frame.minY
+            if let probe {
+                print("F11 \(screen) drag \(drags): wordmark=\(top) \(probe.label)")
+            }
             still = top < previous - 1 ? 0 : still + 1
             previous = top
             if still == 2 { return drags }

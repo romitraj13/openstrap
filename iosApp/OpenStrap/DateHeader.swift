@@ -64,6 +64,12 @@ struct PullSyncScroll<Content: View>: View {
                 }
                 .frame(height: 0)
                 content()
+                #if DEBUG
+                // Card F11, temporary probe (removed before this card's final commit): the enclosing
+                // scroll view's own geometry, read by `testEveryDatedTabScrollsClearOfTheBar`.
+                ScrollGeometryProbe()
+                    .frame(width: 1, height: 1)
+                #endif
             }
             // Card F11: the content takes its own height, whatever height the scroll view proposes. A
             // stack that accepts a proposal is laid out at the height measured before the last card
@@ -301,3 +307,48 @@ struct DateHeader: View {
         return formatter.string(from: date)
     }
 }
+
+#if DEBUG
+/// Card F11, temporary probe (removed before this card's final commit): the enclosing scroll view's
+/// own geometry, read by `testEveryDatedTabScrollsClearOfTheBar` after every drag.
+///
+/// The label is computed when the test takes its accessibility snapshot rather than at layout, so it
+/// reports the scroll view as it is at that moment. `rangeEndY` is the largest offset the scroll view
+/// will accept (`contentSize + adjusted bottom inset - bounds`), `restEndY` the same with the plain
+/// `contentInset` — if the two disagree, the difference is the bar's clearance.
+private final class ScrollGeometryView: UIView {
+    override var accessibilityLabel: String? {
+        get {
+            var ancestor = superview
+            while let candidate = ancestor, !(candidate is UIScrollView) {
+                ancestor = candidate.superview
+            }
+            guard let scroll = ancestor as? UIScrollView else { return "no enclosing scroll view" }
+            let inset = scroll.adjustedContentInset
+            let content = scroll.contentSize.height
+            let height = scroll.bounds.height
+            let laidOut = scroll.subviews.map { $0.frame.height }.max() ?? -1
+            return "contentH=\(content) laidOutH=\(laidOut) boundsH=\(height) "
+                + "insetTop=\(inset.top) insetBottom=\(inset.bottom) "
+                + "safeBottom=\(scroll.safeAreaInsets.bottom) rawBottom=\(scroll.contentInset.bottom) "
+                + "behavior=\(scroll.contentInsetAdjustmentBehavior.rawValue) "
+                + "offsetY=\(scroll.contentOffset.y) still=\(scroll.isDecelerating) "
+                + "rangeEndY=\(content + inset.bottom - height) "
+                + "rawEndY=\(content + scroll.contentInset.bottom - height)"
+        }
+        set { }
+    }
+}
+
+struct ScrollGeometryProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = ScrollGeometryView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "debug.scrollGeom"
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) { }
+}
+#endif
