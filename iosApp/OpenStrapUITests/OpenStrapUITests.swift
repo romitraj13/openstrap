@@ -250,17 +250,23 @@ final class OpenStrapUITests: XCTestCase {
     /// Unlike F4's screens, a tab has no single row to name as its last: the panel at the bottom is
     /// whichever one this day's data draws last. So the walk measures the lowest text on the screen
     /// instead, which at the end of the scroll is the bottom of what the tab is drawing. The drag
-    /// count is printed with it, so the line says how far the walk had to go to reach that end.
-    private func clearsNavBarAtEnd(_ app: XCUIApplication, screen: String) -> String? {
+    /// count and the travel are printed with it, so the line says how far the walk had to go.
+    ///
+    /// Everything here is a hard assertion: a tab that cannot be walked to its end is a broken test,
+    /// not a defect, and must fail. The clearance verdict is the caller's, because Today's is the
+    /// one card F10 recorded as an expected failure.
+    private func measureTabEnd(_ app: XCUIApplication, screen: String) -> TabEnd? {
         let bar = app.descendants(matching: .any)["navBar.top"]
         guard bar.waitForExistence(timeout: 30) else {
             print("F4 \(screen): there is no navBar.top. Tree:\n\(app.debugDescription)")
-            return "\(screen): the floating bar never reported its top edge"
+            XCTFail("\(screen): the floating bar never reported its top edge")
+            return nil
         }
         let barTop = bar.frame.minY
         let wordmark = app.staticTexts["app.wordmark"]
         guard wordmark.waitForExistence(timeout: 30) else {
-            return "\(screen): the dated tab has no wordmark to walk by"
+            XCTFail("\(screen): the dated tab has no wordmark to walk by")
+            return nil
         }
         let walk = scrollToEndOfTab(app, wordmark: wordmark)
         // The end is only the end once the content is inside the window and holds still: a list whose
@@ -288,17 +294,43 @@ final class OpenStrapUITests: XCTestCase {
         }
         attach(app, "F10-\(screen)-end")
         let bottom = drawn.first ?? (label: "(no text)", frame: .zero)
+        let window = app.windows.firstMatch.frame
         print(
             "F4 \(screen): \(bottom.label) maxY=\(bottom.frame.maxY) barTop=\(barTop) "
-                + "window=\(app.windows.firstMatch.frame) drags=\(walk.drags) scrolled=\(walk.moved)"
+                + "window=\(window) drags=\(walk.drags) scrolled=\(walk.moved)"
         )
-        guard walk.moved > 200 else {
-            return "\(screen): the walk never scrolled the tab — the wordmark moved \(walk.moved) pt "
-                + "in \(walk.drags) drags, so this is the top of the screen, not its end"
-        }
-        guard bottom.frame.maxY <= barTop else {
-            return "\(screen): the screen's last text, \"\(bottom.label)\", ends at \(bottom.frame.maxY), under "
-                + "the floating bar whose top is \(barTop), so it cannot be scrolled clear of it"
+        // A walk that never moved the list measured the top of the screen, or a tab the tap did not
+        // switch to: that is the test's own fault and must never be read as a clearance result.
+        XCTAssertGreaterThan(
+            walk.moved, 200,
+            "\(screen): the walk never scrolled the tab — the wordmark moved \(walk.moved) pt in "
+                + "\(walk.drags) drags, so the lowest text above is not the end of this screen"
+        )
+        return TabEnd(
+            screen: screen,
+            barTop: barTop,
+            label: bottom.label,
+            maxY: bottom.frame.maxY,
+            drags: walk.drags,
+            scrolled: walk.moved
+        )
+    }
+
+    /// What one dated tab's walk measured.
+    private struct TabEnd {
+        var screen: String
+        var barTop: CGFloat
+        var label: String
+        var maxY: CGFloat
+        var drags: Int
+        var scrolled: CGFloat
+    }
+
+    /// Card F10: F4's test, in a sentence — or nil when the tab's last text clears the bar.
+    private func clearanceProblem(_ end: TabEnd) -> String? {
+        guard end.maxY <= end.barTop else {
+            return "\(end.screen): the screen's last text, \"\(end.label)\", ends at \(end.maxY), under "
+                + "the floating bar whose top is \(end.barTop), so it cannot be scrolled clear of it"
         }
         return nil
     }
@@ -536,16 +568,17 @@ final class OpenStrapUITests: XCTestCase {
         app.launch()
 
         var failures: [String] = []
-        // The four dated tabs, each with a mark for the panel at the bottom of its list — the thing
-        // the walk is about to measure. Waiting for it is what makes the end of the scroll a fixed
-        // place: the demo's workout analysis lands well after the first paint (it is still missing
-        // 54 s into run 39886609260's `testActivity`), and a list whose last card has not arrived
-        // yet ends the scroll 140 pt early. Today is walked last for the same reason.
-        let tabs: [(name: String, bottom: String)] = [
-            ("Recovery", "How it works"),
-            ("Sleep", "This week"),
-            ("Activity", "Workouts"),
-            ("Today", "Workouts"),
+        // The four dated tabs. Each row names the tab's own screen mark — without it a tap that did
+        // not switch tabs leaves the previous screen's tree to be measured (run 39894321302 did
+        // exactly that with Activity's "Workouts" standing in for Today's) — and the panel at the
+        // bottom of its list, which is what the walk is about to measure. Waiting for that panel is
+        // what makes the end of the scroll a fixed place: the demo's workout analysis lands well
+        // after the first paint (it is still missing 54 s into run 39886609260's `testActivity`).
+        let tabs: [(name: String, mark: String, bottom: String)] = [
+            ("Recovery", "recovery.title", "How it works"),
+            ("Sleep", "sleep.title", "This week"),
+            ("Activity", "Steps", "Workouts"),
+            ("Today", "What changed", "Workouts"),
         ]
         for tab in tabs {
             app.buttons[tab.name].tap()
@@ -555,6 +588,10 @@ final class OpenStrapUITests: XCTestCase {
                 Thread.sleep(forTimeInterval: 5)
             }
             XCTAssertTrue(
+                app.staticTexts[tab.mark].firstMatch.waitForExistence(timeout: 120),
+                "The tab bar's \(tab.name) did not open its screen (no \(tab.mark))"
+            )
+            XCTAssertTrue(
                 app.staticTexts[tab.bottom].firstMatch.waitForExistence(timeout: 120),
                 "The \(tab.name) tab never drew the bottom of its list (\(tab.bottom))"
             )
@@ -563,6 +600,9 @@ final class OpenStrapUITests: XCTestCase {
             // too early ends on a half-drawn screen (run 39873446048). Card F5's rule for the first
             // query after a tab switch, with room for the queries behind the panels.
             Thread.sleep(forTimeInterval: 6)
+            // The walk and its hard checks happen outside the expectation scope: a tab that cannot
+            // be walked to its end must fail the run, not be filed as the known defect.
+            let end = measureTabEnd(app, screen: tab.name)
             if tab.name == "Today" {
                 // Card F10's finding, and why this one is recorded rather than asserted. Walked to
                 // the end of its scroll — the wordmark holds still over two drags, and two rounds
@@ -580,11 +620,11 @@ final class OpenStrapUITests: XCTestCase {
                     "Today's last card ends under the floating bar at the end of its scroll",
                     options: options
                 ) {
-                    if let problem = clearsNavBarAtEnd(app, screen: tab.name) {
+                    if let end, let problem = clearanceProblem(end) {
                         XCTFail(problem)
                     }
                 }
-            } else if let problem = clearsNavBarAtEnd(app, screen: tab.name) {
+            } else if let end, let problem = clearanceProblem(end) {
                 failures.append(problem)
             }
         }
