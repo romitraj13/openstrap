@@ -1459,29 +1459,26 @@ DEBUG probe in the scroll content (`UIScrollView.contentSize`, the tallest laid-
 
 The list was complete, the bar's clearance was in the adjusted inset, and the scroll view still had
 137 pt to give; the walk read the frozen frame as the end and measured the last card wherever the list
-happened to be. The walk now drags a fixed budget of twelve drags — past the longest tab's 2349 pt of
-travel — and never reads an element's frame for the end. Whether the list grew under it is
-`measureTabEnd`'s settle loop, which re-reads the lowest *on-screen* text after 2.5 s and walks again if
-it moved.
+happened to be. The walk now drags a fixed budget and never reads an element's frame for the end.
+Whether the list grew under it is `measureTabEnd`'s settle loop, which re-reads the lowest *on-screen*
+text after 2.5 s and walks again if it moved.
 
-The second is that Today's pan would still not take those last 137 pt with twelve drags, while Recovery,
-Sleep and Activity reach their ends exactly. The same probe reported a 1444.67 pt range for Today, and
-adding 136 pt to the bottom of the list did not move where its drags came to rest (1288-1302 before and
-after) — so the pan is using a size the layout no longer has, not the content's real height. Two changes
-address it: the bar's clearance rides in the list itself, as its last 136 pt (`barClearance` 112 plus
-the 24 pt the home indicator used to add) instead of in a bottom safe-area inset that the pan can drop,
-and `DayTab` builds its scroll view once more 1.5 s after it first appears, so the scroll view measures
-the list that is actually on screen. Both are invisible: the cards still scroll under the glass and the
-end of the scroll comes to rest where the tabs that always measured right had it.
+The second defect was the budget itself. A fling on the CI simulator is worth 124 pt on Recovery, 198 on
+Sleep, 154 on Activity and only 114 on Today — Today's cards sit under the finger differently — so a
+fixed twelve drags left Today 130 pt short of its own 1444.67 pt range, which read as a clamp on run
+after run. Eighteen drags is past the longest walk at the shortest fling: with them Today reaches its
+range and its last card comes to rest at 690.99 against the bar's 754.0, as it did on the earlier runs
+whose walk happened not to freeze.
 
-An earlier attempt gated Today's list on the reads behind it (day and workouts) so the workouts card
-could not arrive after the list's first layout. It was dropped: the probe showed the list's height was
-never the problem, and the gate could leave Today showing nothing at all when a read did not answer
-(run 40006225116's `testActivity` waited 120 s for a card that never came). `TodayScreen` asks for its
-reads in its own `onAppear` again, as every other screen does.
+No product code had to change for any of this: Today's list, its bottom inset and its content height
+were right in every probe. An earlier attempt in this card gated Today's list on the reads behind it (day
+and workouts) so the workouts card could not arrive after the list's first layout; it was dropped once
+the probe showed the list's height was never the problem, and because it could leave Today showing
+nothing at all when a read did not answer (run 40006225116's `testActivity` waited 120 s for a card that
+never came). `TodayScreen` asks for its reads in its own `onAppear`, as every other screen does.
 
-The recap flag fix from this card stays: `-todayMonday` forces the recap card on a day that is not a
-Monday, and `HealthModel.reloadRecapSteps` now honours the same flag, so a forced recap reads its steps
-(the row read "Steps a day —" without them, in `U5-todayrecap-1`). A real Monday is unaffected, and a
-release build reads the flag as false.
+The one product fix from this card is the recap flag: `-todayMonday` forces the recap card on a day that
+is not a Monday, and `HealthModel.reloadRecapSteps` now honours the same flag, so a forced recap reads
+its steps (the row read "Steps a day —" without them, in `U5-todayrecap-1`). A real Monday is
+unaffected, and a release build reads the flag as false.
 

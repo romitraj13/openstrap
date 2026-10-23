@@ -374,12 +374,14 @@ final class OpenStrapUITests: XCTestCase {
 
     /// One pass to the bottom: a fixed budget of drags, with no early stop.
     ///
-    /// A held drag moves about 300-650 pt; the tallest dated tab is six screenfuls (card U7, 2349 pt
-    /// of travel on the CI simulator), so twelve is past the end of every one of them. A drag with
-    /// nothing left to move costs a second and changes nothing.
+    /// Card F11 measured what a drag is worth on the CI simulator: 124 pt on Recovery, 198 on Sleep,
+    /// 154 on Activity and only 114 on Today, whose cards sit under the finger differently. The longest
+    /// tab needs 2349 pt, so twelve drags was not always enough — Today's twelve left it 130 pt short of
+    /// its own limit and the last card under the bar, which read as a clamp for five cards' worth of
+    /// runs. Eighteen is past the longest walk at the shortest drag.
     private func walkDown(_ app: XCUIApplication) -> Int {
         var drags = 0
-        for _ in 0..<12 {
+        for _ in 0..<18 {
             drag(app, from: 0.78, to: 0.22)
             drags += 1
             Thread.sleep(forTimeInterval: 0.4)
@@ -542,9 +544,8 @@ final class OpenStrapUITests: XCTestCase {
     /// Card F11 made Today the fourth tab that passes. Its walk used to stop when two drags left the
     /// header's wordmark where it was, and that frame stops updating once the wordmark is far off
     /// screen: the walk declared the end 137 pt early and measured Today's last card under the bar on
-    /// nine runs in ten. It now drags a fixed budget and leaves the end to the settle loop below.
-    /// Today's list also carries the bar's clearance in its own height and is built once more a moment
-    /// after it appears, so the list a drag is offered is the list on screen.
+    /// nine runs in ten. The stop is now a fixed drag budget plus the settle loop below, and the budget
+    /// is eighteen because Today's flings are worth only ~114 pt each.
     ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).

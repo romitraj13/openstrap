@@ -150,9 +150,6 @@ struct DayTab<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @State private var path = NavigationPath()
-    /// Card F11: which build of the scroll view is on screen. It is built once more a moment after the
-    /// list first appears — see the `onAppear` on the scroll view.
-    @State private var listBuild = 0
 
     /// Card F9: the phone's calendar, or the pinned demo day's while `-demoData` is on, so a day
     /// step lands on the same midnight the header and the shared queries measure.
@@ -183,22 +180,8 @@ struct DayTab<Content: View>: View {
                     content()
                 }
                 .padding(.horizontal, 16)
-                // Card F11: the bar's clearance rides in the list, not in the scroll view's bottom
-                // safe-area inset. The probe (run b76c8a0) read the inset as 146 pt and the range it
-                // should produce as 1444.67, yet Today's drags came to rest at 1297-1307 and did not
-                // move when the list grew — the pan keeps a size the layout no longer has. A list that
-                // carries the clearance in its own height cannot lose it: 136 pt is `barClearance` (112)
-                // plus the 24 pt the home indicator used to add.
-                .padding(.bottom, GlowLayout.barClearance + 24)
             }
-            .id(listBuild)
-            .onAppear {
-                // Card F11: build the scroll view once more, a moment after it first appears, so the
-                // scroll view measures the list that is actually on screen rather than the one it took
-                // at its first layout. Once per tab: `listBuild` only ever goes 0 -> 1.
-                guard tab == .today, listBuild == 0 else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { listBuild = 1 }
-            }
+            .glowClearsNavBar()
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { health.reload() }
