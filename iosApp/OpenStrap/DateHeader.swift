@@ -71,11 +71,6 @@ struct PullSyncScroll<Content: View>: View {
                     .frame(width: 1, height: 1)
                 #endif
             }
-            // Card F11: the content takes its own height, whatever height the scroll view proposes. A
-            // stack that accepts a proposal is laid out at the height measured before the last card
-            // arrived, and the scroll view's range follows that layout. Insurance: Today now draws its
-            // list once the reads that feed it are all in, so nothing normally arrives afterwards.
-            .fixedSize(horizontal: false, vertical: true)
         }
         .coordinateSpace(name: space)
         .onPreferenceChange(PullOffsetKey.self) { offset in

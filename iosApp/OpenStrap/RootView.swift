@@ -150,6 +150,10 @@ struct DayTab<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @State private var path = NavigationPath()
+    /// Card F11: which build of the tab's scroll view is on screen. It is rebuilt once, on the frame
+    /// after the list first appears, so the scroll view measures a list whose cards have all been laid
+    /// out at least once (see the `onAppear` on the scroll view below).
+    @State private var listLayout = 0
 
     /// Card F9: the phone's calendar, or the pinned demo day's while `-demoData` is on, so a day
     /// step lands on the same midnight the header and the shared queries measure.
@@ -175,7 +179,18 @@ struct DayTab<Content: View>: View {
                         }
                         .padding(.horizontal, 16)
                     }
+                    .id(listLayout)
                     .glowClearsNavBar()
+                    .onAppear {
+                        // Card F11: one frame after the list first appears, build it again. The first
+                        // layout can commit the list's height before the last card has been laid out
+                        // (measured: a content frame of 2002 pt with a 2172.67 pt list drawn into it, so
+                        // the drags stop 170 pt short of the end and the last card stays under the bar).
+                        // On the second pass the cards have been laid out once and the scroll view
+                        // measures the list it actually draws.
+                        guard tab == .today, listLayout == 0 else { return }
+                        DispatchQueue.main.async { listLayout = 1 }
+                    }
                 } else {
                     // Card F11: Today's scroll view is not built until the reads that feed its list have
                     // all answered, so the list it lays out first is the list it keeps. A scroll view that
