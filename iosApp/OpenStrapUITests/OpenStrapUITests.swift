@@ -272,7 +272,7 @@ final class OpenStrapUITests: XCTestCase {
         var drawn = lowestTexts(app, above: barTop)
         for _ in 0..<3 {
             let bottom = drawn.first?.frame.maxY ?? 0
-            Thread.sleep(forTimeInterval: 1.5)
+            Thread.sleep(forTimeInterval: 2.5)
             let after = lowestTexts(app, above: barTop)
             let settled = abs((after.first?.frame.maxY ?? 0) - bottom) < 1
             if settled && bottom <= windowBottom { break }
@@ -333,15 +333,28 @@ final class OpenStrapUITests: XCTestCase {
     /// capture cannot either while a card still animates (the draft before this one ran its whole
     /// drag budget on captures that never settled).
     ///
-    /// Two passes, with a pause between them: a card whose demo rows are analysed after the first
-    /// paint takes its place below the fold, which lengthens the list without moving the wordmark.
-    /// The second pass takes up the room it added, and costs two drags when there is none.
+    /// Rounds of `walkDown`, with a pause between them, until two rounds end at the same place: a
+    /// card whose demo rows are analysed after the first paint takes its place below the fold, which
+    /// lengthens the list without moving the wordmark until the next round takes up the room it
+    /// added. The round that finds no new room costs two drags. Without this Today was read 140 pt
+    /// short of its end on some runs and at its end on others (runs 39877626154 and 39882557206).
     private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat) {
         let start = wordmark.frame.minY
-        let first = walkDown(app, wordmark: wordmark)
-        Thread.sleep(forTimeInterval: 2.5)
-        let second = walkDown(app, wordmark: wordmark)
-        return (first + second, start - wordmark.frame.minY)
+        var drags = 0
+        var lastEnd = CGFloat.greatestFiniteMagnitude
+        // Three rounds at most. A round that ends where the previous round ended is the end: the list
+        // has not grown since that round. A round that ends higher has taken up room a card added
+        // after the last one (Today's workouts card is the one that lands late), and needs another.
+        for _ in 0..<3 {
+            drags += walkDown(app, wordmark: wordmark)
+            let end = wordmark.frame.minY
+            if abs(end - lastEnd) < 1 {
+                return (drags, start - end)
+            }
+            lastEnd = end
+            Thread.sleep(forTimeInterval: 3)
+        }
+        return (drags, start - wordmark.frame.minY)
     }
 
     /// One pass to the bottom: drag until two drags in a row leave the wordmark where it is.
@@ -511,11 +524,12 @@ final class OpenStrapUITests: XCTestCase {
     ///
     /// The committed `U6-recovery-7` and `U7-sleep-6` screenshots show content under the bar. That
     /// is either a screenful short of the end or a real defect, and only a walk to the end can say
-    /// which: this one drags until two captures in a row are identical, then measures the lowest
-    /// text on the screen against `navBar.top`, the bar's own top edge.
+    /// which: this one drags until the header's wordmark holds still, then measures the lowest text
+    /// on the screen against `navBar.top`, the bar's own top edge. At its end every tab clears by
+    /// 52–64 pt on this device, so those screenshots were a screenful short.
     ///
-    /// `-glowStill` holds the cards' cores still: the walk compares one capture with the next, and a
-    /// card that animates for ever would never give two identical ones (card F5's lesson).
+    /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
+    /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).
     func testEveryDatedTabScrollsClearOfTheBar() {
         let app = XCUIApplication()
         app.launchArguments = ["-demoData", "-glowStill"]
@@ -549,25 +563,7 @@ final class OpenStrapUITests: XCTestCase {
             // too early ends on a half-drawn screen (run 39873446048). Card F5's rule for the first
             // query after a tab switch, with room for the queries behind the panels.
             Thread.sleep(forTimeInterval: 6)
-            if tab.name == "Today" {
-                // Card F10's finding, and the reason this one is expected rather than asserted:
-                // walked to the end of its scroll (the wordmark holds still over two drags, twice,
-                // with a pause between), Today's last card still runs under the bar. Six runs read
-                // its last text at 819, 832, 823, 819, 845, 826 and 834 pt against a bar top of
-                // 754, while Recovery (698), Sleep (702) and Activity (690) all clear it, and the
-                // end-state screenshot shows the card's grey behind the glass where Recovery's is
-                // black. That is app-side — where `DayTab`'s `glowClearsNavBar()` inset goes for a
-                // list whose workouts card arrives after its first layout — and out of this card's
-                // scope, so it is recorded as an expected failure and card t_a2ea904f owns the fix.
-                // `strict` stays off: once the card clears, the test simply passes.
-                XCTExpectFailure("Today's last card ends under the floating bar at the end of its scroll") {
-                    if let problem = clearsNavBarAtEnd(app, screen: tab.name) {
-                        XCTFail(problem)
-                    }
-                }
-            } else if let problem = clearsNavBarAtEnd(app, screen: tab.name) {
-                failures.append(problem)
-            }
+            if let problem = clearsNavBarAtEnd(app, screen: tab.name) { failures.append(problem) }
         }
 
         XCTAssertTrue(
