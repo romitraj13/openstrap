@@ -118,7 +118,9 @@ struct TodayScreen: View {
         }
         .onAppear {
             openLaunchMetric()
-            health.reloadToday()
+            // Card F11: the day's reads are `DayTab`'s now — its `onAppear` asks for them, and it does
+            // not build this screen until they have answered. Asking again here cleared the workouts
+            // flag the gate is waiting on, so this screen was removed and rebuilt for ever.
         }
     }
 

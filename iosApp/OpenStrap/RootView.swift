@@ -170,15 +170,7 @@ struct DayTab<Content: View>: View {
                         controller.syncNow()
                     } content: {
                         VStack(alignment: .leading, spacing: 12) {
-                            DateHeader(
-                                date: selectedDate,
-                                battery: battery,
-                                charging: battery != nil && controller.charging,
-                                picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
-                                onPrev: { step(-1) },
-                                onNext: { step(1) },
-                                onOpenStrap: onOpenStrap
-                            )
+                            header
                             content()
                         }
                         .padding(.horizontal, 16)
@@ -192,7 +184,15 @@ struct DayTab<Content: View>: View {
                     // dead at 1309.0), which left Today's last card under the floating bar. The other
                     // three tabs are built when the bar switches to them, with their data already read;
                     // this is the same rule for the one tab that is on screen from launch.
-                    Color.clear
+                    //
+                    // The header is drawn while the first read is in, as it was before the gate: it does
+                    // not depend on the list, and a launch should show the wordmark and the day rather
+                    // than a black window.
+                    VStack(alignment: .leading, spacing: 12) {
+                        header
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
             .background(ThemeColors.background.ignoresSafeArea())
@@ -210,9 +210,24 @@ struct DayTab<Content: View>: View {
         }
     }
 
+    /// The shared header: wordmark and chip, then the day row. Part of the scrolled content, and on
+    /// its own while Today's first read is in.
+    @ViewBuilder private var header: some View {
+        DateHeader(
+            date: selectedDate,
+            battery: battery,
+            charging: battery != nil && controller.charging,
+            picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
+            onPrev: { step(-1) },
+            onNext: { step(1) },
+            onOpenStrap: onOpenStrap
+        )
+    }
+
     /// Card F11: a dated tab may draw its list once every read that puts a card on it has answered.
     /// Only Today can be waiting: the other three are built when the bar switches to them, after the
-    /// same reads have already landed.
+    /// same reads have already landed. `todayWorkoutsRead` stays true after its first answer, so this
+    /// only gates the list's first build and a later reload keeps the scroll view the reader is in.
     private var ready: Bool {
         tab != .today || (health.dayState != nil && health.todayWorkoutsRead)
     }

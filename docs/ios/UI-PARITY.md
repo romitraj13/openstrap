@@ -1472,10 +1472,18 @@ day), which is what made it the one tab that could grow after the first layout.
 The fix is that Today is not given a scroll view until the reads that feed its list have all answered:
 `HealthModel.reloadToday` clears a `todayWorkoutsRead` flag and sets it when the workouts — the last
 read that puts a card on that list — have answered, and `DayTab` builds its `PullSyncScroll` only when
-that flag and the day's own read are both in. The list's first layout is therefore its final shape, so
-no card is ever drawn past the end of the range. That is also how the other three tabs have always
+that flag and the day's own read are both in. The list's *first* layout is therefore its final shape,
+so no card is ever drawn past the end of the range. That is also how the other three tabs have always
 measured right: the bar builds them when it switches to them, with the same reads already landed. The
 `todayWorkoutsRead` flag is what Today, the one tab on screen from launch, was missing.
+
+The flag is cleared only until its first answer (`workoutsAnsweredOnce` in `HealthModel`). Clearing it
+on every reload tore the list down and rebuilt it from under the reader: `TodayScreen`'s own `onAppear`
+asked for the same reads again, which cleared the flag the gate was waiting on, which removed the
+screen that had just appeared — run 39958448835 looped there and Today never drew a single card. So the
+gate now applies to the first build only; a later reload (a day step, a sync) updates the list in place
+and does not drop the reader to the top. `TodayScreen` no longer asks for the reads itself (only `DayTab`
+does), and while the first read is in the tab draws its header on its own rather than a black window.
 
 `PullSyncScroll` also gives its content its own height (`.fixedSize(horizontal: false, vertical: true)`,
 DateHeader.swift) as insurance, so a stack reports the height of the cards it is drawing rather than

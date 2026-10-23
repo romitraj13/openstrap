@@ -563,9 +563,9 @@ final class OpenStrapUITests: XCTestCase {
     /// Card F11 made Today the fourth tab that passes: the workouts card, drawn by a second read,
     /// landed after Today's list had laid out, and the scroll view clamped its gestures to the height
     /// it had laid the content out at, so the last card sat under the bar on nine runs in ten.
-    /// `TodayScreen` now draws its list once every read that feeds it has answered, so the list's first
-    /// layout is its final shape; the walk launches with `-lateWorkouts` so it still measures the card
-    /// arriving late instead of waiting for luck.
+    /// `DayTab` now builds Today's list once every read that feeds it has answered, so the list's
+    /// first layout is its final shape; the walk launches with `-lateWorkouts` so it still measures
+    /// the card arriving late instead of waiting for luck.
     ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).

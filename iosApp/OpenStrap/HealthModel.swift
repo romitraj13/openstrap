@@ -74,11 +74,15 @@ final class HealthModel: ObservableObject {
     @Published private(set) var recoveryResult: RecoveryResult?
     /// Every workout OpenStrap knows, newest first: Today picks the selected day's out of it.
     @Published private(set) var workoutList: [WorkoutAnalysis] = []
-    /// Card F11: the workouts have answered for the read in flight, so Today may draw its list. Today
-    /// waits for every read that puts a card on that list, because a card that arrives after the list
-    /// has laid out is drawn past its end and cannot be scrolled to (see the note in `reloadToday`).
-    /// False between `reloadToday()` and that answer, which is a frame or two.
+    /// Card F11: the workouts have answered at least once, so Today may draw its list. Today waits for
+    /// every read that puts a card on that list, because a card that arrives after the list has laid
+    /// out is drawn past its end and cannot be scrolled to (see the note in `reloadToday`).
+    /// This is false only until that first answer: from then on the list stays built, because a later
+    /// reload (a day step, a sync) must not tear the reader's scroll view down.
     @Published private(set) var todayWorkoutsRead = false
+    /// Whether the workouts have answered once already. Only the first answer can arrive after Today's
+    /// list exists — the one the flag above gates — so later reloads leave the flag alone.
+    private var workoutsAnsweredOnce = false
     /// The strap's sport-effect records, newest last: Activity's load and fitness panels read them
     /// (`ScreenQueries.sportEffects`, Android's `WorkoutsViewModel.effects`).
     @Published private(set) var sportEffects: [SportEffectRow] = []
@@ -171,7 +175,13 @@ final class HealthModel: ObservableObject {
         // layout is drawn past the end of the list and never added to its range (measured: 2172.67 pt of
         // content, a range ending at 1444.67, drags stopping dead at 1309.0), so the last card could not
         // be dragged clear of the floating bar.
-        todayWorkoutsRead = false
+        //
+        // Only the first pass clears the flag. `TodayScreen` is built once the flag is set, so a reload
+        // that cleared it again would remove the list, rebuild it, and re-run this pass from the screen's
+        // own `onAppear` for ever (run 39958448835: Today never drew a single card). Later passes keep
+        // the built list — a sync must not drop the reader to the top — and the workouts list they
+        // refresh is complete already.
+        if !workoutsAnsweredOnce { todayWorkoutsRead = false }
         screens.day(date: date) { [weak self] state in
             guard let self else { return }
             // A slower answer for a day the user has already left must not overwrite the new one.
@@ -191,10 +201,12 @@ final class HealthModel: ObservableObject {
             if late > 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + late) { [weak self] in
                     self?.workoutList = list
+                    self?.workoutsAnsweredOnce = true
                     self?.todayWorkoutsRead = true
                 }
             } else {
                 self.workoutList = list
+                self.workoutsAnsweredOnce = true
                 self.todayWorkoutsRead = true
             }
         }
