@@ -74,6 +74,11 @@ final class HealthModel: ObservableObject {
     @Published private(set) var recoveryResult: RecoveryResult?
     /// Every workout OpenStrap knows, newest first: Today picks the selected day's out of it.
     @Published private(set) var workoutList: [WorkoutAnalysis] = []
+    /// Card F11: the workouts have answered for the read in flight, so Today may draw its list. Today
+    /// waits for every read that puts a card on that list, because a card that arrives after the list
+    /// has laid out is drawn past its end and cannot be scrolled to (see the note in `reloadToday`).
+    /// False between `reloadToday()` and that answer, which is a frame or two.
+    @Published private(set) var todayWorkoutsRead = false
     /// The strap's sport-effect records, newest last: Activity's load and fitness panels read them
     /// (`ScreenQueries.sportEffects`, Android's `WorkoutsViewModel.effects`).
     @Published private(set) var sportEffects: [SportEffectRow] = []
@@ -159,6 +164,14 @@ final class HealthModel: ObservableObject {
     /// Charge, the workouts, the check-in, the strap's own score and the recap's step history.
     func reloadToday() {
         let date = self.date
+        // Card F11: Today draws its list from one complete read. This flag says the workouts — the last
+        // of the reads that put a card on that list — have answered for this pass, so `TodayScreen` waits
+        // for them instead of drawing the day and letting the workouts card drop in afterwards. A scroll
+        // view clamps its gestures to the content height it laid out, and a card that arrives after that
+        // layout is drawn past the end of the list and never added to its range (measured: 2172.67 pt of
+        // content, a range ending at 1444.67, drags stopping dead at 1309.0), so the last card could not
+        // be dragged clear of the floating bar.
+        todayWorkoutsRead = false
         screens.day(date: date) { [weak self] state in
             guard let self else { return }
             // A slower answer for a day the user has already left must not overwrite the new one.
@@ -173,14 +186,16 @@ final class HealthModel: ObservableObject {
         screens.workouts { [weak self] list in
             guard let self else { return }
             // Card F11's test seam: `-lateWorkouts` holds the card back so it is certain to arrive
-            // after Today's first layout. A run without the flag assigns at once.
+            // after Today's first layout would have happened. A run without the flag assigns at once.
             let late = DemoData.lateWorkoutsSeconds
             if late > 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + late) { [weak self] in
                     self?.workoutList = list
+                    self?.todayWorkoutsRead = true
                 }
             } else {
                 self.workoutList = list
+                self.todayWorkoutsRead = true
             }
         }
         // The Activity tab's two reads (card U8): the seven days of PAI ending on this day, and the
@@ -264,35 +279,6 @@ final class HealthModel: ObservableObject {
             guard let self, self.date == date else { return }
             self.checkIn = feeling
         }
-    }
-
-    /// Card F11: which cards Today's list is made of, as one value that changes when one of them joins
-    /// the list or leaves it. `DayTab` re-identifies Today's scroll content with it.
-    ///
-    /// A SwiftUI scroll view keeps the content height it measured when that content last laid out, and
-    /// a card that arrives afterwards is drawn past the end of the list without being added to its
-    /// scroll range. Today's workouts card is drawn by a second read, so with the demo month it landed
-    /// after the list's first layout and the last card could not be scrolled clear of the floating bar:
-    /// the scroll view's range ended at offset 1444.67 pt while the drags stopped at 1274.0, and
-    /// 1444.67 - 1274.0 is that card's 170.67 pt (card F11's probe, run 39917705796). Rebuilding the
-    /// content makes the scroll view measure the list it is actually drawing.
-    ///
-    /// Presence, not counts: a card gaining a row keeps the list's shape, and a value that only changes
-    /// what a row says must not rebuild the list (and lose Today's own pushed detail with it).
-    var todayListKey: String {
-        let day = dayState
-        return [
-            day == nil ? "noDay" : "day",
-            workoutList.isEmpty ? "noWorkouts" : "workouts",
-            recoveryResult == nil ? "noRecovery" : "recovery",
-            checkIn == nil ? "noCheckIn" : "checkIn",
-            day?.sleep == nil ? "noSleep" : "sleep",
-            (day?.alerts.isEmpty ?? true) ? "noAlerts" : "alerts",
-            (day?.naps.isEmpty ?? true) ? "noNaps" : "naps",
-            strapReadiness == nil ? "noStrap" : "strap",
-            recapSteps.isEmpty ? "noRecap" : "recap",
-            "tiles\(todayTiles.count)",
-        ].joined(separator: "|")
     }
 
     /// The statistics What changed shows, as `MainActivity`'s `todayTiles` reads them: the stored

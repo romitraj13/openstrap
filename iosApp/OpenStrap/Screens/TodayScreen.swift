@@ -88,10 +88,13 @@ struct TodayScreen: View {
 
     var body: some View {
         Group {
-            if let day = health.dayState {
+            if let day = health.dayState, health.todayWorkoutsRead {
                 content(day)
             } else {
-                // The day's first read is in flight. Nothing is invented for the wait.
+                // The day's first read is in flight, or the workouts that put the last card on this list
+                // have not answered yet. Nothing is invented for the wait, and the list is never drawn
+                // without that card: a card that arrives afterwards is drawn past the end of the list and
+                // cannot be scrolled to (card F11).
                 Color.clear.frame(height: 1)
             }
         }

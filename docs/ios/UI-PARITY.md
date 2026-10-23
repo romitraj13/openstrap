@@ -1469,15 +1469,26 @@ which is why the last card could not be dragged clear of the bar however far the
 Today's workouts card is the one card Today draws from a second read (`ScreenQueries.workouts`, not the
 day), which is what made it the one tab that could grow after the first layout.
 
-The fix has two parts, both in `PullSyncScroll` (DateHeader.swift). The content takes its own height
-(`.fixedSize(horizontal: false, vertical: true)`), so the stack reports the height of the cards it is
-drawing instead of accepting the stale proposal; and Today's scroll view is built again when a card
-joins the list (`HealthModel.todayListKey` -> `DayTab.contentKey` -> `.id`), which is what makes the
-scroll view lay the list out again at all. On the run that carried both the content host measured its
-full 2172 pt, the drags reached 1444.67, and Today's last card came to rest at 690.99 against the bar's
-754.0. Either part alone still failed: without the rebuild nothing laid the grown list out, and without
-`fixedSize` the fresh layout was again the height measured before the card. Recovery, Sleep and Activity
-draw every card at first layout, pass no key, and measure exactly as they did before.
+The fix is that Today draws its list once, from one complete read: `HealthModel.reloadToday` clears a
+`todayWorkoutsRead` flag and sets it when the workouts — the last read that puts a card on that list —
+have answered, and `TodayScreen` draws nothing until then. The list's first layout is therefore its
+final shape, so nothing is ever drawn past the end of the range. `PullSyncScroll` also gives its content
+its own height (`.fixedSize(horizontal: false, vertical: true)`, DateHeader.swift), so the stack reports
+the height of the cards it is drawing rather than accepting a stale proposal. On the run that carried
+the fix the content host measured its full 2172 pt, the drags reached 1444.67, and Today's last card came
+to rest at 690.99 against the bar's 754.0; Recovery, Sleep and Activity draw every card at first layout
+and measure exactly as they did before.
+
+The cost is that Today's first paint waits for that read too, as it already waited for the day's. With
+`-lateWorkouts 20` — the test seam — it waits twenty seconds; on a real launch it is the same local
+database read the day's cards already come from, and Compose's `DayViewModel` hands the screen one
+complete state in the same way, so the two builds now agree on when a list may be drawn.
+
+Earlier attempts that did not hold, and what they showed: rebuilding the scroll view when a card joined
+(`.id`, DEBUG runs `a647fec` and `ddc5eb1`) left the range short — 1309.0 of 1444.67 — and `fixedSize`
+alone (`1788d1e`, no rebuild) never got a fresh layout at all (Today read 838.66). Both are recorded
+because they bound the defect: it is the list outgrowing the layout the scroll view clamps to, and only
+a list that is complete when it is first laid out is safe.
 
 `-lateWorkouts 20` (DEBUG only, `HealthModel.reloadToday`) holds that second read back for twenty
 seconds, so the card cannot be in the list when it first lays out: the defect was a race between two
