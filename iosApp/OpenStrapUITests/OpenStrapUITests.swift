@@ -574,18 +574,28 @@ final class OpenStrapUITests: XCTestCase {
         // bottom of its list, which is what the walk is about to measure. Waiting for that panel is
         // what makes the end of the scroll a fixed place: the demo's workout analysis lands well
         // after the first paint (it is still missing 54 s into run 39886609260's `testActivity`).
+        //
+        // Today is first, at launch. Switching *to* Today rebuilds the app's longest list and its
+        // first query has timed out twice (runs 39897512933 and 39894321302 measured Activity's tree
+        // instead), while the launch screen's own first query is the one every other test here
+        // already waits on.
         let tabs: [(name: String, mark: String, bottom: String)] = [
+            ("Today", "What changed", "Workouts"),
             ("Recovery", "recovery.title", "How it works"),
             ("Sleep", "sleep.title", "This week"),
             ("Activity", "Steps", "Workouts"),
-            ("Today", "What changed", "Workouts"),
         ]
-        for tab in tabs {
-            app.buttons[tab.name].tap()
-            // The steps card renders its blurred layers behind a lock on first appearance, and the
-            // first query after the switch is the one that waits for it (card F5, run 39737184826).
-            if tab.name == "Activity" {
-                Thread.sleep(forTimeInterval: 5)
+        for (index, tab) in tabs.enumerated() {
+            // Today is the launch screen: tapping its own cell would rebuild the list, and re-run the
+            // queries behind its cards, for nothing.
+            if index > 0 {
+                app.buttons[tab.name].tap()
+                // Card F5: the first query after a tab switch waits for the cards that render behind
+                // their lock, and a 30 s snapshot timeout is a failed run. The steps card never
+                // settles (run 39737184826).
+                if tab.name == "Activity" {
+                    Thread.sleep(forTimeInterval: 5)
+                }
             }
             XCTAssertTrue(
                 app.staticTexts[tab.mark].firstMatch.waitForExistence(timeout: 120),
