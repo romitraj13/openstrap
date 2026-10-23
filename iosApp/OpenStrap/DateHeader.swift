@@ -74,10 +74,12 @@ struct PullSyncScroll<Content: View>: View {
                 #if DEBUG
                 // Card F11, temporary: the probe the UI test reads to see this scroll view's own
                 // geometry. Removed before the card's final commit.
-                ScrollGeometryProbe()
+                ScrollGeometryProbe(key: contentKey)
                     .frame(width: 1, height: 1)
                 #endif
             }
+            // Card F11: the content takes its own height, not the height the scroll view last measured.
+            .fixedSize(horizontal: false, vertical: true)
         }
         .coordinateSpace(name: space)
         .onPreferenceChange(PullOffsetKey.self) { offset in
@@ -320,6 +322,8 @@ struct DateHeader: View {
 /// content offset the scroll view will accept (`contentSize + bottom inset - bounds`): the number the
 /// walk's end is supposed to reach.
 private final class ScrollGeometryView: UIView {
+    var key = ""
+
     override var accessibilityLabel: String? {
         get {
             var ancestor = superview
@@ -330,23 +334,29 @@ private final class ScrollGeometryView: UIView {
             let inset = scroll.adjustedContentInset
             let content = scroll.contentSize.height
             let height = scroll.bounds.height
+            let hosts = scroll.subviews.map { "\(Int($0.frame.height))" }.joined(separator: ",")
             return "contentH=\(content) boundsH=\(height) insetTop=\(inset.top) "
                 + "insetBottom=\(inset.bottom) offsetY=\(scroll.contentOffset.y) "
-                + "rangeEndY=\(content + inset.bottom - height)"
+                + "rangeEndY=\(content + inset.bottom - height) hosts=[\(hosts)] key=\(key)"
         }
         set { }
     }
 }
 
 struct ScrollGeometryProbe: UIViewRepresentable {
+    var key: String = ""
+
     func makeUIView(context: Context) -> UIView {
         let view = ScrollGeometryView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
         view.isAccessibilityElement = true
         view.accessibilityIdentifier = "debug.scrollGeom"
         view.backgroundColor = .clear
+        view.key = key
         return view
     }
 
-    func updateUIView(_ view: UIView, context: Context) { }
+    func updateUIView(_ view: UIView, context: Context) {
+        (view as? ScrollGeometryView)?.key = key
+    }
 }
 #endif
