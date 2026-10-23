@@ -563,6 +563,14 @@ final class OpenStrapUITests: XCTestCase {
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).
     func testEveryDatedTabScrollsClearOfTheBar() {
+        // F4's walk asserts each screen as it goes and names every screen that is wrong at the end,
+        // so this test keeps going after a failure too — without it the expected failure Today
+        // records would stop the test before Recovery, Sleep and Activity were measured (run
+        // 39901865515 passed after one tab).
+        let previousContinue = continueAfterFailure
+        continueAfterFailure = true
+        defer { continueAfterFailure = previousContinue }
+
         let app = XCUIApplication()
         app.launchArguments = ["-demoData", "-glowStill"]
         app.launch()
