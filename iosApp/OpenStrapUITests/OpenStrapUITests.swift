@@ -374,14 +374,14 @@ final class OpenStrapUITests: XCTestCase {
 
     /// One pass to the bottom: a fixed budget of drags, with no early stop.
     ///
-    /// Card F11 measured what a drag is worth on the CI simulator: 124 pt on Recovery, 198 on Sleep,
-    /// 154 on Activity and only 114 on Today, whose cards sit under the finger differently. The longest
-    /// tab needs 2349 pt, so twelve drags was not always enough — Today's twelve left it 130 pt short of
-    /// its own limit and the last card under the bar, which read as a clamp for five cards' worth of
-    /// runs. Eighteen is past the longest walk at the shortest drag.
+    /// Card F11 measured what a drag is worth on the CI simulator across runs: 75-114 pt on Today, 124
+    /// on Recovery, 198 on Sleep, 154 on Activity. Today needs about 1506 pt of travel to reach its
+    /// range, so twelve drags (900-1370) fell short on every run and eighteen (1350-2050) still could,
+    /// which is what read as a scroll clamp for five cards' worth of runs. Thirty is past the longest
+    /// walk at the shortest drag; a drag with nothing left to move costs a second and changes nothing.
     private func walkDown(_ app: XCUIApplication) -> Int {
         var drags = 0
-        for _ in 0..<18 {
+        for _ in 0..<30 {
             drag(app, from: 0.78, to: 0.22)
             drags += 1
             Thread.sleep(forTimeInterval: 0.4)
@@ -544,8 +544,8 @@ final class OpenStrapUITests: XCTestCase {
     /// Card F11 made Today the fourth tab that passes. Its walk used to stop when two drags left the
     /// header's wordmark where it was, and that frame stops updating once the wordmark is far off
     /// screen: the walk declared the end 137 pt early and measured Today's last card under the bar on
-    /// nine runs in ten. The stop is now a fixed drag budget plus the settle loop below, and the budget
-    /// is eighteen because Today's flings are worth only ~114 pt each.
+    /// nine runs in ten. The stop is now a fixed drag budget plus the settle loop below; the budget is
+    /// thirty because a drag is worth as little as 75 pt on Today and its walk is 1506 pt long.
     ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).

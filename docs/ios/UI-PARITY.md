@@ -1463,12 +1463,12 @@ happened to be. The walk now drags a fixed budget and never reads an element's f
 Whether the list grew under it is `measureTabEnd`'s settle loop, which re-reads the lowest *on-screen*
 text after 2.5 s and walks again if it moved.
 
-The second defect was the budget itself. A fling on the CI simulator is worth 124 pt on Recovery, 198 on
-Sleep, 154 on Activity and only 114 on Today — Today's cards sit under the finger differently — so a
-fixed twelve drags left Today 130 pt short of its own 1444.67 pt range, which read as a clamp on run
-after run. Eighteen drags is past the longest walk at the shortest fling: with them Today reaches its
-range and its last card comes to rest at 690.99 against the bar's 754.0, as it did on the earlier runs
-whose walk happened not to freeze.
+The second defect was the budget itself. A fling on the CI simulator is worth 75-114 pt on Today, 124 on
+Recovery, 198 on Sleep and 154 on Activity, while Today needs about 1506 pt of travel to reach its own
+range — so twelve drags (900-1370 pt) never got there, and eighteen (1350-2050) still fell short on the
+runs whose flings were weakest. That is what read as a clamp on run after run. Thirty drags is past the
+longest walk at the shortest fling: Today then reaches its range and its last card comes to rest at
+691.99 against the bar's 754.0, as it did on the earlier runs whose walk happened not to freeze.
 
 No product code had to change for any of this: Today's list, its bottom inset and its content height
 were right in every probe. An earlier attempt in this card gated Today's list on the reads behind it (day
