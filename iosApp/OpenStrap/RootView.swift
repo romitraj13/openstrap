@@ -174,17 +174,8 @@ struct DayTab<Content: View>: View {
                             content()
                         }
                         .padding(.horizontal, 16)
-                        // Card F11: the bar's clearance is the list's own last 136 pt, not a bottom
-                        // safe-area inset. The inset is not reliably part of the scroll view's range:
-                        // with a 2172.67 pt list, a 146 pt adjusted bottom inset and an 874 pt viewport,
-                        // the same scroll view reported its range ending at 1444.67 and would not scroll
-                        // past 1307.67, so Today's last card never came clear of the bar. The clearance
-                        // rides in the content, where the range necessarily follows it. 136 is the bar's
-                        // 112 pt plus the 24 pt the list used to get from the home indicator's inset, so
-                        // the end of the scroll looks the same as on the tabs that measure right.
-                        .padding(.bottom, GlowLayout.barClearance + 24)
                     }
-                    .ignoresSafeArea(.container, edges: .bottom)
+                    .glowClearsNavBar()
                 } else {
                     // Card F11: Today's scroll view is not built until the reads that feed its list have
                     // all answered, so the list it lays out first is the list it keeps. A scroll view that

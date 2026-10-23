@@ -355,55 +355,34 @@ final class OpenStrapUITests: XCTestCase {
         return drawn.sorted { $0.frame.maxY > $1.frame.maxY }
     }
 
-    /// Card F10: drag a dated tab to its end, watching the header's wordmark.
+    /// Card F10: drag a dated tab to its end.
     ///
-    /// The wordmark is the top of the scrolled content: it starts on screen and its y goes negative
-    /// as the list moves, so it is the one element that can be followed the whole way down. A row
-    /// near the bottom cannot be followed (card F2's note: a SwiftUI stack's off-screen children
-    /// report frames clamped into the viewport, and a clamped frame never moves with the scroll —
-    /// the first draft of this walk stopped after four drags on Today for that reason), and a
-    /// capture cannot either while a card still animates (the draft before this one ran its whole
-    /// drag budget on captures that never settled).
-    ///
-    /// Rounds of `walkDown`, with a pause between them, until two rounds end at the same place: a
-    /// card whose demo rows are analysed after the first paint takes its place below the fold, which
-    /// lengthens the list without moving the wordmark until the next round takes up the room it
-    /// added. The round that finds no new room costs two drags. Without this Today was read 140 pt
-    /// short of its end on some runs and at its end on others (runs 39877626154 and 39882557206).
+    /// The end is not read from an element's frame any more (card F11): the header's wordmark was the
+    /// one element that could be followed the whole way down, but its frame stops updating once it is
+    /// well off screen. Probe run b76c8a0 read the wordmark at -1299.67 for drags 3-6 while the scroll
+    /// view's own offset sat at 1307.67 of a 1444.67 pt range, so the walk declared the end 137 pt
+    /// early and measured Today's last card under the bar. A fixed budget of drags cannot mistake a
+    /// stale frame for the end; whether the list grew after them is `measureTabEnd`'s settle loop,
+    /// which reads the lowest text on screen rather than the wordmark.
     private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat) {
         let start = wordmark.frame.minY
-        var drags = 0
-        var lastEnd = CGFloat.greatestFiniteMagnitude
-        // Three rounds at most. A round that ends where the previous round ended is the end: the list
-        // has not grown since that round. A round that ends higher has taken up room a card added
-        // after the last one (Today's workouts card is the one that lands late), and needs another.
-        for _ in 0..<3 {
-            drags += walkDown(app, wordmark: wordmark)
-            let end = wordmark.frame.minY
-            if abs(end - lastEnd) < 1 {
-                return (drags, start - end)
-            }
-            lastEnd = end
-            Thread.sleep(forTimeInterval: 3)
-        }
+        let drags = walkDown(app)
+        // Reported, not trusted: the wordmark's frame is a fair measure of the travel until it goes
+        // stale, and `measureTabEnd` asserts it moved at all.
         return (drags, start - wordmark.frame.minY)
     }
 
-    /// One pass to the bottom: drag until two drags in a row leave the wordmark where it is.
-    private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement) -> Int {
-        var previous = wordmark.frame.minY
-        var still = 0
+    /// One pass to the bottom: a fixed budget of drags, with no early stop.
+    ///
+    /// A held drag moves about 300-650 pt; the tallest dated tab is six screenfuls (card U7, 2349 pt
+    /// of travel on the CI simulator), so twelve is past the end of every one of them. A drag with
+    /// nothing left to move costs a second and changes nothing.
+    private func walkDown(_ app: XCUIApplication) -> Int {
         var drags = 0
-        // A held drag moves about half a window; the tallest dated tab is six screenfuls (card U7),
-        // so sixteen is past the end of any of them.
-        for _ in 0..<16 {
+        for _ in 0..<12 {
             drag(app, from: 0.78, to: 0.22)
             drags += 1
             Thread.sleep(forTimeInterval: 0.4)
-            let top = wordmark.frame.minY
-            still = top < previous - 1 ? 0 : still + 1
-            previous = top
-            if still == 2 { return drags }
         }
         return drags
     }
@@ -560,12 +539,13 @@ final class OpenStrapUITests: XCTestCase {
     /// on the screen against `navBar.top`, the bar's own top edge. At its end every tab clears by
     /// 52–64 pt on this device, so those screenshots were a screenful short.
     ///
-    /// Card F11 made Today the fourth tab that passes: the workouts card, drawn by a second read,
-    /// landed after Today's list had laid out, and the scroll view clamped its gestures to the height
-    /// it had laid the content out at, so the last card sat under the bar on nine runs in ten.
-    /// `DayTab` now builds Today's list once every read that feeds it has answered, so the list's
-    /// first layout is its final shape; the walk launches with `-lateWorkouts` so it still measures
-    /// the card arriving late instead of waiting for luck.
+    /// Card F11 made Today the fourth tab that passes. Its walk used to stop when two drags left the
+    /// header's wordmark where it was, and that frame stops updating once the wordmark is far off
+    /// screen: the walk declared the end 137 pt early and measured Today's last card under the bar on
+    /// nine runs in ten. It now drags a fixed budget and leaves the end to the settle loop below.
+    /// Today's list is also built once every read that feeds it has answered, so the workouts card is
+    /// in the list from its first layout; `-lateWorkouts` holds that read back so the walk measures
+    /// that condition every run rather than a race.
     ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).
