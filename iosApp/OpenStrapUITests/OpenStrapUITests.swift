@@ -291,7 +291,7 @@ final class OpenStrapUITests: XCTestCase {
                 "F10 \(screen): not the end yet (last text \(bottom), window bottom \(windowBottom), "
                     + "settled \(settled)); walking again"
             )
-            _ = scrollToEndOfTab(app, wordmark: wordmark)
+            _ = scrollToEndOfTab(app, wordmark: wordmark, screen: screen)
             drawn = lowestTexts(app, above: barTop)
         }
         for one in drawn.prefix(6) {
