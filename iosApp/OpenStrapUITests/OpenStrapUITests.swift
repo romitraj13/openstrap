@@ -536,16 +536,16 @@ final class OpenStrapUITests: XCTestCase {
         app.launch()
 
         var failures: [String] = []
-        // The four dated tabs, each with a mark only that tab's own screen draws: a tab that never
-        // drew fails here instead of being measured as an empty list. Today is walked last on
-        // purpose: it is the launch screen, and its workouts card is drawn from an analysis that
-        // lands after the first paint, so walking it first measures a list that is still growing
-        // (runs 39849833708 and 39864487525 read its last row 26 pt lower on each pass).
-        let tabs: [(name: String, drawn: String)] = [
-            ("Recovery", "recovery.title"),
-            ("Sleep", "sleep.title"),
-            ("Activity", "Steps"),
-            ("Today", "What changed"),
+        // The four dated tabs, each with a mark for the panel at the bottom of its list — the thing
+        // the walk is about to measure. Waiting for it is what makes the end of the scroll a fixed
+        // place: the demo's workout analysis lands well after the first paint (it is still missing
+        // 54 s into run 39886609260's `testActivity`), and a list whose last card has not arrived
+        // yet ends the scroll 140 pt early. Today is walked last for the same reason.
+        let tabs: [(name: String, bottom: String)] = [
+            ("Recovery", "How it works"),
+            ("Sleep", "This week"),
+            ("Activity", "Workouts"),
+            ("Today", "Workouts"),
         ]
         for tab in tabs {
             app.buttons[tab.name].tap()
@@ -555,8 +555,8 @@ final class OpenStrapUITests: XCTestCase {
                 Thread.sleep(forTimeInterval: 5)
             }
             XCTAssertTrue(
-                app.staticTexts[tab.drawn].firstMatch.waitForExistence(timeout: 120),
-                "The \(tab.name) tab never drew \(tab.drawn)"
+                app.staticTexts[tab.bottom].firstMatch.waitForExistence(timeout: 120),
+                "The \(tab.name) tab never drew the bottom of its list (\(tab.bottom))"
             )
             // Give the tab's own data a moment to land before the walk starts asking for frames:
             // `RecoveryScreen` and the others read their panels on appear, and a walk that starts
