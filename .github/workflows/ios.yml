@@ -17,6 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Card notes belong on the kanban board, not in the public repo. This fails the build if a
+      # *SCRATCHPAD* file is ever committed, so the next one cannot slip through review; the same
+      # pattern in .gitignore keeps it from being staged in the first place.
+      - name: No scratchpad files are committed
+        run: |
+          tracked=$(git ls-files | grep -i 'SCRATCHPAD' || true)
+          if [ -n "$tracked" ]; then
+            echo "scratchpad files are committed:"
+            echo "$tracked"
+            echo "move the notes to the kanban board and git rm the file"
+            exit 1
+          fi
+          echo "no scratchpad files are committed"
+
       # All networking lives in the Zepp sign-in screen (plan section 8: no network access outside
       # it). This fails the build if URLSession, WKWebView, NWConnection or URLRequest ever appears
       # in another Swift file, so later cards cannot add it elsewhere.
