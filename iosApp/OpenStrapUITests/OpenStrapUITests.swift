@@ -543,9 +543,8 @@ final class OpenStrapUITests: XCTestCase {
     /// header's wordmark where it was, and that frame stops updating once the wordmark is far off
     /// screen: the walk declared the end 137 pt early and measured Today's last card under the bar on
     /// nine runs in ten. It now drags a fixed budget and leaves the end to the settle loop below.
-    /// Today's list is also built once every read that feeds it has answered, so the workouts card is
-    /// in the list from its first layout; `-lateWorkouts` holds that read back so the walk measures
-    /// that condition every run rather than a race.
+    /// Today's list also carries the bar's clearance in its own height and is built once more a moment
+    /// after it appears, so the list a drag is offered is the list on screen.
     ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).
@@ -558,12 +557,7 @@ final class OpenStrapUITests: XCTestCase {
         defer { continueAfterFailure = previousContinue }
 
         let app = XCUIApplication()
-        // Card F11: `-lateWorkouts 20` holds the workouts card back for twenty seconds, so it cannot be
-        // in Today's list when the list lays out for the first time — that is the condition the card is
-        // about, and it used to decide whether Today's last card could be scrolled clear of the bar (nine
-        // runs in ten it could not). Twenty seconds is well past the day's own read and the first paint,
-        // so this is the late card on every run, not a race that sometimes goes the other way.
-        app.launchArguments = ["-demoData", "-glowStill", "-lateWorkouts", "20"]
+        app.launchArguments = ["-demoData", "-glowStill"]
         app.launch()
 
         var failures: [String] = []

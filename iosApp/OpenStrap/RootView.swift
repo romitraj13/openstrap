@@ -150,6 +150,9 @@ struct DayTab<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @State private var path = NavigationPath()
+    /// Card F11: which build of the scroll view is on screen. It is built once more a moment after the
+    /// list first appears — see the `onAppear` on the scroll view.
+    @State private var listBuild = 0
 
     /// Card F9: the phone's calendar, or the pinned demo day's while `-demoData` is on, so a day
     /// step lands on the same midnight the header and the shared queries measure.
@@ -164,79 +167,46 @@ struct DayTab<Content: View>: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if ready {
-                    PullSyncScroll(syncing: controller.syncRunning) {
-                        controller.syncNow()
-                    } content: {
-                        VStack(alignment: .leading, spacing: 12) {
-                            header
-                            content()
-                        }
-                        .padding(.horizontal, 16)
-                        // Card F11: the bar's clearance rides in the list, not in the scroll view's
-                        // bottom safe-area inset. The probe (run b76c8a0) reads the inset as 146 pt and
-                        // the range it should produce as 1444.67, yet Today's drags rest at 1297-1307 —
-                        // the range of `contentSize - bounds`, i.e. without the inset. The other three
-                        // tabs get the inset and reach their range exactly. So the clearance is the
-                        // list's own last 136 pt (`barClearance` 112 + the 24 pt the home indicator used
-                        // to add); contentSize is right on every tab, so the range follows it either way.
-                        .padding(.bottom, GlowLayout.barClearance + 24)
-                    }
-                } else {
-                    // Card F11: Today's scroll view is not built until the reads that feed its list have
-                    // all answered, so the list it lays out first is the list it keeps. A scroll view that
-                    // exists while its content is still arriving clamps its gestures to a height short of
-                    // the cards it ends up drawing (measured: a range ending at 1444.67, drags stopping
-                    // dead at 1309.0), which left Today's last card under the floating bar. The other
-                    // three tabs are built when the bar switches to them, with their data already read;
-                    // this is the same rule for the one tab that is on screen from launch.
-                    //
-                    // The header is drawn while the first read is in, as it was before the gate: it does
-                    // not depend on the list, and a launch should show the wordmark and the day rather
-                    // than a black window.
-                    VStack(alignment: .leading, spacing: 12) {
-                        header
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            PullSyncScroll(syncing: controller.syncRunning) {
+                controller.syncNow()
+            } content: {
+                VStack(alignment: .leading, spacing: 12) {
+                    DateHeader(
+                        date: selectedDate,
+                        battery: battery,
+                        charging: battery != nil && controller.charging,
+                        picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
+                        onPrev: { step(-1) },
+                        onNext: { step(1) },
+                        onOpenStrap: onOpenStrap
+                    )
+                    content()
                 }
+                .padding(.horizontal, 16)
+                // Card F11: the bar's clearance rides in the list, not in the scroll view's bottom
+                // safe-area inset. The probe (run b76c8a0) read the inset as 146 pt and the range it
+                // should produce as 1444.67, yet Today's drags came to rest at 1297-1307 and did not
+                // move when the list grew — the pan keeps a size the layout no longer has. A list that
+                // carries the clearance in its own height cannot lose it: 136 pt is `barClearance` (112)
+                // plus the 24 pt the home indicator used to add.
+                .padding(.bottom, GlowLayout.barClearance + 24)
+            }
+            .id(listBuild)
+            .onAppear {
+                // Card F11: build the scroll view once more, a moment after it first appears, so the
+                // scroll view measures the list that is actually on screen rather than the one it took
+                // at its first layout. Once per tab: `listBuild` only ever goes 0 -> 1.
+                guard tab == .today, listBuild == 0 else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { listBuild = 1 }
             }
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear {
-                // Today's own reads, asked for here rather than by the screen, because the screen is not
-                // built until they have answered.
-                if tab == .today && health.dayState == nil { health.reloadToday() }
-                health.reload()
-            }
+            .onAppear { health.reload() }
             .onChange(of: controller.lastSyncEpochSeconds) { _, _ in
                 health.reload()
                 health.reloadDaysWithData()
             }
         }
-    }
-
-    /// The shared header: wordmark and chip, then the day row. Part of the scrolled content, and on
-    /// its own while Today's first read is in.
-    @ViewBuilder private var header: some View {
-        DateHeader(
-            date: selectedDate,
-            battery: battery,
-            charging: battery != nil && controller.charging,
-            picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
-            onPrev: { step(-1) },
-            onNext: { step(1) },
-            onOpenStrap: onOpenStrap
-        )
-    }
-
-    /// Card F11: a dated tab may draw its list once every read that puts a card on it has answered.
-    /// Only Today can be waiting: the other three are built when the bar switches to them, after the
-    /// same reads have already landed. `todayWorkoutsRead` stays true after its first answer, so this
-    /// only gates the list's first build and a later reload keeps the scroll view the reader is in.
-    private var ready: Bool {
-        tab != .today || (health.dayState != nil && health.todayWorkoutsRead)
     }
 
     /// One day back or forward, never past today (`DayViewModel.previousDay`/`nextDay`).

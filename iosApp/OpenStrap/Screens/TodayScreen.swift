@@ -91,9 +91,7 @@ struct TodayScreen: View {
             if let day = health.dayState {
                 content(day)
             } else {
-                // The day's first read is in flight. Nothing is invented for the wait. (Card F11: the
-                // scroll view around this screen is not built until that read and the workouts have both
-                // answered — see `DayTab.ready` — so a card is never drawn after the list has laid out.)
+                // The day's first read is in flight. Nothing is invented for the wait.
                 Color.clear.frame(height: 1)
             }
         }
@@ -118,9 +116,7 @@ struct TodayScreen: View {
         }
         .onAppear {
             openLaunchMetric()
-            // Card F11: the day's reads are `DayTab`'s now — its `onAppear` asks for them, and it does
-            // not build this screen until they have answered. Asking again here cleared the workouts
-            // flag the gate is waiting on, so this screen was removed and rebuilt for ever.
+            health.reloadToday()
         }
     }
 

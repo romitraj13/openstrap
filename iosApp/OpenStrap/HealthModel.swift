@@ -32,25 +32,6 @@ enum DemoData {
         return false
         #endif
     }
-
-    /// Debug only: `-lateWorkouts <seconds>` holds Today's workouts read back for that many seconds,
-    /// so the workouts card lands after the list's first layout on every run.
-    ///
-    /// Card F11: whether that card is in Today's list when the scroll view first lays it out is a race
-    /// between two database reads (`reloadToday` asks for the day and for the workouts separately), and
-    /// the card arriving afterwards is what left Today's last card under the floating bar on nine runs
-    /// in ten. A test that wants that condition should not wait for luck: this makes it every run. A
-    /// release build ignores the argument, and a run without it keeps the race.
-    static var lateWorkoutsSeconds: Double {
-        #if DEBUG
-        let arguments = CommandLine.arguments
-        guard let flag = arguments.firstIndex(of: "-lateWorkouts"), flag + 1 < arguments.count,
-              let seconds = Double(arguments[flag + 1]) else { return 0 }
-        return max(seconds, 0)
-        #else
-        return 0
-        #endif
-    }
 }
 
 /// The screens' data, read from the shared Kotlin `ScreenQueries` (U4's calendar, profile and goals;
@@ -74,15 +55,6 @@ final class HealthModel: ObservableObject {
     @Published private(set) var recoveryResult: RecoveryResult?
     /// Every workout OpenStrap knows, newest first: Today picks the selected day's out of it.
     @Published private(set) var workoutList: [WorkoutAnalysis] = []
-    /// Card F11: the workouts have answered at least once, so Today may draw its list. Today waits for
-    /// every read that puts a card on that list, because a card that arrives after the list has laid
-    /// out is drawn past its end and cannot be scrolled to (see the note in `reloadToday`).
-    /// This is false only until that first answer: from then on the list stays built, because a later
-    /// reload (a day step, a sync) must not tear the reader's scroll view down.
-    @Published private(set) var todayWorkoutsRead = false
-    /// Whether the workouts have answered once already. Only the first answer can arrive after Today's
-    /// list exists — the one the flag above gates — so later reloads leave the flag alone.
-    private var workoutsAnsweredOnce = false
     /// The strap's sport-effect records, newest last: Activity's load and fitness panels read them
     /// (`ScreenQueries.sportEffects`, Android's `WorkoutsViewModel.effects`).
     @Published private(set) var sportEffects: [SportEffectRow] = []
@@ -168,20 +140,6 @@ final class HealthModel: ObservableObject {
     /// Charge, the workouts, the check-in, the strap's own score and the recap's step history.
     func reloadToday() {
         let date = self.date
-        // Card F11: Today draws its list from one complete read. This flag says the workouts — the last
-        // of the reads that put a card on that list — have answered for this pass, so `TodayScreen` waits
-        // for them instead of drawing the day and letting the workouts card drop in afterwards. A scroll
-        // view clamps its gestures to the content height it laid out, and a card that arrives after that
-        // layout is drawn past the end of the list and never added to its range (measured: 2172.67 pt of
-        // content, a range ending at 1444.67, drags stopping dead at 1309.0), so the last card could not
-        // be dragged clear of the floating bar.
-        //
-        // Only the first pass clears the flag. `TodayScreen` is built once the flag is set, so a reload
-        // that cleared it again would remove the list, rebuild it, and re-run this pass from the screen's
-        // own `onAppear` for ever (run 39958448835: Today never drew a single card). Later passes keep
-        // the built list — a sync must not drop the reader to the top — and the workouts list they
-        // refresh is complete already.
-        if !workoutsAnsweredOnce { todayWorkoutsRead = false }
         screens.day(date: date) { [weak self] state in
             guard let self else { return }
             // A slower answer for a day the user has already left must not overwrite the new one.
@@ -194,21 +152,7 @@ final class HealthModel: ObservableObject {
             self.recoveryResult = result
         }
         screens.workouts { [weak self] list in
-            guard let self else { return }
-            // Card F11's test seam: `-lateWorkouts` holds the card back so it is certain to arrive
-            // after Today's first layout would have happened. A run without the flag assigns at once.
-            let late = DemoData.lateWorkoutsSeconds
-            if late > 0 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + late) { [weak self] in
-                    self?.workoutList = list
-                    self?.workoutsAnsweredOnce = true
-                    self?.todayWorkoutsRead = true
-                }
-            } else {
-                self.workoutList = list
-                self.workoutsAnsweredOnce = true
-                self.todayWorkoutsRead = true
-            }
+            self?.workoutList = list
         }
         // The Activity tab's two reads (card U8): the seven days of PAI ending on this day, and the
         // strap's sport effects, which its load and fitness panels need.

@@ -1438,70 +1438,50 @@ names and the one scheme name, the Swift module `OpenStrap` and the framework `O
 
 ## The dated tabs' end of scroll (cards F4, F10, F11)
 
-The four dated tabs scroll their content under the floating bar, so each one takes the bar's clearance
-(`GlowLayout.barClearance` = 112 pt through `glowClearsNavBar()`, above) and its last card must come
-clear of the bar once the list has been dragged to its end. F4 measures that for the You screens and
-F9's workout screens; `testEveryDatedTabScrollsClearOfTheBar` (card F10) does it for Today, Recovery,
-Sleep and Activity. Its walk followed the header's wordmark — the top of the scrolled content — and
-stopped when two drags in a row left it in the same place; then it measured the lowest text on the
-screen against `navBar.top` (754.0 pt in the 402×874 simulator window).
+The four dated tabs scroll their content under the floating bar, so each one keeps the bar's clearance
+(`GlowLayout.barClearance` = 112 pt) after its last card, and that card must come clear of the bar once
+the list has been dragged to its end. F4 measures that for the You screens and F9's workout screens;
+`testEveryDatedTabScrollsClearOfTheBar` (card F10) does it for Today, Recovery, Sleep and Activity. Its
+walk follows the header's wordmark and stops when two drags in a row leave it in the same place; then it
+measures the lowest text on the screen against `navBar.top` (754.0 pt in the 402×874 simulator window).
 
-That stop condition was wrong, and it is what card F11 found. The wordmark's frame stops updating once
-the wordmark is far off screen: XCUITest reports it at its last on-screen position rather than its
-scrolled one. A temporary probe on the scroll view itself (`UIScrollView.contentSize`, the tallest
-laid-out subview, `adjustedContentInset`, `bounds`, `contentOffset`), printed after every drag of the
-walk, caught it:
+Card F11 found two defects, both in the measurement path rather than in the list.
+
+The first is the walk's stop condition. The wordmark's frame stops updating once the wordmark is far off
+screen: XCUITest reports it at its last on-screen position rather than its scrolled one. A temporary
+DEBUG probe in the scroll content (`UIScrollView.contentSize`, the tallest laid-out subview, the insets,
+`bounds`, `contentOffset`), printed after every drag, caught it:
 
     F11 Today drag 2: wordmark=-1299.67  contentH=2172.67  laidOutH=2172.67  boundsH=874.0
                       insetTop=62.0  insetBottom=146.0  offsetY=1307.67  rangeEndY=1444.67
     F11 Today drag 3: wordmark=-1299.67  ...  offsetY=1307.67
     F11 Today drag 4: wordmark=-1299.67  ...  offsetY=1307.67
 
-The list is complete (content size and the laid-out content frame are the same 2172.67 pt), the bar's
-clearance is in the adjusted inset (146 = 34 home indicator + 112 `barClearance`, the same on all four
-tabs), and the scroll view still had 137 pt of travel left when the wordmark froze. The walk read that
-freeze as "two drags left it where it is" and stopped, then measured the last card wherever the list
-happened to be — which is why Today's number varied run to run (819-861 pt) while the three tabs whose
-walks happened not to freeze read their end exactly. On the runs where the wordmark kept reporting its
-position the same build reached 1444.67 and Today's last card rested at 690.99. So the clearance, the
-content's height and the late workouts card were never the defect; the measurement was.
+The list was complete, the bar's clearance was in the adjusted inset, and the scroll view still had
+137 pt to give; the walk read the frozen frame as the end and measured the last card wherever the list
+happened to be. The walk now drags a fixed budget of twelve drags — past the longest tab's 2349 pt of
+travel — and never reads an element's frame for the end. Whether the list grew under it is
+`measureTabEnd`'s settle loop, which re-reads the lowest *on-screen* text after 2.5 s and walks again if
+it moved.
 
-The walk now drags a fixed budget of twelve drags — past the longest tab's 2349 pt of travel — and never
-reads an element's frame for the end. Whether the list grew under it is `measureTabEnd`'s settle loop,
-which re-reads the lowest *on-screen* text after 2.5 s and walks again if it moved. The end of the
-scroll is therefore a fact about the list, not about a frame.
+The second is that Today's pan would still not take those last 137 pt with twelve drags, while Recovery,
+Sleep and Activity reach their ends exactly. The same probe reported a 1444.67 pt range for Today, and
+adding 136 pt to the bottom of the list did not move where its drags came to rest (1288-1302 before and
+after) — so the pan is using a size the layout no longer has, not the content's real height. Two changes
+address it: the bar's clearance rides in the list itself, as its last 136 pt (`barClearance` 112 plus
+the 24 pt the home indicator used to add) instead of in a bottom safe-area inset that the pan can drop,
+and `DayTab` builds its scroll view once more 1.5 s after it first appears, so the scroll view measures
+the list that is actually on screen. Both are invisible: the cards still scroll under the glass and the
+end of the scroll comes to rest where the tabs that always measured right had it.
 
-The app keeps one change from this card, because the race it removes is real even though it was not
-Today's under-bar defect: Today's list is not built until the reads that feed it have answered.
-`HealthModel.reloadToday` clears a `todayWorkoutsRead` flag and sets it when the workouts — the last
-read that puts a card on that list — have answered, and `DayTab` builds its `PullSyncScroll` only when
-that flag and the day's own read are both in, so the list's first layout is its final shape. The other
-three tabs have always been built when the bar switches to them, with the same reads already landed;
-`todayWorkoutsRead` is what Today, the one tab on screen from launch, was missing.
+An earlier attempt gated Today's list on the reads behind it (day and workouts) so the workouts card
+could not arrive after the list's first layout. It was dropped: the probe showed the list's height was
+never the problem, and the gate could leave Today showing nothing at all when a read did not answer
+(run 40006225116's `testActivity` waited 120 s for a card that never came). `TodayScreen` asks for its
+reads in its own `onAppear` again, as every other screen does.
 
-The flag is cleared only until its first answer (`workoutsAnsweredOnce` in `HealthModel`). Clearing it
-on every reload tore the list down and rebuilt it from under the reader: `TodayScreen`'s own `onAppear`
-asked for the same reads again, which cleared the flag the gate was waiting on, which removed the
-screen that had just appeared — run 39958448835 looped there and Today never drew a single card. So the
-gate now applies to the first build only; a later reload (a day step, a sync) updates the list in place
-and does not drop the reader to the top. `TodayScreen` no longer asks for the reads itself (only `DayTab`
-does), and while the first read is in the tab draws its header on its own rather than a black window.
-
-The cost is that Today's first paint waits for that read too, as it already waited for the day's. With
-`-lateWorkouts 20` — the test seam — it waits twenty seconds; on a real launch it is the same local
-database read the day's cards already come from, and Compose's `DayViewModel` hands the screen one
-complete state in the same way, so the two builds now agree on when a list may be drawn.
-
-Attempts that did not hold, and what they showed: rebuilding the scroll view when a card joined (`.id`,
-runs `a647fec` and `ddc5eb1`) and `.fixedSize` on its content (`1788d1e`) left the drags at the same
-short offsets (1309.0, and 838.66 read). They are recorded because they ruled the content's height out
-before the probe measured it: the content was already the height it should be.
-
-`-lateWorkouts 20` (DEBUG only, `HealthModel.reloadToday`) holds that second read back for twenty
-seconds, so Today's list cannot be built before the card is there: the walk measures the list the gate
-waits for on every run, rather than a race between two database reads.
-
-`-todayMonday` forces the recap card on a day that is not a Monday; `HealthModel.reloadRecapSteps`
-honours the same flag, so a forced recap reads its steps (the row read "Steps a day —" without them,
-in `U5-todayrecap-1`). A real Monday is unaffected, and a release build reads the flag as false.
+The recap flag fix from this card stays: `-todayMonday` forces the recap card on a day that is not a
+Monday, and `HealthModel.reloadRecapSteps` now honours the same flag, so a forced recap reads its steps
+(the row read "Steps a day —" without them, in `U5-todayrecap-1`). A real Monday is unaffected, and a
+release build reads the flag as false.
 
