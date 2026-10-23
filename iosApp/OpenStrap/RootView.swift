@@ -174,8 +174,15 @@ struct DayTab<Content: View>: View {
                             content()
                         }
                         .padding(.horizontal, 16)
+                        // Card F11: the bar's clearance rides in the list, not in the scroll view's
+                        // bottom safe-area inset. The probe (run b76c8a0) reads the inset as 146 pt and
+                        // the range it should produce as 1444.67, yet Today's drags rest at 1297-1307 —
+                        // the range of `contentSize - bounds`, i.e. without the inset. The other three
+                        // tabs get the inset and reach their range exactly. So the clearance is the
+                        // list's own last 136 pt (`barClearance` 112 + the 24 pt the home indicator used
+                        // to add); contentSize is right on every tab, so the range follows it either way.
+                        .padding(.bottom, GlowLayout.barClearance + 24)
                     }
-                    .glowClearsNavBar()
                 } else {
                     // Card F11: Today's scroll view is not built until the reads that feed its list have
                     // all answered, so the list it lays out first is the list it keeps. A scroll view that

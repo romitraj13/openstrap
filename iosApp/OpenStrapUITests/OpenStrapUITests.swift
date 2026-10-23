@@ -380,26 +380,11 @@ final class OpenStrapUITests: XCTestCase {
     private func walkDown(_ app: XCUIApplication) -> Int {
         var drags = 0
         for _ in 0..<12 {
-            dragHeld(app, from: 0.78, to: 0.22)
+            drag(app, from: 0.78, to: 0.22)
             drags += 1
             Thread.sleep(forTimeInterval: 0.4)
         }
         return drags
-    }
-
-    /// Card F11: a slow drag held still before it lifts, not a fling.
-    ///
-    /// A fling's momentum decides where the list comes to rest, and the bottom bounce means the frame
-    /// the next statement reads can be mid-settle; a drag held still for 0.4 s lands on the scroll
-    /// view's own limit. Card F10's walk used flings, and the list's last 137 pt were never taken.
-    private func dragHeld(_ app: XCUIApplication, from: CGFloat, to: CGFloat) {
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
-            .press(
-                forDuration: 0.1,
-                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
-                withVelocity: .slow,
-                thenHoldForDuration: 0.4
-            )
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
