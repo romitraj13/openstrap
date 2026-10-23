@@ -49,6 +49,10 @@ struct PullSyncScroll<Content: View>: View {
     static var pullDistance: CGFloat { 80 }
 
     var syncing: Bool
+    /// Card F11: the identity of the scrolled content. When it changes the content is built again, which
+    /// is the only thing that makes a SwiftUI scroll view measure a list that grew after its last layout
+    /// (`HealthModel.todayListKey`). Empty for a screen whose cards never arrive after the first layout.
+    var contentKey: String = ""
     var onSync: () -> Void
     @ViewBuilder var content: () -> Content
 
@@ -71,6 +75,7 @@ struct PullSyncScroll<Content: View>: View {
                     .frame(width: 1, height: 1)
                 #endif
             }
+            .id(contentKey)
         }
         .coordinateSpace(name: space)
         .onPreferenceChange(PullOffsetKey.self) { offset in

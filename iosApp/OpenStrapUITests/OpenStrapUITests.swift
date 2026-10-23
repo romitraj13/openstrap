@@ -253,8 +253,8 @@ final class OpenStrapUITests: XCTestCase {
     /// count and the travel are printed with it, so the line says how far the walk had to go.
     ///
     /// Everything here is a hard assertion: a tab that cannot be walked to its end is a broken test,
-    /// not a defect, and must fail. The clearance verdict is the caller's, because Today's is the
-    /// one card F10 recorded as an expected failure.
+    /// not a defect, and must fail. The clearance verdict is the caller's, so that one run names every
+    /// tab that is wrong instead of stopping at the first.
     private func measureTabEnd(_ app: XCUIApplication, screen: String) -> TabEnd? {
         let bar = app.descendants(matching: .any)["navBar.top"]
         guard bar.waitForExistence(timeout: 30) else {
@@ -572,13 +572,18 @@ final class OpenStrapUITests: XCTestCase {
     /// on the screen against `navBar.top`, the bar's own top edge. At its end every tab clears by
     /// 52–64 pt on this device, so those screenshots were a screenful short.
     ///
+    /// Card F11 made Today the fourth tab that passes: the workouts card, drawn by a second read,
+    /// landed after Today's list had laid out, and the scroll view never added it to its range, so the
+    /// last card sat under the bar on nine runs in ten. `HealthModel.todayListKey` now re-identifies
+    /// Today's scroll content as each card joins the list, and the walk launches with
+    /// `-lateWorkouts` so it measures that late card on every run instead of one run in ten.
+    ///
     /// `-glowStill` holds the cards' cores still — the walk asks for the screen's whole text tree
     /// twice per tab, and a card that animates for ever makes such a query wait (card F5's lesson).
     func testEveryDatedTabScrollsClearOfTheBar() {
         // F4's walk asserts each screen as it goes and names every screen that is wrong at the end,
-        // so this test keeps going after a failure too — without it the expected failure Today
-        // records would stop the test before Recovery, Sleep and Activity were measured (run
-        // 39901865515 passed after one tab).
+        // so this test keeps going after a failure too — without it the first wrong tab would stop
+        // the test before the other three were measured (run 39901865515 passed after one tab).
         let previousContinue = continueAfterFailure
         continueAfterFailure = true
         defer { continueAfterFailure = previousContinue }
@@ -635,31 +640,11 @@ final class OpenStrapUITests: XCTestCase {
             // too early ends on a half-drawn screen (run 39873446048). Card F5's rule for the first
             // query after a tab switch, with room for the queries behind the panels.
             Thread.sleep(forTimeInterval: 6)
-            // The walk and its hard checks happen outside the expectation scope: a tab that cannot
-            // be walked to its end must fail the run, not be filed as the known defect.
+            // The walk and its hard checks: a tab that cannot be walked to its end is a broken test,
+            // and one whose last text stays under the bar is a defect. Both fail the run; the walk
+            // asserts as it goes and every tab is measured before the run is judged.
             let end = measureTabEnd(app, screen: tab.name)
-            if tab.name == "Today" {
-                // Card F10's finding, and why this one is recorded rather than asserted. Walked to
-                // the end of its scroll — the wordmark holds still over two drags, and two rounds
-                // three seconds apart end at the same place — Today's last card still sits under
-                // the bar: 819, 832, 823, 819, 845, 826, 834 and 818 pt against a bar top of 754 in
-                // eight runs, while Recovery (698), Sleep (702) and Activity (690) clear it every
-                // run. One run in that eight (39882557206) scrolled 1506 pt instead of ~1370 and
-                // read 692, so the list's scrollable extent is 126 pt short — the height of the
-                // workouts card — whenever that card is inserted after the list's first layout,
-                // which is app-side and outside this card. Non-strict, so a run that does clear the
-                // bar, or the card that fixes it, passes without changing this test.
-                let options = XCTExpectedFailure.Options()
-                options.isStrict = false
-                XCTExpectFailure(
-                    "Today's last card ends under the floating bar at the end of its scroll",
-                    options: options
-                ) {
-                    if let end, let problem = clearanceProblem(end) {
-                        XCTFail(problem)
-                    }
-                }
-            } else if let end, let problem = clearanceProblem(end) {
+            if let end, let problem = clearanceProblem(end) {
                 failures.append(problem)
             }
         }
