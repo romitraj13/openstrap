@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /*
  * The top of every date screen: the OpenHealth wordmark and the strap chip, the gap a pull opens,
@@ -49,13 +48,6 @@ struct PullSyncScroll<Content: View>: View {
     static var pullDistance: CGFloat { 80 }
 
     var syncing: Bool
-    /// Card F11: the identity of the scrolled content. When it changes the scroll view is built again,
-    /// which is what makes it take the list's new height into its scroll range: today's workouts card
-    /// arrives after the list has laid out, and a scroll view that has already measured its content
-    /// keeps the range it had (measured: 2172.67 pt of content, drags stopping at offset 1308.0 with
-    /// the range's end at 1444.67). See `HealthModel.todayListKey`. Empty — one identity for the life
-    /// of the tab — for a screen whose cards are all there at first layout.
-    var contentKey: String = ""
     var onSync: () -> Void
     @ViewBuilder var content: () -> Content
 
@@ -71,14 +63,17 @@ struct PullSyncScroll<Content: View>: View {
                 }
                 .frame(height: 0)
                 content()
-                #if DEBUG
-                // Card F11, temporary: the probe the UI test reads to see this scroll view's own
-                // geometry. Removed before the card's final commit.
-                ScrollGeometryProbe(key: contentKey)
-                    .frame(width: 1, height: 1)
-                #endif
             }
-            // Card F11: the content takes its own height, not the height the scroll view last measured.
+            // Card F11: the content takes its own height, whatever height the scroll view proposes.
+            //
+            // A card that joins the list after it has laid out (Today's workouts card comes from a second
+            // read) used to be drawn but never added to the scroll range: the content was laid out 135 pt
+            // shorter than its own content size, and the scroll view clamps its gestures to the layout,
+            // so the last card stayed under the floating bar however far the list was dragged (measured:
+            // 2172.67 pt of content, a range ending at 1444.67, drags stopping dead at 1309.0). Under
+            // `fixedSize` the stack reports the height of the cards it is drawing, so the range follows
+            // the list. The four dated tabs all scroll under the bar; the other three draw every card at
+            // first layout, and this leaves them exactly as they were.
             .fixedSize(horizontal: false, vertical: true)
         }
         .coordinateSpace(name: space)
@@ -89,7 +84,6 @@ struct PullSyncScroll<Content: View>: View {
         }
         .environment(\.pullSync, PullSyncState(fraction: fraction, syncing: syncing))
         .refreshable { onSync() }
-        .id(contentKey)
     }
 
     /// The fraction the header draws with: the pull, or a full one while a sync runs.
@@ -312,51 +306,3 @@ struct DateHeader: View {
         return formatter.string(from: date)
     }
 }
-
-#if DEBUG
-/// Card F11, temporary probe (removed before this card's final commit): the enclosing scroll view's
-/// own geometry, read by `testEveryDatedTabScrollsClearOfTheBar`.
-///
-/// The label is computed when the test takes its accessibility snapshot rather than when the view is
-/// laid out, so the offset it reports is the offset at the end of the walk. `rangeEndY` is the largest
-/// content offset the scroll view will accept (`contentSize + bottom inset - bounds`): the number the
-/// walk's end is supposed to reach.
-private final class ScrollGeometryView: UIView {
-    var key = ""
-
-    override var accessibilityLabel: String? {
-        get {
-            var ancestor = superview
-            while let candidate = ancestor, !(candidate is UIScrollView) {
-                ancestor = candidate.superview
-            }
-            guard let scroll = ancestor as? UIScrollView else { return "no enclosing scroll view" }
-            let inset = scroll.adjustedContentInset
-            let content = scroll.contentSize.height
-            let height = scroll.bounds.height
-            let hosts = scroll.subviews.map { "\(Int($0.frame.height))" }.joined(separator: ",")
-            return "contentH=\(content) boundsH=\(height) insetTop=\(inset.top) "
-                + "insetBottom=\(inset.bottom) offsetY=\(scroll.contentOffset.y) "
-                + "rangeEndY=\(content + inset.bottom - height) hosts=[\(hosts)] key=\(key)"
-        }
-        set { }
-    }
-}
-
-struct ScrollGeometryProbe: UIViewRepresentable {
-    var key: String = ""
-
-    func makeUIView(context: Context) -> UIView {
-        let view = ScrollGeometryView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-        view.isAccessibilityElement = true
-        view.accessibilityIdentifier = "debug.scrollGeom"
-        view.backgroundColor = .clear
-        view.key = key
-        return view
-    }
-
-    func updateUIView(_ view: UIView, context: Context) {
-        (view as? ScrollGeometryView)?.key = key
-    }
-}
-#endif

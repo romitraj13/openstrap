@@ -266,35 +266,6 @@ final class HealthModel: ObservableObject {
         }
     }
 
-    /// Card F11: which cards Today's list is made of, as one value that changes when one of them joins
-    /// the list or leaves it. `DayTab` re-identifies Today's scroll content with it.
-    ///
-    /// A SwiftUI scroll view keeps the content height it measured when that content last laid out, and
-    /// a card that arrives afterwards is drawn past the end of the list without being added to its
-    /// scroll range. Today's workouts card is drawn by a second read, so with the demo month it landed
-    /// after the list's first layout and the last card could not be scrolled clear of the floating bar:
-    /// the scroll view's range ended at offset 1444.67 pt while the drags stopped at 1274.0, and
-    /// 1444.67 - 1274.0 is that card's 170.67 pt (card F11's probe, run 39917705796). Rebuilding the
-    /// content makes the scroll view measure the list it is actually drawing.
-    ///
-    /// Presence, not counts: a card gaining a row keeps the list's shape, and a value that only changes
-    /// what a row says must not rebuild the list (and lose Today's own pushed detail with it).
-    var todayListKey: String {
-        let day = dayState
-        return [
-            day == nil ? "noDay" : "day",
-            workoutList.isEmpty ? "noWorkouts" : "workouts",
-            recoveryResult == nil ? "noRecovery" : "recovery",
-            checkIn == nil ? "noCheckIn" : "checkIn",
-            day?.sleep == nil ? "noSleep" : "sleep",
-            (day?.alerts.isEmpty ?? true) ? "noAlerts" : "alerts",
-            (day?.naps.isEmpty ?? true) ? "noNaps" : "naps",
-            strapReadiness == nil ? "noStrap" : "strap",
-            recapSteps.isEmpty ? "noRecap" : "recap",
-            "tiles\(todayTiles.count)",
-        ].joined(separator: "|")
-    }
-
     /// The statistics What changed shows, as `MainActivity`'s `todayTiles` reads them: the stored
     /// names in their order, else all six.
     func reloadTodayTiles() {

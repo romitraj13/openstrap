@@ -1435,3 +1435,52 @@ names and the one scheme name, the Swift module `OpenStrap` and the framework `O
 `org.openstrap.*` Kotlin packages, and the seven string constants `org.openstrap.ios`,
 `strap-auth-key`, `org.openstrap.central`, `org.openstrap.ble`, `openstrap.db`,
 `openstrap.strapPeripheralIdentifier` and `openstrap.writeToAppleHealth`.
+
+## The dated tabs' end of scroll (cards F4, F10, F11)
+
+The four dated tabs scroll their content under the floating bar, so each one takes the bar's clearance
+(`GlowLayout.barClearance` = 112 pt through `glowClearsNavBar()`, above) and its last card must come
+clear of the bar once the list has been dragged to its end. F4 measures that for the You screens and
+F9's workout screens; `testEveryDatedTabScrollsClearOfTheBar` (card F10) does it for Today, Recovery,
+Sleep and Activity. Its walk follows the header's wordmark — the top of the scrolled content, which
+cannot be read clamped the way a row below the fold can — and stops only when two drags in a row leave
+it in the same place; then it measures the lowest text on the screen against `navBar.top` (754.0 pt in
+the 402×874 simulator window).
+
+At its end Recovery, Sleep and Activity come to rest 52–64 pt above the bar on every run. Today did
+not: its last card sat 65–95 pt below the bar on nine runs in ten, and the one run in nine that was
+right was the run where Today's workouts card was already in the list when it first laid out.
+
+Card F11 measured why, with a temporary probe on the scroll view itself (`UIScrollView.contentSize`,
+`adjustedContentInset`, `bounds`, `contentOffset`), printed after every drag of the walk. With the
+card late, every drag reported:
+
+    contentH=2172.67  boundsH=874.0  insetTop=62.0  insetBottom=146.0
+    rangeEndY=1444.67  offsetY stuck at 1309.0
+
+So the bar's clearance was in place — `insetBottom` 146 = 34 home indicator + 112 `barClearance`, the
+same on all four tabs — and the content size was the whole list. What was wrong is that the stack the
+scroll view had *laid out* was 135 pt shorter than that: the drags stopped dead at 1309.0 while that
+much range remained, because the scroll view clamps its gestures to the height it laid the content out
+at, and the content had accepted the height the scroll view measured before the workouts card arrived.
+The card itself was drawn — its row measured at 827 pt down an 874 pt window, past the end of the list
+the scroll view had measured — and nothing re-measured the layout until an unrelated pass came along,
+which is why the last card could not be dragged clear of the bar however far the list was pushed.
+Today's workouts card is the one card Today draws from a second read (`ScreenQueries.workouts`, not the
+day), which is what made it the one tab that could grow after the first layout.
+
+The fix is one modifier: `PullSyncScroll` gives its content its own height
+(`.fixedSize(horizontal: false, vertical: true)`, DateHeader.swift), so the stack reports the height of
+the cards it is drawing instead of accepting the stale proposal. On the run that carried it the content
+host measured its full 2172 pt, the drags reached 1444.67, and Today's last card came to rest at 690.99
+against the bar's 754.0. Recovery, Sleep and Activity draw every card at first layout and measure
+exactly as they did before.
+
+`-lateWorkouts 3` (DEBUG only, `HealthModel.reloadToday`) holds that second read back so the card lands
+after the first layout on every run: the defect was a race between two database reads, and the test
+now measures the late card every time rather than one run in ten.
+
+`-todayMonday` forces the recap card on a day that is not a Monday; `HealthModel.reloadRecapSteps`
+honours the same flag, so a forced recap reads its steps (the row read "Steps a day —" without them,
+in `U5-todayrecap-1`). A real Monday is unaffected, and a release build reads the flag as false.
+
