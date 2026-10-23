@@ -1447,35 +1447,38 @@ cannot be read clamped the way a row below the fold can — and stops only when 
 it in the same place; then it measures the lowest text on the screen against `navBar.top` (754.0 pt in
 the 402×874 simulator window).
 
-At its end Recovery, Sleep and Activity come to rest 52–64 pt above the bar on every run. Today did
-not: its last card sat 65–95 pt below the bar on nine runs in ten, and the one run in nine that was
-right was the run where Today's workouts card was already in the list when it first laid out.
+At its end Recovery, Sleep and Activity come to rest above the bar on every run. Today did not: its
+last card sat 65–95 pt below the bar on nine runs in ten, whatever the run's timing.
 
 Card F11 measured why, with a temporary probe on the scroll view itself (`UIScrollView.contentSize`,
-`adjustedContentInset`, `bounds`, `contentOffset`), printed after every drag of the walk. With the
-card late, every drag reported:
+the tallest laid-out subview, `adjustedContentInset`, `bounds`, `contentOffset`), printed after every
+drag of the walk. On a run where Today fails, every drag reports:
 
-    contentH=2172.67  boundsH=874.0  insetTop=62.0  insetBottom=146.0
-    rangeEndY=1444.67  offsetY stuck at 1309.0
+    contentH=2172.67  laidOutH=2172.67  boundsH=874.0  insetTop=62.0  insetBottom=146.0
+    rangeEndY=1444.67  offsetY stuck at 1307.67
 
-So the bar's clearance was in place — `insetBottom` 146 = 34 home indicator + 112 `barClearance`, the
-same on all four tabs — and the content size was the whole list. What was wrong is that the stack the
-scroll view had *laid out* was 135 pt shorter than that: the drags stopped dead at 1309.0 while that
-much range remained, because the scroll view clamps its gestures to the height it laid the content out
-at, and the content had accepted the height the scroll view measured before the workouts card arrived.
-The card itself was drawn — its row measured at 827 pt down an 874 pt window, past the end of the list
-the scroll view had measured — and nothing re-measured the layout until an unrelated pass came along,
-which is why the last card could not be dragged clear of the bar however far the list was pushed.
-Today's workouts card is the one card Today draws from a second read (`ScreenQueries.workouts`, not the
-day), which is what made it the one tab that could grow after the first layout.
+The list is complete — content size and the laid-out content frame are the same 2172.67 pt — and the
+bar's clearance is in the adjusted inset (146 = 34 home indicator + 112 `barClearance`, the same on all
+four tabs). What the scroll view will not do is *use* that inset: it rests 137–170 pt short of the range
+it reports, as if the bottom inset were 9 pt instead of 146. On a run where the same build does reach
+1444.67, Today's last card rests at 690.99 and the card sits in the list from its first layout. So the
+defect is not the content's height and not the late card's arrival; it is that the range a drag is
+offered is not always `contentSize + adjustedContentInset − bounds`.
 
-The fix is that Today is not given a scroll view until the reads that feed its list have all answered:
-`HealthModel.reloadToday` clears a `todayWorkoutsRead` flag and sets it when the workouts — the last
-read that puts a card on that list — have answered, and `DayTab` builds its `PullSyncScroll` only when
-that flag and the day's own read are both in. The list's *first* layout is therefore its final shape,
-so no card is ever drawn past the end of the range. That is also how the other three tabs have always
-measured right: the bar builds them when it switches to them, with the same reads already landed. The
-`todayWorkoutsRead` flag is what Today, the one tab on screen from launch, was missing.
+The fix is to stop asking a safe-area inset to carry the bar's clearance. On the four dated tabs the
+list itself ends 136 pt below its last card — `GlowLayout.barClearance` (112) plus the 24 pt of home
+indicator the scroll view no longer subtracts — and the scroll view ignores the bottom safe area, so its
+range is simply `contentSize − bounds`, a number that is right on every run. Nothing moves on screen:
+the cards still scroll under the glass, and the end of the scroll comes to rest where the tabs that
+always measured right had it.
+
+Today's list is also not drawn before the reads that feed it have answered: `HealthModel.reloadToday`
+clears a `todayWorkoutsRead` flag and sets it when the workouts — the last read that puts a card on that
+list — have answered, and `DayTab` builds its `PullSyncScroll` only when that flag and the day's own
+read are both in. The list's *first* layout is therefore its final shape, which is what the walk's
+`-lateWorkouts` seam measures. The other three tabs have always been built when the bar switches to
+them, with the same reads already landed; `todayWorkoutsRead` is what Today, the one tab on screen from
+launch, was missing.
 
 The flag is cleared only until its first answer (`workoutsAnsweredOnce` in `HealthModel`). Clearing it
 on every reload tore the list down and rebuilt it from under the reader: `TodayScreen`'s own `onAppear`
@@ -1485,26 +1488,20 @@ gate now applies to the first build only; a later reload (a day step, a sync) up
 and does not drop the reader to the top. `TodayScreen` no longer asks for the reads itself (only `DayTab`
 does), and while the first read is in the tab draws its header on its own rather than a black window.
 
-`PullSyncScroll` also gives its content its own height (`.fixedSize(horizontal: false, vertical: true)`,
-DateHeader.swift) as insurance, so a stack reports the height of the cards it is drawing rather than
-accepting a stale proposal. On the run that carried the earlier half of this work the content host
-measured its full 2172 pt, the drags reached 1444.67, and Today's last card came to rest at 690.99
-against the bar's 754.0.
-
 The cost is that Today's first paint waits for that read too, as it already waited for the day's. With
 `-lateWorkouts 20` — the test seam — it waits twenty seconds; on a real launch it is the same local
 database read the day's cards already come from, and Compose's `DayViewModel` hands the screen one
 complete state in the same way, so the two builds now agree on when a list may be drawn.
 
 Earlier attempts that did not hold, and what they showed: rebuilding the scroll view when a card joined
-(`.id`, DEBUG runs `a647fec` and `ddc5eb1`) left the range short — 1309.0 of 1444.67 — and `fixedSize`
-alone (`1788d1e`, no rebuild) never got a fresh layout at all (Today read 838.66). Both are recorded
-because they bound the defect: it is the list outgrowing the layout the scroll view clamps to, and only
-a list that is complete when it is first laid out is safe.
+(`.id`, runs `a647fec` and `ddc5eb1`) and `.fixedSize` on its content (`1788d1e`) all left the drags
+short of the same 1444.67 pt range (1309.0, and 838.66 read). They are recorded because they ruled the
+content's height out: the content was already the height it should be, and the number missing was the
+inset's.
 
 `-lateWorkouts 20` (DEBUG only, `HealthModel.reloadToday`) holds that second read back for twenty
-seconds, so the card cannot be in the list when it first lays out: the defect was a race between two
-database reads, and the test now measures the late card every time rather than one run in ten.
+seconds, so Today's list cannot be built before the card is there: the walk then measures the list the
+gate waits for on every run, rather than a race between two database reads.
 
 `-todayMonday` forces the recap card on a day that is not a Monday; `HealthModel.reloadRecapSteps`
 honours the same flag, so a forced recap reads its steps (the row read "Steps a day —" without them,
