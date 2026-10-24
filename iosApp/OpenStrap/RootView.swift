@@ -139,40 +139,6 @@ struct RootView: View {
     }
 }
 
-/// Card F13 probe: the enclosing scroll view's own geometry, so a UI test can print what the pan
-/// actually has. Temporary; removed before the card ships.
-#if DEBUG
-struct ScrollGeometryProbe: UIViewRepresentable {
-    func makeUIView(context: Context) -> Probe { Probe() }
-    func updateUIView(_ uiView: Probe, context: Context) {}
-
-    final class Probe: UIView {
-        override init(frame: CGRect) {
-            super.init(frame: frame)
-            isAccessibilityElement = true
-            accessibilityIdentifier = "F13.probe"
-            isUserInteractionEnabled = false
-            backgroundColor = .clear
-        }
-        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-        override var accessibilityLabel: String? {
-            get {
-                var view: UIView? = superview
-                while let one = view, !(one is UIScrollView) { view = one.superview }
-                guard let scroll = view as? UIScrollView else { return "no-scroll" }
-                let height = Int(scroll.contentSize.height)
-                let offset = Int(scroll.contentOffset.y)
-                let bounds = Int(scroll.bounds.height)
-                let bottom = Int(scroll.adjustedContentInset.bottom)
-                return "h=\(height) off=\(offset) b=\(bounds) bottom=\(bottom)"
-            }
-            set {}
-        }
-    }
-}
-#endif
-
 /// One of the four dated tabs: its own `NavigationStack`, the shared header, pull to sync, and the
 /// tab's screen underneath. A detail opens inside this tab and never switches tabs.
 struct DayTab<Content: View>: View {
@@ -215,19 +181,14 @@ struct DayTab<Content: View>: View {
                         content()
                     }
                     .padding(.horizontal, 16)
-                    .overlay(alignment: .topLeading) {
-                        #if DEBUG
-                        ScrollGeometryProbe().frame(width: 1, height: 1)
-                        #endif
-                    }
-                    // Card F13: the bar's clearance is the list's own last 136 pt, not a bottom
-                    // safe-area inset. Today's pan keeps the range of `contentSize - bounds` and drops
-                    // the inset on most runs (runs 40040762359, 40036175056, 40044419882: 30 and 45 drags
-                    // both rested at 1378.67, or 127 pt short of the 1505.67 its inset reports), so the
-                    // last card came to rest under the bar; a list whose height carries the clearance
-                    // cannot lose it. This is the Compose rule: `ScreenList` gives the bar's room to the
-                    // list's own `contentPadding` (`ScreenParts.kt:80-84`), and a LazyColumn has no
-                    // scroll inset to drop.
+                    // Card F13: the bar's clearance is the list's own last 136 pt, a view after the cards
+                    // rather than a bottom safe-area inset the scroll view applies for us. Compose gives
+                    // the bar's room to the list's `contentPadding` (`ScreenParts.kt:80-84`) and a
+                    // `LazyColumn` has no scroll inset to drop, so this is the faithful port; it also
+                    // holds the end of the list 136 pt clear of the bar whatever the scroll view does
+                    // with its insets. The tab therefore takes no `.glowClearsNavBar()`. Measured with it
+                    // (run 40069012760, four tabs, walks to the true end): Recovery 674.43, Sleep 678.0,
+                    // Activity 665.97, Today 667.99 against the bar's top at 754.0.
                     Color.clear
                         .frame(height: GlowLayout.barClearance + 24)
                         .accessibilityHidden(true)

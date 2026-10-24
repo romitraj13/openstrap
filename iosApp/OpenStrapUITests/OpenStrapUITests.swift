@@ -380,47 +380,37 @@ final class OpenStrapUITests: XCTestCase {
         return (walk.drags, start - wordmark.frame.minY, walk.converged)
     }
 
-    /// One pass to the bottom: drag until two rounds end at the same offset.
+    /// One pass to the bottom: drag until a whole rotation of starts leaves the list where it was.
     ///
-    /// A round that ends where the previous round ended is the end, so the round that finds no room
-    /// costs two drags. `movedRounds` keeps the first rounds from declaring the end before the list has
-    /// moved at all: a tap that did not switch tabs, or a gesture the app was too busy to take, would
-    /// otherwise read as "at the end" while the screen was still at its top.
+    /// Three start heights, because a card can take the gesture: `GlowScrub` puts a sideways drag on
+    /// the charts, and a drag that starts over one never reaches the list. That is what every short
+    /// walk in this card's history was. Probe run 40069012760 held Today at offset 1297 of its 1467 for
+    /// sixty drags from 0.78, and the first drag from 0.58 took it to 1467 — its real end — where the
+    /// last card measured 667.99 against the bar's 754.0. Sleep then stopped dead at 1170 of 2311 with
+    /// both of those starts. A drag the list never sees leaves it exactly where it was, which reads the
+    /// same as the end, so the end is only the end once a full rotation (0.78, 0.58, 0.38) has moved
+    /// nothing: one card cannot cover three starts 330 pt apart.
     ///
-    /// The wordmark reports its real position the whole way down — probe run 40054569928 printed it
-    /// after every drag for all four tabs and it moved until the pan stopped, then held (Today -70.0 to
-    /// -1303.0 and still at drags 2-60; Recovery to -1415.33; and so on). Sixty is past every dated tab's
-    /// range at this runner's drag, so a walk still moving at sixty is following the wrong thing, and
-    /// `measureTabEnd` fails the run rather than measuring a row short of the end.
+    /// Twenty rotations (sixty drags) is a stop for a walk that never ends, not a budget. A drag is
+    /// worth 540-690 pt here, so the longest dated tab — Sleep, 2311 pt of range — reaches its end in
+    /// five.
     private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement, cap: Int = 60) -> (drags: Int, converged: Bool) {
+        let starts: [CGFloat] = [0.78, 0.58, 0.38]
         var previous = wordmark.frame.minY
-        var still = 0
-        var movedRounds = 0
-        for drags in 1...cap {
-            // Card F13: the start of the drag alternates. A card's own gesture can swallow one at one
-            // height — a swallowed drag leaves the list exactly where it was, which reads the same as
-            // the end of the list. Today stopped 170 pt short of its content on every drag from 0.78
-            // (probe run 40064035511) while Recovery, Sleep and Activity reached their ends from the
-            // same start. Two heights, so one swallowed drag cannot pass for the end.
-            let from: CGFloat = drags % 2 == 1 ? 0.78 : 0.58
-            drag(app, from: from, to: 0.22)
-            Thread.sleep(forTimeInterval: 0.4)
-            let y = wordmark.frame.minY
-            // F13 PROBE: remove before shipping.
-            let probe = app.descendants(matching: .any)["F13.probe"]
-            print("F13PROBE drag=\(drags) from=\(from) wordmark=\(y) scroll=\(probe.exists ? probe.label : "absent")")
-            if y <= previous - 1 {
-                movedRounds += 1
-                still = 0
-            } else {
-                still += 1
+        var drags = 0
+        while drags < cap {
+            for from in starts where drags < cap {
+                drag(app, from: from, to: 0.22)
+                drags += 1
+                Thread.sleep(forTimeInterval: 0.4)
             }
-            previous = y
-            if still == 2 && movedRounds > 0 {
+            let y = wordmark.frame.minY
+            if y > previous - 1 {
                 return (drags, true)
             }
+            previous = y
         }
-        return (cap, false)
+        return (drags, false)
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
@@ -660,18 +650,6 @@ final class OpenStrapUITests: XCTestCase {
             if let end, let problem = clearanceProblem(end) {
                 failures.append(problem)
             }
-        }
-
-        // F13 DIAGNOSTIC (remove before shipping): Today measured again after leaving and returning,
-        // i.e. a Today whose scroll view was built with its data already in hand. If this one clears
-        // and launch Today does not, the launch-time build is the defect.
-        app.buttons["Recovery"].tap()
-        _ = app.staticTexts["recovery.title"].firstMatch.waitForExistence(timeout: 60)
-        app.buttons["Today"].tap()
-        _ = app.staticTexts["What changed"].firstMatch.waitForExistence(timeout: 120)
-        Thread.sleep(forTimeInterval: 6)
-        if let again = measureTabEnd(app, screen: "Today again"), let problem = clearanceProblem(again) {
-            failures.append(problem)
         }
 
         XCTAssertTrue(
