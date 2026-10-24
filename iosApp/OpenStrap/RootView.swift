@@ -66,6 +66,9 @@ struct RootView: View {
 
     private var items: [NavItem] { AppTab.allCases.map(\.navItem) }
 
+    /// Card F13: whether Today's day has answered yet — see the Today tab's `.id(hasDay)`.
+    private var hasDay: Bool { health.dayState != nil }
+
     var body: some View {
         if controller.hasStoredKey || DemoData.isEnabled {
             shell
@@ -79,9 +82,19 @@ struct RootView: View {
             Group {
                 switch tab {
                 case .today:
+                    // Card F13: Today is the launch tab, and its scroll view otherwise exists before the
+                    // reads behind its list answer — `TodayScreen` draws a 1 pt `Color.clear` until
+                    // `dayState` lands. A scroll view built then keeps the range it had at that first
+                    // layout: probe run 40064035511 read `h=2307 off=1291 b=874`, i.e. the content was
+                    // complete (the 136 pt clearance included) and the pan still stopped 142 pt short of
+                    // its end, leaving the last card at 843.99 under the bar's 754.0. A Today built after
+                    // its data is in hand — the bar's own tap rebuilds this same view — reached 1529.67
+                    // and 667.99. So the tab's identity changes once, when the day arrives, and it is
+                    // built the way a tab switch builds it. No timer: `hasDay` only goes false -> true.
                     DayTab(tab: .today, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
                         TodayScreen(controller: controller, health: health, onOpenTab: openTab)
                     }
+                    .id(hasDay)
                 case .recovery:
                     DayTab(tab: .recovery, controller: controller, health: health, selectedDate: $selectedDate, onOpenStrap: openStrap) {
                         RecoveryScreen(health: health, controller: controller)
