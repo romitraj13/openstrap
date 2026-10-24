@@ -397,12 +397,18 @@ final class OpenStrapUITests: XCTestCase {
         var still = 0
         var movedRounds = 0
         for drags in 1...cap {
-            drag(app, from: 0.78, to: 0.22)
+            // Card F13: the start of the drag alternates. A card's own gesture can swallow one at one
+            // height — a swallowed drag leaves the list exactly where it was, which reads the same as
+            // the end of the list. Today stopped 170 pt short of its content on every drag from 0.78
+            // (probe run 40064035511) while Recovery, Sleep and Activity reached their ends from the
+            // same start. Two heights, so one swallowed drag cannot pass for the end.
+            let from: CGFloat = drags % 2 == 1 ? 0.78 : 0.58
+            drag(app, from: from, to: 0.22)
             Thread.sleep(forTimeInterval: 0.4)
             let y = wordmark.frame.minY
             // F13 PROBE: remove before shipping.
             let probe = app.descendants(matching: .any)["F13.probe"]
-            print("F13PROBE drag=\(drags) wordmark=\(y) scroll=\(probe.exists ? probe.label : "absent")")
+            print("F13PROBE drag=\(drags) from=\(from) wordmark=\(y) scroll=\(probe.exists ? probe.label : "absent")")
             if y <= previous - 1 {
                 movedRounds += 1
                 still = 0
