@@ -150,9 +150,6 @@ struct DayTab<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @State private var path = NavigationPath()
-    /// Card F13: which build of the tab's scroll view is on screen. Today's is built again once its
-    /// day has data — see the `onChange(of: hasDay)` below.
-    @State private var listBuild = 0
 
     /// Card F9: the phone's calendar, or the pinned demo day's while `-demoData` is on, so a day
     /// step lands on the same midnight the header and the shared queries measure.
@@ -170,54 +167,42 @@ struct DayTab<Content: View>: View {
             PullSyncScroll(syncing: controller.syncRunning) {
                 controller.syncNow()
             } content: {
-                VStack(alignment: .leading, spacing: 12) {
-                    DateHeader(
-                        date: selectedDate,
-                        battery: battery,
-                        charging: battery != nil && controller.charging,
-                        picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
-                        onPrev: { step(-1) },
-                        onNext: { step(1) },
-                        onOpenStrap: onOpenStrap
-                    )
-                    content()
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        DateHeader(
+                            date: selectedDate,
+                            battery: battery,
+                            charging: battery != nil && controller.charging,
+                            picker: DayPicker(available: health.daysWithData, onPick: { selectedDate = $0 }),
+                            onPrev: { step(-1) },
+                            onNext: { step(1) },
+                            onOpenStrap: onOpenStrap
+                        )
+                        content()
+                    }
+                    .padding(.horizontal, 16)
+                    // Card F13: the bar's clearance is the list's own last 136 pt, not a bottom
+                    // safe-area inset. Today's pan keeps the range of `contentSize - bounds` and drops
+                    // the inset on most runs (runs 40040762359, 40036175056, 40044419882: 30 and 45 drags
+                    // both rested at 1378.67, or 127 pt short of the 1505.67 its inset reports), so the
+                    // last card came to rest under the bar; a list whose height carries the clearance
+                    // cannot lose it. This is the Compose rule: `ScreenList` gives the bar's room to the
+                    // list's own `contentPadding` (`ScreenParts.kt:80-84`), and a LazyColumn has no
+                    // scroll inset to drop.
+                    Color.clear
+                        .frame(height: GlowLayout.barClearance + 24)
+                        .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 16)
-                // Card F13: the bar's clearance is the list's own last 136 pt, not a bottom safe-area
-                // inset. Today's pan keeps the range of `contentSize - bounds` and drops the inset on
-                // most runs (runs 40040762359, 40036175056, 40044419882: 30 and 45 drags both rested at
-                // 1378.67, or 127 pt short of the 1505.67 its inset reports), so the last card came to
-                // rest under the bar; a list whose height carries the clearance cannot lose it. This is
-                // the Compose rule: `ScreenList` gives the bar's room to the list's own
-                // `contentPadding` (`ScreenParts.kt:80-84`), and no scroll inset is involved.
-                .padding(.bottom, GlowLayout.barClearance + 24)
             }
-            // Card F13: Today is the launch tab, and its scroll view is built before the reads behind
-            // its list have answered — `TodayScreen` draws a 1 pt `Color.clear` until `dayState` lands.
-            // That first build keeps the range of the list it saw, and the 136 pt the list ends with is
-            // not in it: run 40054569928, with the padding in the content and sixty drags, rested Today
-            // at 1373 pt of travel with its last card at 824.65 under the bar whose top is 754.0, while
-            // the same padding carried Recovery, Sleep and Activity to 674.43, 678.0 and 665.97. So the
-            // scroll view is built once more when the day's data arrives, the way 9812c60's 1.5 s timer
-            // did, but keyed on the data rather than on a clock. `hasDay` only goes false -> true, so
-            // this runs once and a reload afterwards keeps the scroll view the reader is in.
-            .id(listBuild)
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { health.reload() }
-            .onChange(of: hasDay) { _, ready in
-                guard tab == .today, ready else { return }
-                listBuild += 1
-            }
             .onChange(of: controller.lastSyncEpochSeconds) { _, _ in
                 health.reload()
                 health.reloadDaysWithData()
             }
         }
     }
-
-    /// Card F13: whether this tab's list has data to draw. Only Today can be waiting at launch.
-    private var hasDay: Bool { health.dayState != nil }
 
     /// One day back or forward, never past today (`DayViewModel.previousDay`/`nextDay`).
     private func step(_ days: Int) {
