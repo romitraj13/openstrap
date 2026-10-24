@@ -400,6 +400,9 @@ final class OpenStrapUITests: XCTestCase {
             drag(app, from: 0.78, to: 0.22)
             Thread.sleep(forTimeInterval: 0.4)
             let y = wordmark.frame.minY
+            // F13 PROBE: remove before shipping.
+            let probe = app.descendants(matching: .any)["F13.probe"]
+            print("F13PROBE drag=\(drags) wordmark=\(y) scroll=\(probe.exists ? probe.label : "absent")")
             if y <= previous - 1 {
                 movedRounds += 1
                 still = 0

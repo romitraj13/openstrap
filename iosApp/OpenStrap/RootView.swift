@@ -139,6 +139,40 @@ struct RootView: View {
     }
 }
 
+/// Card F13 probe: the enclosing scroll view's own geometry, so a UI test can print what the pan
+/// actually has. Temporary; removed before the card ships.
+#if DEBUG
+struct ScrollGeometryProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> Probe { Probe() }
+    func updateUIView(_ uiView: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isAccessibilityElement = true
+            accessibilityIdentifier = "F13.probe"
+            isUserInteractionEnabled = false
+            backgroundColor = .clear
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+        override var accessibilityLabel: String? {
+            get {
+                var view: UIView? = superview
+                while let one = view, !(one is UIScrollView) { view = one.superview }
+                guard let scroll = view as? UIScrollView else { return "no-scroll" }
+                let height = Int(scroll.contentSize.height)
+                let offset = Int(scroll.contentOffset.y)
+                let bounds = Int(scroll.bounds.height)
+                let bottom = Int(scroll.adjustedContentInset.bottom)
+                return "h=\(height) off=\(offset) b=\(bounds) bottom=\(bottom)"
+            }
+            set {}
+        }
+    }
+}
+#endif
+
 /// One of the four dated tabs: its own `NavigationStack`, the shared header, pull to sync, and the
 /// tab's screen underneath. A detail opens inside this tab and never switches tabs.
 struct DayTab<Content: View>: View {
@@ -181,6 +215,11 @@ struct DayTab<Content: View>: View {
                         content()
                     }
                     .padding(.horizontal, 16)
+                    .overlay(alignment: .topLeading) {
+                        #if DEBUG
+                        ScrollGeometryProbe().frame(width: 1, height: 1)
+                        #endif
+                    }
                     // Card F13: the bar's clearance is the list's own last 136 pt, not a bottom
                     // safe-area inset. Today's pan keeps the range of `contentSize - bounds` and drops
                     // the inset on most runs (runs 40040762359, 40036175056, 40044419882: 30 and 45 drags
