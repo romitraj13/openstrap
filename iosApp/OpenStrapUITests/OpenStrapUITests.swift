@@ -269,6 +269,15 @@ final class OpenStrapUITests: XCTestCase {
             return nil
         }
         let walk = scrollToEndOfTab(app, wordmark: wordmark)
+        // Card F13: the walk says it reached the end. A walk that never converged stopped at its cap
+        // with the list still moving, so whatever the lowest text below is, it is not the end of the
+        // screen: measuring it would be the same false pass a fixed drag budget gave on bce4376.
+        XCTAssertTrue(
+            walk.converged,
+            "\(screen): the walk never reached the end — the wordmark was still moving after "
+                + "\(walk.drags) drags (\(walk.moved) pt of travel), so the last text measured below "
+                + "is not the bottom of this screen"
+        )
         // The end is only the end once the content is inside the window and holds still: a list whose
         // panels are still arriving ends the scroll early (run 39873446048 walked Recovery to the end
         // of a half-drawn screen, 454 pt of travel, and measured its last text 1705 pt down a 874 pt
@@ -357,36 +366,50 @@ final class OpenStrapUITests: XCTestCase {
 
     /// Card F10: drag a dated tab to its end.
     ///
-    /// The end is not read from an element's frame any more (card F11): the header's wordmark was the
-    /// one element that could be followed the whole way down, but its frame stops updating once it is
-    /// well off screen. Probe run b76c8a0 read the wordmark at -1299.67 for drags 3-6 while the scroll
-    /// view's own offset sat at 1307.67 of a 1444.67 pt range, so the walk declared the end 137 pt
-    /// early and measured Today's last card under the bar. A fixed budget of drags cannot mistake a
-    /// stale frame for the end; whether the list grew after them is `measureTabEnd`'s settle loop,
-    /// which reads the lowest text on screen rather than the wordmark.
-    private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat) {
+    /// The end is the header's wordmark, which is the top of the scrolled content: its minY falls by
+    /// exactly as much as the list travels, so two drags in a row that leave it in the same place mean
+    /// the pan has nothing left to give. Card F11 dropped that rule for a fixed budget of drags, and a
+    /// fixed budget is what let bce4376 pass with Today's last card 127 pt under the bar: thirty drags
+    /// were worth 1378.67 pt on that runner, 127 pt short of Today's range, so the lowest text it
+    /// measured happened to be one that stood above the bar. Card F13 puts the rule back, with a cap
+    /// that is a stop for a walk that never ends rather than a budget, and `converged` is asserted by
+    /// `measureTabEnd`: a walk that hits the cap fails instead of measuring a row short of the end.
+    private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat, converged: Bool) {
         let start = wordmark.frame.minY
-        let drags = walkDown(app)
-        // Reported, not trusted: the wordmark's frame is a fair measure of the travel until it goes
-        // stale, and `measureTabEnd` asserts it moved at all.
-        return (drags, start - wordmark.frame.minY)
+        let walk = walkDown(app, wordmark: wordmark)
+        return (walk.drags, start - wordmark.frame.minY, walk.converged)
     }
 
-    /// One pass to the bottom: a fixed budget of drags, with no early stop.
+    /// One pass to the bottom: drag until two rounds end at the same offset.
     ///
-    /// Card F11 measured what a drag is worth on the CI simulator across runs: 75-114 pt on Today, 124
-    /// on Recovery, 198 on Sleep, 154 on Activity. Today needs about 1506 pt of travel to reach its
-    /// range, so twelve drags (900-1370) fell short on every run and eighteen (1350-2050) still could,
-    /// which is what read as a scroll clamp for five cards' worth of runs. Thirty is past the longest
-    /// walk at the shortest drag; a drag with nothing left to move costs a second and changes nothing.
-    private func walkDown(_ app: XCUIApplication) -> Int {
-        var drags = 0
-        for _ in 0..<30 {
+    /// A round that ends where the previous round ended is the end, so the round that finds no room
+    /// costs two drags. `movedRounds` keeps the first rounds from declaring the end before the list has
+    /// moved at all: a tap that did not switch tabs, or a gesture the app was too busy to take, would
+    /// otherwise read as "at the end" while the screen was still at its top.
+    ///
+    /// Sixty is past every dated tab's range at the shortest drag this runner has shown (45.8 pt:
+    /// Today's 1549 pt range is 34 drags), so a walk that is still moving at sixty is not a slow
+    /// runner, it is a walk that is following the wrong thing — and says so.
+    private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement, cap: Int = 60) -> (drags: Int, converged: Bool) {
+        var previous = wordmark.frame.minY
+        var still = 0
+        var movedRounds = 0
+        for drags in 1...cap {
             drag(app, from: 0.78, to: 0.22)
-            drags += 1
             Thread.sleep(forTimeInterval: 0.4)
+            let y = wordmark.frame.minY
+            if y <= previous - 1 {
+                movedRounds += 1
+                still = 0
+            } else {
+                still += 1
+            }
+            previous = y
+            if still == 2 && movedRounds > 0 {
+                return (drags, true)
+            }
         }
-        return drags
+        return (cap, false)
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear

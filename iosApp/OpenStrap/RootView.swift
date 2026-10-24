@@ -180,8 +180,18 @@ struct DayTab<Content: View>: View {
                     content()
                 }
                 .padding(.horizontal, 16)
+                // Card F13: the bar's clearance is the list's own last 136 pt, not a bottom safe-area
+                // inset. Today's pan keeps the range of `contentSize - bounds` and drops the inset on
+                // most runs (runs 40040762359, 40036175056, 40044419882: 30 and 45 drags both rested at
+                // 1378.67, or 127 pt short of the 1505.67 its inset reports), so the last card came to
+                // rest under the bar; a list whose height carries the clearance cannot lose it. This is
+                // the Compose rule: `ScreenList` gives the bar's room to the list's own
+                // `contentPadding` (`ScreenParts.kt:80-84`), and no scroll inset is involved. The
+                // rebuild-on-appear from 9812c60 is deliberately not back: on run 40011978227 the list
+                // already measured its full range with the padding alone, and the run failed on a
+                // twelve-drag walk, not on a stale height.
+                .padding(.bottom, GlowLayout.barClearance + 24)
             }
-            .glowClearsNavBar()
             .background(ThemeColors.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { health.reload() }

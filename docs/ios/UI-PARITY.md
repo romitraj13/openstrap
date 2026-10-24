@@ -374,7 +374,7 @@ calls, 46 `.imageset`s). `--check` fails if the two ever disagree.
 | `Pane { Full, Left, Right }` (70) | `Pane` (GlowLayout.swift:54) | ported |
 | `GlowBlocks.full/left/right(key)` (76-86) | `GlowBlock.full/left/right(key:)` (GlowLayout.swift:62) | ported |
 | `GlowScreenList(contentPadding, state, scrollTo, onScrolled)` (96-132) | `GlowScreenList` (GlowLayout.swift:85) | ported |
-| `ScreenList`'s `contentPadding.bottom + 24.dp` under the floating bar (`ScreenParts.kt:80-84`), which every pushed Compose screen gets from `Scaffold(bottomBar = …)`'s `padding` (`MainActivity.kt:304-311`) | `GlowLayout.barClearance` = `navBarHeight` 88 + `navBarGap` 24 (GlowLayout.swift:279-291), applied by `View.glowClearsNavBar()` (GlowLayout.swift:293-309) on the tab roots, ProfileScreen, StrapView, PairView, LicencesView and DiagnosticsView (card F4) | ported; `GoalsSheet` is a sheet over the shell and does not scroll under the bar, so it takes none |
+| `ScreenList`'s `contentPadding.bottom + 24.dp` under the floating bar (`ScreenParts.kt:80-84`), which every pushed Compose screen gets from `Scaffold(bottomBar = …)`'s `padding` (`MainActivity.kt:304-311`) | `GlowLayout.barClearance` = `navBarHeight` 88 + `navBarGap` 24 (GlowLayout.swift:279-293), applied by `View.glowClearsNavBar()` (GlowLayout.swift:295-311) on ProfileScreen, StrapView, PairView, LicencesView and DiagnosticsView, and as the dated tabs' list padding (RootView.swift:182-194, card F13) | ported; `GoalsSheet` is a sheet over the shell and does not scroll under the bar, so it takes none |
 | gutter `max((w - 1040)/2, tight ? 16 : 20)` and tight = wide or < 400 (104-106) | the same (GlowLayout.swift:91-97) | ported |
 | runs of left/right blocks in two columns, full blocks spanning; a lopsided run stacks (117-127) | `sections` + `sectionView` (GlowLayout.swift:135-168) | ported |
 | `scrollTo` animates to the block's key (110-113) | `ScrollViewReader` + `onAppear` / `onChange` (GlowLayout.swift:113-124) | ported |
@@ -848,7 +848,7 @@ reaches, so iOS stacks them (`TodayScreen.swift:110`) exactly as Compose's phone
 | `onOpenMetric(metric)` from the heart card, tiles and alerts (74, 163, 367) | `TodayRoute.metric(name)` → `MetricDetailPlaceholder` (TodayScreen.swift:928) | ported as the route: card U9 replaces the screen the route pushes |
 | `onOpenWorkout(start)` from the workouts rows (79, 178) | `TodayRoute.workout(start)` → `MetricDetailPlaceholder` (TodayScreen.swift:246) | ported as the route: card U9 replaces the screen |
 | `left`/`right` layout hints, two columns at 600 pt (141-170) | stacked in the same order (TodayScreen.swift:110) | not ported: the two-column branch; the app declares portrait only, so it never reaches 600 pt |
-| `contentPadding` from the shell | `DayTab`'s `.glowClearsNavBar()` (RootView.swift:176, card F4) | ported in U4/F4 |
+| `contentPadding` from the shell | `DayTab`'s list padding, `.padding(.bottom, GlowLayout.barClearance + 24)` on the scrolled VStack (RootView.swift:182, card F13; `.glowClearsNavBar()` before it, cards U4/F4) | ported in U4/F4, moved into the list in F13 |
 
 ## `app/src/main/kotlin/org/openstrap/app/ui/glow/GlowTodayExtras.kt` (card U5)
 
@@ -1436,7 +1436,7 @@ names and the one scheme name, the Swift module `OpenStrap` and the framework `O
 `strap-auth-key`, `org.openstrap.central`, `org.openstrap.ble`, `openstrap.db`,
 `openstrap.strapPeripheralIdentifier` and `openstrap.writeToAppleHealth`.
 
-## The dated tabs' end of scroll (cards F4, F10, F11)
+## The dated tabs' end of scroll (cards F4, F10, F11, F13)
 
 The four dated tabs scroll their content under the floating bar, so each one keeps the bar's clearance
 (`GlowLayout.barClearance` = 112 pt) after its last card, and that card must come clear of the bar once
@@ -1445,39 +1445,43 @@ the list has been dragged to its end. F4 measures that for the You screens and F
 walk follows the header's wordmark and stops when two drags in a row leave it in the same place; then it
 measures the lowest text on the screen against `navBar.top` (754.0 pt in the 402×874 simulator window).
 
-Card F11 found two defects, both in the measurement path rather than in the list.
+Card F11 found the first defect in the walk's stop rule: it read a fixed drag budget for a while, since
+the wordmark's frame looked stale. Card F13 showed the frame was telling the truth. On the runs that
+failed, Today's pan came to rest at exactly `contentSize - bounds` — 1378.67 pt — while the same list
+reported a range of 1505.67 pt with its bottom inset in it. The pan had genuinely dropped the inset; the
+wordmark was not stale, it had scrolled as far as the scroll view would take it. The other three tabs
+honoured the same inset and reached their ranges exactly (Recovery 1461.33, Sleep 2349.0, Activity
+1824.33 on run 40018161005 and again on 40044419882, byte for byte).
 
-The first is the walk's stop condition. The wordmark's frame stops updating once the wordmark is far off
-screen: XCUITest reports it at its last on-screen position rather than its scrolled one. A temporary
-DEBUG probe in the scroll content (`UIScrollView.contentSize`, the tallest laid-out subview, the insets,
-`bounds`, `contentOffset`), printed after every drag, caught it:
+Card F11's second finding was the budget itself. A drag is worth 45.8-50.2 pt on the current simulator, so
+thirty drags (1374-1506 pt) could not reach Today's 1549 pt range, and the run that ended at 1378.67
+measured a row that happened to stand above the bar (691.99) — which is how `bce4376` went green with the
+defect in place. A walk that counts drags cannot say whether it reached the end.
 
-    F11 Today drag 2: wordmark=-1299.67  contentH=2172.67  laidOutH=2172.67  boundsH=874.0
-                      insetTop=62.0  insetBottom=146.0  offsetY=1307.67  rangeEndY=1444.67
-    F11 Today drag 3: wordmark=-1299.67  ...  offsetY=1307.67
-    F11 Today drag 4: wordmark=-1299.67  ...  offsetY=1307.67
+So card F13 does two things:
 
-The list was complete, the bar's clearance was in the adjusted inset, and the scroll view still had
-137 pt to give; the walk read the frozen frame as the end and measured the last card wherever the list
-happened to be. The walk now drags a fixed budget and never reads an element's frame for the end.
-Whether the list grew under it is `measureTabEnd`'s settle loop, which re-reads the lowest *on-screen*
-text after 2.5 s and walks again if it moved.
+* The dated tabs carry the bar's clearance in the list's own height,
+  `.padding(.bottom, GlowLayout.barClearance + 24)` on `DayTab`'s scrolled `VStack`, and take no bottom
+  inset. That is Compose's model: `ScreenList` gives the bar's room to the list's `contentPadding`
+  (`ScreenParts.kt:80-84`) and a `LazyColumn` has no scroll inset to drop. With the padding in the
+  content, the range is `contentSize - bounds` on every tab and cannot go missing. The measured effect
+  on run 40011978227, the first run of the padding build, was +24 pt of travel and -24 pt of `maxY` on
+  every tab: Recovery 674.43, Sleep 678.0, Activity 665.97 against 698.43, 702.0 and 689.97 with the
+  inset. `9812c60`'s 1.5 s rebuild-on-appear is deliberately not back: that run's list already had its
+  full range, and it failed on a twelve-drag walk, not on a stale height — a timer that hides a layout
+  bug would fail on a slow phone.
+* The walk converges again: two drags in a row that leave the wordmark in the same place end it, with a
+  cap of sixty drags that is a stop for a walk that never ends, and `measureTabEnd` asserts the walk
+  converged. A walk that hits the cap fails with the travel and drag count it reached instead of
+  measuring a row short of the end. `measureTabEnd`'s settle loop still re-walks if the list grew under
+  the measurement.
 
-The second defect was the budget itself. A fling on the CI simulator is worth 75-114 pt on Today, 124 on
-Recovery, 198 on Sleep and 154 on Activity, while Today needs about 1506 pt of travel to reach its own
-range — so twelve drags (900-1370 pt) never got there, and eighteen (1350-2050) still fell short on the
-runs whose flings were weakest. That is what read as a clamp on run after run. Thirty drags is past the
-longest walk at the shortest fling: Today then reaches its range and its last card comes to rest at
-691.99 against the bar's 754.0, as it did on the earlier runs whose walk happened not to freeze.
+Two attempts earlier in the history, both reverted with this card: gating Today's list on the reads
+behind it (the workouts card could not arrive after the list's first layout) was dropped because it could
+leave Today showing nothing at all when a read did not answer (run 40006225116's `testActivity` waited
+120 s for a card that never came), and a fixed budget of forty-five drags changed only the test.
 
-No product code had to change for any of this: Today's list, its bottom inset and its content height
-were right in every probe. An earlier attempt in this card gated Today's list on the reads behind it (day
-and workouts) so the workouts card could not arrive after the list's first layout; it was dropped once
-the probe showed the list's height was never the problem, and because it could leave Today showing
-nothing at all when a read did not answer (run 40006225116's `testActivity` waited 120 s for a card that
-never came). `TodayScreen` asks for its reads in its own `onAppear`, as every other screen does.
-
-The one product fix from this card is the recap flag: `-todayMonday` forces the recap card on a day that
+Card F11's one product fix stays: the recap flag. `-todayMonday` forces the recap card on a day that
 is not a Monday, and `HealthModel.reloadRecapSteps` now honours the same flag, so a forced recap reads
 its steps (the row read "Steps a day —" without them, in `U5-todayrecap-1`). A real Monday is
 unaffected, and a release build reads the flag as false.

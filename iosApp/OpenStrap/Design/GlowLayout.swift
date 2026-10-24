@@ -297,8 +297,10 @@ extension GlowLayout {
     /// (`ScreenParts.kt:80-84`), the Compose rule this clearance follows.
     static let navBarGap: CGFloat = 24
     /// The room a screen that scrolls under the floating bar leaves under its last row, so the row
-    /// can be dragged fully clear of the bar. The one number for every such screen: `glowClearsNavBar()`
-    /// is the only place it is used, and the UI test measures the bar itself against it.
+    /// can be dragged fully clear of the bar. The one number for every such screen, and the UI test
+    /// measures the bar itself against it. `glowClearsNavBar()` applies it as a bottom safe-area inset
+    /// on the pushed screens; the four dated tabs carry it in the list's own height instead (card F13,
+    /// `RootView`'s `DayTab`), because Today's pan drops the inset and then rests 127 pt short.
     static let barClearance: CGFloat = navBarHeight + navBarGap
 }
 
