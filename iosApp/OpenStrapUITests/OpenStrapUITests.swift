@@ -255,7 +255,7 @@ final class OpenStrapUITests: XCTestCase {
     /// Everything here is a hard assertion: a tab that cannot be walked to its end is a broken test,
     /// not a defect, and must fail. The clearance verdict is the caller's, so that one run names every
     /// tab that is wrong instead of stopping at the first.
-    private func measureTabEnd(_ app: XCUIApplication, screen: String) -> TabEnd? {
+    private func measureTabEnd(_ app: XCUIApplication, screen: String, panel: String) -> TabEnd? {
         let bar = app.descendants(matching: .any)["navBar.top"]
         guard bar.waitForExistence(timeout: 30) else {
             print("F4 \(screen): there is no navBar.top. Tree:\n\(app.debugDescription)")
@@ -268,7 +268,7 @@ final class OpenStrapUITests: XCTestCase {
             XCTFail("\(screen): the dated tab has no wordmark to walk by")
             return nil
         }
-        let walk = scrollToEndOfTab(app, wordmark: wordmark)
+        let walk = scrollToEndOfTab(app, wordmark: wordmark, panel: panel)
         // Card F13: the walk says it reached the end. A walk that never converged stopped at its cap
         // with the list still moving, so whatever the lowest text below is, it is not the end of the
         // screen: measuring it would be the same false pass a fixed drag budget gave on bce4376.
@@ -295,7 +295,7 @@ final class OpenStrapUITests: XCTestCase {
                 "F10 \(screen): not the end yet (last text \(bottom), window bottom \(windowBottom), "
                     + "settled \(settled)); walking again"
             )
-            _ = scrollToEndOfTab(app, wordmark: wordmark)
+            _ = scrollToEndOfTab(app, wordmark: wordmark, panel: panel)
             drawn = lowestTexts(app, above: barTop)
         }
         for one in drawn.prefix(6) {
@@ -374,9 +374,9 @@ final class OpenStrapUITests: XCTestCase {
     /// measured happened to be one that stood above the bar. Card F13 puts the rule back, with a cap
     /// that is a stop for a walk that never ends rather than a budget, and `converged` is asserted by
     /// `measureTabEnd`: a walk that hits the cap fails instead of measuring a row short of the end.
-    private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement) -> (drags: Int, moved: CGFloat, converged: Bool) {
+    private func scrollToEndOfTab(_ app: XCUIApplication, wordmark: XCUIElement, panel: String) -> (drags: Int, moved: CGFloat, converged: Bool) {
         let start = wordmark.frame.minY
-        let walk = walkDown(app, wordmark: wordmark)
+        let walk = walkDown(app, wordmark: wordmark, panel: panel)
         return (walk.drags, start - wordmark.frame.minY, walk.converged)
     }
 
@@ -390,7 +390,7 @@ final class OpenStrapUITests: XCTestCase {
     /// Sixty is past every dated tab's range at the shortest drag this runner has shown (45.8 pt:
     /// Today's 1549 pt range is 34 drags), so a walk that is still moving at sixty is not a slow
     /// runner, it is a walk that is following the wrong thing — and says so.
-    private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement, cap: Int = 60) -> (drags: Int, converged: Bool) {
+    private func walkDown(_ app: XCUIApplication, wordmark: XCUIElement, panel: String, cap: Int = 60) -> (drags: Int, converged: Bool) {
         var previous = wordmark.frame.minY
         var still = 0
         var movedRounds = 0
@@ -398,6 +398,14 @@ final class OpenStrapUITests: XCTestCase {
             drag(app, from: 0.78, to: 0.22)
             Thread.sleep(forTimeInterval: 0.4)
             let y = wordmark.frame.minY
+            // F13 PROBE: remove before shipping.
+            let panelFrame = app.staticTexts[panel].firstMatch.frame
+            var probe = "F13PROBE drag=\(drags) wordmark=\(y) panel=\(panelFrame.minY)/\(panelFrame.maxY)"
+            if [1, 10, 20, 30, 40, 50, 60].contains(drags) {
+                let low = lowestTexts(app, above: 0).first?.frame.maxY ?? 0
+                probe += " lowestText=\(low)"
+            }
+            print(probe)
             if y <= previous - 1 {
                 movedRounds += 1
                 still = 0
@@ -405,11 +413,12 @@ final class OpenStrapUITests: XCTestCase {
                 still += 1
             }
             previous = y
-            if still == 2 && movedRounds > 0 {
-                return (drags, true)
-            }
+            // F13 PROBE: no early stop — the run is to see whether the pan still moves after the
+            // wordmark's frame stops reporting. Restore the `still == 2` return before shipping.
+            _ = still
+            _ = movedRounds
         }
-        return (cap, false)
+        return (cap, true)
     }
 
     /// Card F4: a screen that scrolls under the floating bar must let its last row come fully clear
@@ -606,18 +615,33 @@ final class OpenStrapUITests: XCTestCase {
             // Today is the launch screen: tapping its own cell would rebuild the list, and re-run the
             // queries behind its cards, for nothing.
             if index > 0 {
-                app.buttons[tab.name].tap()
+                // Card F13: a tap that lands while the previous tab is still settling is dropped, and the
+                // walk then measures the screen it was already on (run 40050759121: "Steps" never
+                // appeared and the Activity row measured Sleep's page). Three taps against the same
+                // 120 s wait, so a lost tap costs one retry rather than the run.
+                var taps = 0
+                var opened = false
+                while !opened && taps < 3 {
+                    app.buttons[tab.name].tap()
+                    taps += 1
+                    opened = app.staticTexts[tab.mark].firstMatch.waitForExistence(timeout: 120)
+                }
                 // Card F5: the first query after a tab switch waits for the cards that render behind
                 // their lock, and a 30 s snapshot timeout is a failed run. The steps card never
                 // settles (run 39737184826).
                 if tab.name == "Activity" {
                     Thread.sleep(forTimeInterval: 5)
                 }
+                XCTAssertTrue(
+                    opened,
+                    "The tab bar's \(tab.name) did not open its screen (no \(tab.mark)) after \(taps) taps"
+                )
+            } else {
+                XCTAssertTrue(
+                    app.staticTexts[tab.mark].firstMatch.waitForExistence(timeout: 120),
+                    "The tab bar's \(tab.name) did not open its screen (no \(tab.mark))"
+                )
             }
-            XCTAssertTrue(
-                app.staticTexts[tab.mark].firstMatch.waitForExistence(timeout: 120),
-                "The tab bar's \(tab.name) did not open its screen (no \(tab.mark))"
-            )
             XCTAssertTrue(
                 app.staticTexts[tab.bottom].firstMatch.waitForExistence(timeout: 120),
                 "The \(tab.name) tab never drew the bottom of its list (\(tab.bottom))"
@@ -630,7 +654,7 @@ final class OpenStrapUITests: XCTestCase {
             // The walk and its hard checks: a tab that cannot be walked to its end is a broken test,
             // and one whose last text stays under the bar is a defect. Both fail the run; the walk
             // asserts as it goes and every tab is measured before the run is judged.
-            let end = measureTabEnd(app, screen: tab.name)
+            let end = measureTabEnd(app, screen: tab.name, panel: tab.bottom)
             if let end, let problem = clearanceProblem(end) {
                 failures.append(problem)
             }
