@@ -1,0 +1,162 @@
+package org.openstrap.app.data
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
+import org.openstrap.shared.clock.ScreenClock
+import org.openstrap.app.data.db.ActivityExtendedMinute
+import org.openstrap.app.data.db.ActivityMinute
+import org.openstrap.app.data.db.DailyAggregate
+import org.openstrap.app.data.db.DailyMaxHr
+import org.openstrap.app.data.db.DailyPai
+import org.openstrap.app.data.db.HealthAlertRow
+import org.openstrap.app.data.db.HrvSdnnSample
+import org.openstrap.app.data.db.OsaEventRow
+import org.openstrap.app.data.db.OsaResultRow
+import org.openstrap.app.data.db.SleepSpo2Sample
+import org.openstrap.app.data.db.BreathRate
+import org.openstrap.app.data.db.CheckInRow
+import org.openstrap.app.data.db.HealthDao
+import org.openstrap.app.data.db.HeartRateSample
+import org.openstrap.app.data.db.HrvSample
+import org.openstrap.app.data.db.PaiSample
+import org.openstrap.app.data.db.RestingHeartRate
+import org.openstrap.app.data.db.SkinTemperature
+import org.openstrap.app.data.db.SleepSession
+import org.openstrap.app.data.db.SleepStage
+import org.openstrap.app.data.db.Spo2Sample
+import org.openstrap.app.data.db.StressSample
+
+/** A [from, to] window in epoch seconds covering one local calendar day. */
+data class DayWindow(val from: Long, val to: Long) {
+    companion object {
+        fun of(date: LocalDate, zone: TimeZone = ScreenClock.zone()): DayWindow {
+            val from = date.atStartOfDayIn(zone).epochSeconds
+            val to = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone).epochSeconds - 1
+            return DayWindow(from, to)
+        }
+
+        /** Sleep that *ended* on [date]: from 18:00 the previous evening until 18:00 on [date]. */
+        fun nightEndingOn(date: LocalDate, zone: TimeZone = ScreenClock.zone()): DayWindow {
+            val to = LocalDateTime(date, LocalTime(18, 0)).toInstant(zone).epochSeconds
+            return DayWindow(to - 24 * 3600, to)
+        }
+    }
+}
+
+class HealthRepository(private val dao: HealthDao) {
+    private val recoveryEngine = RecoveryEngine(dao)
+
+    /**
+     * Readiness and charge for [date]; heavy, so call it off the main thread. Also logs the night's own inputs next to
+     * the strap's ([NightMetricsRow]) for the calibration review.
+     */
+    suspend fun recovery(date: LocalDate, profile: org.openstrap.app.data.settings.UserProfile): RecoveryResult {
+        val r = recoveryEngine.compute(date, profile, ScreenClock.zone(), ScreenClock.nowEpochSeconds())
+        r.tonight?.let { logNight(it) }
+        return r
+    }
+
+    private suspend fun logNight(n: Recovery.Night) {
+        val strap = dao.strapReadinessOnce(n.day, n.day).firstOrNull()
+        dao.insertNightMetrics(listOf(NightMetrics.row(n, strap, ScreenClock.nowEpochSeconds())))
+    }
+
+    /** The morning check-in for [date], 1-5, or null before the user answered. */
+    fun checkIn(date: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<CheckInRow?> = dao.checkIn(DayWindow.of(date, zone).from)
+
+    /** Saves the check-in for [date]; null clears it. */
+    suspend fun saveCheckIn(date: LocalDate, feeling: Int?, zone: TimeZone = ScreenClock.zone()) {
+        val day = DayWindow.of(date, zone).from
+        if (feeling == null) dao.deleteCheckIn(day)
+        else dao.insertCheckIns(listOf(CheckInRow(day, feeling.coerceIn(CheckIn.MIN, CheckIn.MAX), ScreenClock.nowEpochSeconds())))
+    }
+
+
+    /** Emits whenever new heart-rate, stress or sleep data lands, so derived scores can refresh. */
+    fun changes(): Flow<Unit> = kotlinx.coroutines.flow.combine(dao.latestHeartRateTime(), dao.latestStressTime(), dao.latestSleepEnd()) { _, _, _ -> }
+
+    /** Local days that have any heart rate, steps or sleep, for the calendar. */
+    fun daysWithData(zone: TimeZone = ScreenClock.zone()): Flow<Set<LocalDate>> = dao.hoursWithData().map { hours ->
+        hours.mapTo(HashSet()) { Instant.fromEpochSeconds(it * 3600).toLocalDateTime(zone).date }
+    }
+
+    fun heartRate(w: DayWindow): Flow<List<HeartRateSample>> = dao.heartRate(w.from, w.to)
+    fun activity(w: DayWindow): Flow<List<ActivityMinute>> = dao.activity(w.from, w.to)
+    fun sleepSessions(w: DayWindow): Flow<List<SleepSession>> = dao.sleepSessions(w.from, w.to)
+    fun sleepStages(sessionStart: Long): Flow<List<SleepStage>> = dao.sleepStages(sessionStart)
+    fun spo2(w: DayWindow): Flow<List<Spo2Sample>> = dao.spo2(w.from, w.to)
+    fun stress(w: DayWindow): Flow<List<StressSample>> = dao.stress(w.from, w.to)
+    fun hrv(w: DayWindow): Flow<List<HrvSample>> = dao.hrv(w.from, w.to)
+    fun restingHr(from: Long, to: Long): Flow<List<RestingHeartRate>> = dao.restingHr(from, to)
+    fun skinTemperature(w: DayWindow): Flow<List<SkinTemperature>> = dao.skinTemperature(w.from, w.to)
+    fun breathRate(w: DayWindow): Flow<List<BreathRate>> = dao.breathRate(w.from, w.to)
+    fun latestPai(before: Long): Flow<PaiSample?> = dao.latestPai(before)
+
+    fun sleepSpo2(w: DayWindow): Flow<List<SleepSpo2Sample>> = dao.sleepSpo2(w.from, w.to)
+    fun hrvSdnn(w: DayWindow): Flow<List<HrvSdnnSample>> = dao.hrvSdnn(w.from, w.to)
+    fun osaEvents(w: DayWindow): Flow<List<OsaEventRow>> = dao.osaEvents(w.from, w.to)
+    fun activityExtended(w: DayWindow): Flow<List<ActivityExtendedMinute>> = dao.activityExtended(w.from, w.to)
+    fun healthAlerts(w: DayWindow): Flow<List<HealthAlertRow>> = dao.healthAlerts(w.from, w.to)
+    fun dailyMaxHr(w: DayWindow): Flow<DailyMaxHr?> = dao.dailyMaxHr(w.from, w.to).map { it.lastOrNull() }
+
+    /** The strap's sleep-apnea summary for the night ending on [date]: its belongTime + 2 h falls on that date. */
+    fun osaResult(date: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<OsaResultRow?> {
+        val d = DayWindow.of(date, zone)
+        return dao.osaResults(d.from - 2 * 3600, d.to - 2 * 3600).map { it.lastOrNull() }
+    }
+
+    /** One value per local day from [from] to [to], for week, month and year views. Days without data are absent. */
+    fun daily(metric: DailyMetric, from: LocalDate, to: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<List<DayStat>> {
+        val a = DayWindow.of(from, zone).from
+        val b = DayWindow.of(to, zone).to
+        // The strap stores one resting HR per day already, keyed by local midnight.
+        if (metric == DailyMetric.RestingHr) return dao.restingHr(a, b).map { rows ->
+            rows.map { r ->
+                val bpm = r.bpm.toFloat()
+                DayStat(Instant.fromEpochSeconds(r.day).toLocalDateTime(zone).date, bpm, bpm, bpm, 1)
+            }
+        }
+        val rows = when (metric) {
+            DailyMetric.RestingHr -> error("handled above")
+            DailyMetric.HeartRate -> dao.dailyHeartRate(a, b)
+            DailyMetric.Steps -> dao.dailySteps(a, b)
+            DailyMetric.Hrv -> dao.dailyHrv(a, b)
+            DailyMetric.HrvSdnn -> dao.dailyHrvSdnn(a, b)
+            DailyMetric.Spo2 -> dao.dailySpo2(a, b)
+            DailyMetric.SleepSpo2 -> dao.dailySleepSpo2(a, b)
+            DailyMetric.Stress -> dao.dailyStress(a, b)
+            DailyMetric.SkinTemperature -> dao.dailySkinTemperature(a, b)
+            DailyMetric.Breathing -> dao.dailyBreathRate(a, b)
+        }
+        return rows.map { list -> list.mapNotNull(DayStat::of) }
+    }
+
+    /** Each day's PAI (earned that day, and the 7-day total), keyed by local date. */
+    fun dailyPai(from: LocalDate, to: LocalDate, zone: TimeZone = ScreenClock.zone()): Flow<Map<LocalDate, DailyPai>> =
+        dao.dailyPai(DayWindow.of(from, zone).from, DayWindow.of(to, zone).to).map { rows ->
+            rows.mapNotNull { r -> DayStat.parseDay(r.day)?.let { it to r } }.toMap()
+        }
+}
+
+/** Sampled metrics that have a per-day series. */
+enum class DailyMetric { HeartRate, RestingHr, Steps, Hrv, HrvSdnn, Spo2, SleepSpo2, Stress, SkinTemperature, Breathing }
+
+/** One local day of a metric: the average (the total, for steps), lowest and highest sample, and how many samples. */
+data class DayStat(val date: LocalDate, val value: Float, val min: Float, val max: Float, val count: Int) {
+    companion object {
+        fun parseDay(day: String): LocalDate? = runCatching { LocalDate.parse(day) }.getOrNull()
+
+        fun of(row: DailyAggregate): DayStat? =
+            parseDay(row.day)?.let { DayStat(it, row.value.toFloat(), row.min.toFloat(), row.max.toFloat(), row.count) }
+    }
+}

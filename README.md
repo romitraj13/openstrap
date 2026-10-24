@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-# OpenStrap: open-source Amazfit Helio Strap app for Android (Zepp alternative)
+# OpenStrap: open-source Amazfit Helio Strap app for iOS (Zepp alternative)
 
 OpenStrap replaces the Zepp app for the **Amazfit Helio Strap**. It pairs the strap, syncs sleep, heart rate, HRV, SpO₂, stress and workouts, and computes Recovery and Charge scores. Everything stays on your phone. After the first pairing you don't need a cloud account.
 

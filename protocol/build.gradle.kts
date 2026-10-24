@@ -1,24 +1,47 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.kotlin.jvm)
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    // The Kotlin Gradle plugin is already on the build classpath (root build.gradle.kts pins the
+    // version), so the multiplatform plugin must be requested without a version here.
+    kotlin("multiplatform")
 }
 
 kotlin {
     jvmToolchain(21)
-    // Bytecode level matches the Android app module.
-    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+
+    compilerOptions {
+        // `expect object Aes` is the design the card asks for; the flag only silences the Beta warning.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
+    jvm {
+        // Bytecode level matches the Android app module.
+        compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+    }
+    iosArm64()
+    iosSimulatorArm64()
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(libs.coroutines.core)
+            implementation(libs.kotlinx.datetime)
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.coroutines.test)
+        }
+        jvmTest.dependencies {
+            implementation(libs.junit)
+            // Only used to cross-check our B-163 implementation in tests; not shipped.
+            implementation(libs.bouncycastle)
+        }
+    }
 }
 
-dependencies {
-    implementation(libs.coroutines.core)
-    testImplementation(libs.junit)
-    testImplementation(libs.coroutines.test)
-    // Only used to cross-check our B-163 implementation in tests; not shipped.
-    testImplementation(libs.bouncycastle)
+// The upstream Android workflow runs `:protocol:test`, which the JVM plugin used to provide.
+// Multiplatform renamed it to `jvmTest`; this alias keeps that workflow command working.
+tasks.register("test") {
+    group = "verification"
+    description = "Alias for jvmTest so the upstream Android workflow command keeps working"
+    dependsOn("jvmTest")
 }

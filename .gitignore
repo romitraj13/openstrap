@@ -9,3 +9,6 @@ captures/
 *.keystore
 *.jks
 signing.env
+# Card notes stay out of the public repo: a scratchpad may sit in the working tree, but it cannot
+# be staged by accident. The iOS workflow fails if one ever is.
+*SCRATCHPAD*

@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Copy the iOS UI test screenshots from GitHub Actions into docs/ios/screenshots/.
+
+  screens.py [SHA]     default: git HEAD
+
+Finds the newest successful iOS workflow run for the commit, downloads its `screens`
+artifact and writes every `U*-*.png` and `R*-*.png` into docs/ios/screenshots/ as
+`<name>.png` (`U1-designlab-1`, `U2-designlab-3`, `R1-today-header`, …). Standard library
+only.
+
+Environment:
+  OPENSTRAP_REPO   owner/name (default romitraj13/openstrap)
+  TOKEN_FILE       default /opt/data/tools/secrets/github-openstrap.token
+The token is read from the file, sent only to api.github.com, and never printed.
+"""
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+import zipfile
+from pathlib import Path
+
+REPO = os.environ.get("OPENSTRAP_REPO", "romitraj13/openstrap")
+TOKEN_FILE = os.environ.get("TOKEN_FILE", "/opt/data/tools/secrets/github-openstrap.token")
+API = "https://api.github.com"
+ROOT = Path(__file__).resolve().parents[2]
+OUTPUT = ROOT / "docs/ios/screenshots"
+
+# U1-designlab-1, U2-designlab-12, R1-today-header, R1-homescreen ... The trailing parts of an
+# exported attachment name are dropped: xcresulttool writes `U1-designlab-1_0_<uuid>.png`, and card
+# R1's names carry a second word (`R1-today-header`) where the U cards carry a number.
+SHOT = re.compile(r"^((?:U|R)\d+-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)")
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def token():
+    try:
+        with open(TOKEN_FILE) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def api(path):
+    request = urllib.request.Request(
+        API + path,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "openstrap-screens"},
+    )
+    auth = token()
+    if auth:
+        request.add_header("Authorization", "Bearer " + auth)
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read())
+
+
+def download(url):
+    """GET a URL that answers with a redirect to signed storage, without sending the token on."""
+    request = urllib.request.Request(url, headers={"User-Agent": "openstrap-screens"})
+    auth = token()
+    if auth:
+        request.add_header("Authorization", "Bearer " + auth)
+    try:
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=120) as response:
+            return response.read()
+    except urllib.error.HTTPError as error:
+        if error.code not in (301, 302, 303, 307, 308):
+            raise
+        location = error.headers["Location"]
+        with urllib.request.urlopen(
+            urllib.request.Request(location, headers={"User-Agent": "openstrap-screens"}), timeout=180
+        ) as response:
+            return response.read()
+
+
+def head():
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+
+
+def newest_successful_run(sha):
+    runs = api(f"/repos/{REPO}/actions/runs?head_sha={sha}&per_page=50")["workflow_runs"]
+    for run in runs:  # newest first
+        if run.get("name") == "iOS" and run.get("status") == "completed" and run.get("conclusion") == "success":
+            return run
+    return None
+
+
+def screens_artifact(run_id):
+    artifacts = api(f"/repos/{REPO}/actions/runs/{run_id}/artifacts?per_page=100")["artifacts"]
+    for artifact in artifacts:
+        if artifact.get("name") == "screens" and not artifact.get("expired"):
+            return artifact
+    return None
+
+
+def names_from_manifest(payload):
+    """xcresulttool writes a manifest mapping each exported file to its attachment name."""
+    mapping = {}
+
+    def walk(node):
+        if isinstance(node, dict):
+            exported = node.get("exportedFileName")
+            suggested = node.get("suggestedHumanReadableName")
+            if exported and suggested:
+                mapping[exported] = suggested
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(payload)
+    return mapping
+
+
+def main():
+    sha = sys.argv[1] if len(sys.argv) > 1 else head()
+    run = newest_successful_run(sha)
+    if run is None:
+        print(f"no successful iOS run for {sha[:7]} yet")
+        return 1
+    artifact = screens_artifact(run["id"])
+    if artifact is None:
+        print(f"run {run['id']} has no `screens` artifact")
+        return 1
+
+    archive = zipfile.ZipFile(io.BytesIO(download(artifact["archive_download_url"])))
+    names = archive.namelist()
+
+    manifest = {}
+    for name in names:
+        if Path(name).name == "manifest.json":
+            try:
+                manifest = names_from_manifest(json.loads(archive.read(name)))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                manifest = {}
+            break
+
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    written = []
+    for name in names:
+        leaf = Path(name).name
+        if not leaf.lower().endswith(".png"):
+            continue
+        # Both xcresulttool and the SCREENSHOT_DIR fallback name the file after the attachment,
+        # sometimes with `_<index>_<uuid>` appended; the part the card names is the prefix.
+        candidate = manifest.get(leaf) or leaf
+        match = SHOT.match(Path(candidate).stem)
+        if not match:
+            continue
+        target = match.group(1) + ".png"
+        if target in written:
+            continue
+        (OUTPUT / target).write_bytes(archive.read(name))
+        written.append(target)
+
+    for name in sorted(written):
+        print(f"docs/ios/screenshots/{name}")
+    print(f"{len(written)} screenshots from run {run['id']} ({sha[:7]})")
+    return 0 if written else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
